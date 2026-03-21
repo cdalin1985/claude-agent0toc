@@ -23,8 +23,12 @@ serve(async (req) => {
 
     // Validate inputs
     const validDisciplines = ['8 Ball', '9 Ball', '10 Ball'];
-    if (!validDisciplines.includes(discipline)) return new Response(JSON.stringify({ error: 'Invalid discipline.' }), { headers: corsHeaders });
-    if (!Number.isInteger(race_length) || race_length < 5 || race_length > 15) return new Response(JSON.stringify({ error: 'Race length must be 5-15.' }), { headers: corsHeaders });
+    if (!validDisciplines.includes(discipline)) {
+      return new Response(JSON.stringify({ error: 'Invalid discipline.' }), { headers: corsHeaders });
+    }
+    if (!Number.isInteger(race_length) || race_length < 6) {
+      return new Response(JSON.stringify({ error: 'Race length must be at least 6.' }), { headers: corsHeaders });
+    }
 
     // Get challenger player
     const { data: challenger } = await supabase.from('players').select('id, is_active').eq('profile_id', user.id).single();
@@ -36,26 +40,66 @@ serve(async (req) => {
     const { data: challenged } = await supabase.from('players').select('id, is_active').eq('id', challenged_player_id).single();
     if (!challenged || !challenged.is_active) return new Response(JSON.stringify({ error: 'That player is not active.' }), { headers: corsHeaders });
 
-    // Check rank difference
-    const [challengerRank, challengedRank] = await Promise.all([
+    // Get rankings
+    const [challengerRankRes, challengedRankRes] = await Promise.all([
       supabase.from('rankings').select('position').eq('player_id', challenger.id).single(),
       supabase.from('rankings').select('position').eq('player_id', challenged_player_id).single(),
     ]);
-    if (!challengerRank.data || !challengedRank.data) return new Response(JSON.stringify({ error: 'Could not retrieve rankings.' }), { headers: corsHeaders });
-    if (Math.abs(challengerRank.data.position - challengedRank.data.position) > 5) {
-      return new Response(JSON.stringify({ error: 'You can only challenge players within ±5 of your rank.' }), { headers: corsHeaders });
+    if (!challengerRankRes.data || !challengedRankRes.data) {
+      return new Response(JSON.stringify({ error: 'Could not retrieve rankings.' }), { headers: corsHeaders });
+    }
+    const myPos   = challengerRankRes.data.position;
+    const theirPos = challengedRankRes.data.position;
+
+    // Check if this is the challenger's first ever challenge (any status counts)
+    const { count: priorChallenges } = await supabase
+      .from('challenges')
+      .select('id', { count: 'exact', head: true })
+      .eq('challenger_id', challenger.id);
+    const isFirstChallenge = (priorChallenges ?? 0) === 0;
+
+    // Validate challenge range
+    if (myPos === 1) {
+      // #1 can challenge anyone — no range restriction
+    } else if (myPos <= 10) {
+      // Top 10: can challenge ±5 in either direction
+      if (Math.abs(myPos - theirPos) > 5) {
+        return new Response(JSON.stringify({ error: 'Top 10 players can challenge anyone within 5 spots up or down.' }), { headers: corsHeaders });
+      }
+    } else if (isFirstChallenge) {
+      // First challenge ever: up to 10 spots above (lower rank number)
+      if (theirPos >= myPos || (myPos - theirPos) > 10) {
+        return new Response(JSON.stringify({ error: 'Your first challenge must be directed at someone up to 10 spots above you.' }), { headers: corsHeaders });
+      }
+    } else {
+      // Standard: up to 5 spots above only
+      if (theirPos >= myPos || (myPos - theirPos) > 5) {
+        return new Response(JSON.stringify({ error: 'You can only challenge players up to 5 spots above you.' }), { headers: corsHeaders });
+      }
     }
 
-    // Check cooldown
+    // Check weekly challenge limit (2 per rolling 7-day window)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+    const { count: weeklyCount } = await supabase
+      .from('challenges')
+      .select('id', { count: 'exact', head: true })
+      .eq('challenger_id', challenger.id)
+      .gte('created_at', sevenDaysAgo);
+    if ((weeklyCount ?? 0) >= 2) {
+      return new Response(JSON.stringify({ error: 'You have reached your limit of 2 challenges per week.' }), { headers: corsHeaders });
+    }
+
+    // Check post-match cooldown (24h after a win)
     const { data: cooldown } = await supabase
       .from('cooldowns')
       .select('id')
       .eq('player_id', challenger.id)
+      .eq('type', 'post_match')
       .gt('expires_at', new Date().toISOString())
       .single();
-    if (cooldown) return new Response(JSON.stringify({ error: 'You are in a cooldown period.' }), { headers: corsHeaders });
+    if (cooldown) return new Response(JSON.stringify({ error: 'You must wait 24 hours after a match win before challenging again.' }), { headers: corsHeaders });
 
-    // Check no active outgoing challenge
+    // Check no pending outgoing challenge
     const { data: existingOut } = await supabase
       .from('challenges')
       .select('id')
@@ -64,17 +108,17 @@ serve(async (req) => {
       .single();
     if (existingOut) return new Response(JSON.stringify({ error: 'You already have a pending outgoing challenge.' }), { headers: corsHeaders });
 
-    // Check no active incoming challenge on challenged player
+    // Check challenged player doesn't already have a pending challenge (must play first challenger first)
     const { data: existingIn } = await supabase
       .from('challenges')
       .select('id')
       .eq('challenged_id', challenged_player_id)
       .eq('status', 'pending')
       .single();
-    if (existingIn) return new Response(JSON.stringify({ error: 'That player already has a pending challenge.' }), { headers: corsHeaders });
+    if (existingIn) return new Response(JSON.stringify({ error: 'That player already has a pending challenge they must respond to first.' }), { headers: corsHeaders });
 
-    // Create challenge
-    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+    // Create challenge — 48 hour response window
+    const expiresAt = new Date(Date.now() + 48 * 3600 * 1000).toISOString();
     const { data: challenge, error: insertErr } = await supabase.from('challenges').insert({
       challenger_id: challenger.id,
       challenged_id: challenged_player_id,
@@ -85,17 +129,33 @@ serve(async (req) => {
     }).select().single();
     if (insertErr) throw insertErr;
 
-    // Award +2 points to challenger
-    await supabase.rpc('increment_points', { pid: challenger.id, pts: 2 }).catch(() => {
-      // Fallback if RPC doesn't exist — direct update
-      return supabase.from('player_season_stats')
-        .update({ points: supabase.rpc('player_season_stats_points_increment', { pid: challenger.id }) })
+    // Update challenge stats
+    const { data: challengerStats } = await supabase.from('player_season_stats').select('challenges_issued').eq('player_id', challenger.id).single();
+    if (challengerStats) {
+      await supabase.from('player_season_stats')
+        .update({ challenges_issued: challengerStats.challenges_issued + 1 })
         .eq('player_id', challenger.id);
-    });
-    // Simple direct increment
-    const { data: stats } = await supabase.from('player_season_stats').select('points').eq('player_id', challenger.id).single();
-    if (stats) {
-      await supabase.from('player_season_stats').update({ points: stats.points + 2 }).eq('player_id', challenger.id);
+    }
+    const { data: challengedStats } = await supabase.from('player_season_stats').select('challenges_received').eq('player_id', challenged_player_id).single();
+    if (challengedStats) {
+      await supabase.from('player_season_stats')
+        .update({ challenges_received: challengedStats.challenges_received + 1 })
+        .eq('player_id', challenged_player_id);
+    }
+    // Discipline stats
+    await supabase.from('player_discipline_stats')
+      .upsert({ player_id: challenger.id, discipline }, { onConflict: 'player_id,discipline', ignoreDuplicates: false });
+    const { data: dStatsC } = await supabase.from('player_discipline_stats').select('challenges_issued').eq('player_id', challenger.id).eq('discipline', discipline).single();
+    if (dStatsC) {
+      await supabase.from('player_discipline_stats')
+        .update({ challenges_issued: dStatsC.challenges_issued + 1 })
+        .eq('player_id', challenger.id).eq('discipline', discipline);
+    }
+    const { data: dStatsD } = await supabase.from('player_discipline_stats').select('challenges_received').eq('player_id', challenged_player_id).eq('discipline', discipline).single();
+    if (dStatsD) {
+      await supabase.from('player_discipline_stats')
+        .update({ challenges_received: dStatsD.challenges_received + 1 })
+        .eq('player_id', challenged_player_id).eq('discipline', discipline);
     }
 
     // Notify challenged player
@@ -104,7 +164,7 @@ serve(async (req) => {
       player_id: challenged_player_id,
       type: 'challenge_received',
       title: `⚔️ ${challengerPlayer?.full_name} challenged you!`,
-      body: `${discipline} · Race to ${race_length}. You have 14 days to respond.`,
+      body: `${discipline} · Race to ${race_length}. You have 48 hours to respond.`,
       reference_id: challenge.id,
       reference_type: 'challenge',
     });

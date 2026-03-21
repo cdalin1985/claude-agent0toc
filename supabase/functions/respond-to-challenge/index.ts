@@ -27,9 +27,16 @@ serve(async (req) => {
       if (challenge.status !== 'pending') return new Response(JSON.stringify({ error: 'Challenge is not pending.' }), { headers: cors });
       if (!venue || !scheduled_at) return new Response(JSON.stringify({ error: 'venue and scheduled_at required.' }), { headers: cors });
 
-      await supabase.from('challenges').update({ status: 'scheduled', venue, scheduled_at }).eq('id', challenge_id);
+      // Match must be played within 10 days of acceptance
+      const matchDeadline = new Date(Date.now() + 10 * 24 * 3600 * 1000).toISOString();
 
-      // Create match row
+      await supabase.from('challenges').update({
+        status: 'scheduled',
+        venue,
+        scheduled_at,
+        match_deadline: matchDeadline,
+      }).eq('id', challenge_id);
+
       const { data: match } = await supabase.from('matches').insert({
         challenge_id,
         player1_id: challenge.challenger_id,
@@ -41,7 +48,6 @@ serve(async (req) => {
         status: 'scheduled',
       }).select().single();
 
-      // Notify challenger
       const { data: challengedPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenged_id).single();
       await supabase.from('notifications').insert({
         player_id: challenge.challenger_id,
@@ -52,7 +58,6 @@ serve(async (req) => {
         reference_type: 'match',
       });
 
-      // Activity feed
       const { data: challengerPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenger_id).single();
       await supabase.from('activity_feed').insert({
         event_type: 'challenge_accepted',
@@ -67,25 +72,64 @@ serve(async (req) => {
 
       await supabase.from('challenges').update({ status: 'declined' }).eq('id', challenge_id);
 
-      // 24h cooldown on decliner
-      await supabase.from('cooldowns').insert({
-        player_id: callerPlayer.id,
-        type: 'post_decline',
-        expires_at: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
-      });
+      // No cooldown on the decliner — admin will confirm the spot move
+      // Notify admin players of the decline so they can confirm the forfeit
+      const { data: admins } = await supabase
+        .from('profiles')
+        .select('id')
+        .in('role', ['admin', 'super_admin']);
 
-      // Notify challenger
+      const { data: challengerPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenger_id).single();
       const { data: challengedPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenged_id).single();
+
+      if (admins && admins.length > 0) {
+        // Find admin player records for notification
+        const { data: adminPlayers } = await supabase
+          .from('players')
+          .select('id')
+          .in('profile_id', admins.map((a: { id: string }) => a.id));
+
+        if (adminPlayers && adminPlayers.length > 0) {
+          await supabase.from('notifications').insert(
+            adminPlayers.map((ap: { id: string }) => ({
+              player_id: ap.id,
+              type: 'challenge_declined_admin',
+              title: `⚠️ Challenge declined — action needed`,
+              body: `${challengedPlayer?.full_name} declined ${challengerPlayer?.full_name}'s challenge. Confirm if ${challengerPlayer?.full_name} should take the spot.`,
+              reference_id: challenge_id,
+              reference_type: 'challenge',
+            }))
+          );
+        }
+      }
+
+      // Notify challenger of the decline
       await supabase.from('notifications').insert({
         player_id: challenge.challenger_id,
         type: 'challenge_declined',
         title: `❌ Challenge declined`,
-        body: `${challengedPlayer?.full_name} declined your ${challenge.discipline} challenge.`,
+        body: `${challengedPlayer?.full_name} declined your ${challenge.discipline} challenge. An admin will confirm your spot move.`,
         reference_id: challenge_id,
         reference_type: 'challenge',
       });
 
+    } else if (action === 'wash') {
+      // Either player can declare a scheduling wash — treated as if the challenge never happened
+      const isChallenger = challenge.challenger_id === callerPlayer.id;
+      const isChallenged  = challenge.challenged_id === callerPlayer.id;
+      if (!isChallenger && !isChallenged) return new Response(JSON.stringify({ error: 'Not authorized.' }), { headers: cors });
+      if (!['pending', 'accepted', 'scheduled'].includes(challenge.status)) {
+        return new Response(JSON.stringify({ error: 'Challenge cannot be washed at this stage.' }), { headers: cors });
+      }
+
+      // Cancel with no penalties — no cooldowns, no rank changes
+      await supabase.from('challenges').update({ status: 'cancelled' }).eq('id', challenge_id);
+
+      // Also cancel the associated match if one was created
+      await supabase.from('matches').update({ status: 'resolved' }).eq('challenge_id', challenge_id);
+
     } else if (action === 'cancel') {
+      // Challenger cancels their own pending challenge
       if (challenge.challenger_id !== callerPlayer.id) return new Response(JSON.stringify({ error: 'Not authorized.' }), { headers: cors });
       if (challenge.status !== 'pending') return new Response(JSON.stringify({ error: 'Can only cancel pending challenges.' }), { headers: cors });
       await supabase.from('challenges').update({ status: 'cancelled' }).eq('id', challenge_id);

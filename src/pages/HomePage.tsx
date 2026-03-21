@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Swords, Trophy, TrendingUp, Zap } from 'lucide-react';
+import { Swords, Trophy, TrendingUp, AlertTriangle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { useRankings } from '../hooks/useRankings';
@@ -21,7 +21,6 @@ export default function HomePage() {
 
   const myRanking = rankings.find((r) => r.player.id === player?.id);
 
-  // Recent notifications
   const { data: notifications = [] } = useQuery<Notification[]>({
     queryKey: ['notifications', 'preview', player?.id],
     queryFn: async () => {
@@ -38,7 +37,6 @@ export default function HomePage() {
     enabled: !!player,
   });
 
-  // Activity feed
   const { data: feed = [] } = useQuery<ActivityFeedItem[]>({
     queryKey: ['activity-feed', 'preview'],
     queryFn: async () => {
@@ -51,22 +49,56 @@ export default function HomePage() {
     },
   });
 
-  // Points leaderboard
-  const { data: leaderboard = [] } = useQuery({
-    queryKey: ['points-leaderboard'],
+  // #1 compliance info (only relevant if player is ranked #1)
+  const isRank1 = myRanking?.ranking.position === 1;
+  const { data: rank1Compliance } = useQuery({
+    queryKey: ['rank1-compliance', player?.id],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('player_season_stats')
-        .select('*, players(full_name)')
-        .order('points', { ascending: false })
-        .limit(10);
-      return data ?? [];
+      if (!player || !isRank1) return null;
+      // Get rank1_since and count top-5 matches
+      const { data: rankRow } = await supabase
+        .from('rankings')
+        .select('rank1_since')
+        .eq('player_id', player.id)
+        .single();
+      if (!rankRow?.rank1_since) return null;
+
+      const rank1Since = new Date(rankRow.rank1_since);
+      const daysSince = (Date.now() - rank1Since.getTime()) / (1000 * 3600 * 24);
+
+      const { data: top5 } = await supabase
+        .from('rankings')
+        .select('player_id')
+        .gte('position', 2)
+        .lte('position', 5);
+      const top5Ids = (top5 ?? []).map((r: { player_id: string }) => r.player_id);
+
+      let matchCount = 0;
+      if (top5Ids.length > 0) {
+        const { count } = await supabase
+          .from('matches')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'confirmed')
+          .gte('completed_at', rankRow.rank1_since)
+          .or(
+            `and(player1_id.eq.${player.id},player2_id.in.(${top5Ids.join(',')})),` +
+            `and(player2_id.eq.${player.id},player1_id.in.(${top5Ids.join(',')}))`
+          );
+        matchCount = count ?? 0;
+      }
+
+      return {
+        daysElapsed: Math.floor(daysSince),
+        daysRemaining: Math.max(0, Math.floor(30 - daysSince)),
+        matchCount,
+        compliant: matchCount >= 2,
+      };
     },
+    enabled: !!player && isRank1,
+    refetchInterval: 60000,
   });
 
   const myStats = myRanking?.stats;
-  const myPoints = myStats?.points ?? 0;
-  const myPointsRank = leaderboard.findIndex((l) => l.player_id === player?.id) + 1;
 
   if (!player || !myRanking) {
     return (
@@ -78,12 +110,36 @@ export default function HomePage() {
     );
   }
 
+  const winPct = myStats && myStats.matches_played > 0
+    ? Math.round((myStats.wins / myStats.matches_played) * 100)
+    : 0;
+
   return (
     <div className="min-h-screen px-4 pt-8 pb-4 space-y-5">
+      {/* #1 compliance banner */}
+      {isRank1 && rank1Compliance && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+          <GlassCard className={`p-4 border ${rank1Compliance.compliant ? 'border-[#22C55E]/30' : rank1Compliance.daysRemaining <= 5 ? 'border-[#EF4444]/40' : 'border-[#F59E0B]/30'}`}>
+            <div className="flex items-start gap-3">
+              <AlertTriangle size={18} className={rank1Compliance.compliant ? 'text-[#22C55E]' : rank1Compliance.daysRemaining <= 5 ? 'text-[#EF4444]' : 'text-[#F59E0B]'} />
+              <div className="flex-1">
+                <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">
+                  {rank1Compliance.compliant ? '✅ #1 Obligation Met' : `#1 Obligation — ${rank1Compliance.matchCount}/2 top-5 matches`}
+                </div>
+                <div className="text-[#9CA3AF] text-xs font-[Outfit] mt-0.5">
+                  {rank1Compliance.compliant
+                    ? `Window resets in ${rank1Compliance.daysRemaining} days`
+                    : `${rank1Compliance.daysRemaining} days left to play a top-5 opponent or you drop to #10`}
+                </div>
+              </div>
+            </div>
+          </GlassCard>
+        </motion.div>
+      )}
+
       {/* Player card */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
         <GlassCard className="p-5 relative overflow-hidden">
-          {/* Subtle top-right glow */}
           <div className="absolute top-0 right-0 w-32 h-32 bg-[#C62828]/5 rounded-full blur-2xl pointer-events-none" />
           <div className="flex items-center gap-4">
             <PoolBall position={myRanking.ranking.position} size={64} />
@@ -92,10 +148,7 @@ export default function HomePage() {
                 {profile?.display_name ?? player.full_name}
               </div>
               <div className="flex items-center gap-3 mt-1">
-                <span
-                  className="font-[JetBrains_Mono] font-bold text-2xl"
-                  style={{ color: '#C62828' }}
-                >
+                <span className="font-[JetBrains_Mono] font-bold text-2xl" style={{ color: '#C62828' }}>
                   #{myRanking.ranking.position}
                 </span>
                 {myRanking.metrics?.fargo_rating && (
@@ -103,17 +156,19 @@ export default function HomePage() {
                     FR {myRanking.metrics.fargo_rating}
                   </span>
                 )}
+                {myStats?.best_rank_achieved && myStats.best_rank_achieved < myRanking.ranking.position && (
+                  <Badge variant="default">Best #{myStats.best_rank_achieved}</Badge>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Stats row */}
           <div className="grid grid-cols-4 gap-2 mt-5 pt-4 border-t border-white/5">
             {[
-              { label: 'Wins',   value: myStats?.wins ?? 0,    color: '#22C55E' },
-              { label: 'Losses', value: myStats?.losses ?? 0,  color: '#EF4444' },
-              { label: 'Pts',    value: myPoints,              color: '#D4AF37' },
-              { label: 'Streak', value: myStats?.current_streak ?? 0, color: myStats?.current_streak && myStats.current_streak > 0 ? '#22C55E' : '#9CA3AF' },
+              { label: 'Wins',   value: myStats?.wins ?? 0,           color: '#22C55E' },
+              { label: 'Losses', value: myStats?.losses ?? 0,         color: '#EF4444' },
+              { label: 'Win %',  value: `${winPct}%`,                 color: '#E8E2D6' },
+              { label: 'Streak', value: myStats?.current_streak ?? 0, color: (myStats?.current_streak ?? 0) > 0 ? '#22C55E' : '#9CA3AF' },
             ].map((s) => (
               <div key={s.label} className="text-center">
                 <div className="font-[JetBrains_Mono] font-bold text-xl" style={{ color: s.color }}>
@@ -165,38 +220,8 @@ export default function HomePage() {
         </motion.div>
       )}
 
-      {/* Points widget */}
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.4 }}>
-        <GlassCard className="p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Zap size={18} className="text-[#D4AF37]" />
-            <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6]">Season Points</h2>
-          </div>
-          <div className="flex items-end justify-between">
-            <div>
-              <div className="font-[JetBrains_Mono] font-bold text-4xl text-[#D4AF37]">{myPoints}</div>
-              <div className="text-[#9CA3AF] text-xs font-[Outfit] mt-1">
-                {myPointsRank > 0 ? `#${myPointsRank} on leaderboard` : 'Not ranked yet'}
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-[#9CA3AF] text-xs font-[Outfit] mb-2">Top scorers</div>
-              {leaderboard.slice(0, 3).map((l, i) => (
-                <div key={l.player_id} className="flex items-center gap-2 justify-end">
-                  <span className="text-[#6B7280] text-xs font-[JetBrains_Mono]">#{i + 1}</span>
-                  <span className="text-[#E8E2D6] text-xs font-[Outfit] truncate max-w-[100px]">
-                    {(l as { players?: { full_name: string } }).players?.full_name?.split(' ')[0] ?? ''}
-                  </span>
-                  <span className="text-[#D4AF37] text-xs font-[JetBrains_Mono] font-bold">{l.points}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </GlassCard>
-      </motion.div>
-
       {/* Activity feed */}
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25, duration: 0.4 }}>
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.4 }}>
         <GlassCard className="p-4">
           <div className="flex items-center gap-2 mb-3">
             <TrendingUp size={18} className="text-[#9CA3AF]" />
@@ -211,10 +236,11 @@ export default function HomePage() {
               {feed.map((item) => (
                 <div key={item.id} className="flex gap-2 items-start py-1.5 border-b border-white/5 last:border-0">
                   <div className="text-lg shrink-0">
-                    {item.event_type === 'challenge_issued' ? '⚔️'
+                    {item.event_type === 'challenge_issued'  ? '⚔️'
                       : item.event_type === 'challenge_accepted' ? '✅'
-                      : item.event_type === 'match_confirmed' ? '🏆'
-                      : item.event_type === 'rank_change' ? '📈'
+                      : item.event_type === 'match_confirmed'   ? '🏆'
+                      : item.event_type === 'rank_change'       ? '📈'
+                      : item.event_type === 'rank1_penalty'     ? '📉'
                       : '🎱'}
                   </div>
                   <div className="flex-1 min-w-0">

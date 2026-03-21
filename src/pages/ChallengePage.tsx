@@ -1,23 +1,39 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, CheckCircle, Swords } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle, Swords, Minus, Plus } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { useRankings } from '../hooks/useRankings';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '../lib/supabase';
 import { PoolBall } from '../components/PoolBall';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
-import { supabase } from '../lib/supabase';
 
 type Discipline = '8 Ball' | '9 Ball' | '10 Ball';
 
 const DISCIPLINES: { value: Discipline; emoji: string; desc: string }[] = [
-  { value: '8 Ball', emoji: '🎱', desc: 'Classic — pocket the 8 ball last' },
-  { value: '9 Ball', emoji: '🔵', desc: 'Fast-paced — lowest ball first' },
-  { value: '10 Ball', emoji: '🟡', desc: 'Strategic — call-shot 10 ball' },
+  { value: '8 Ball', emoji: '🎱', desc: 'Classic — BCA rules, pocket the 8 last' },
+  { value: '9 Ball', emoji: '🔵', desc: 'Fast-paced — modified BCA, call the 9' },
+  { value: '10 Ball', emoji: '🟡', desc: 'Strategic — call shot, 10 in the middle' },
 ];
 
-const RACE_OPTIONS = [5, 7, 9, 11, 13, 15];
+function useWeeklyCount(playerId: string | undefined) {
+  return useQuery({
+    queryKey: ['weekly-challenges', playerId],
+    queryFn: async () => {
+      if (!playerId) return 0;
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+      const { count } = await supabase
+        .from('challenges')
+        .select('id', { count: 'exact', head: true })
+        .eq('challenger_id', playerId)
+        .gte('created_at', sevenDaysAgo);
+      return count ?? 0;
+    },
+    enabled: !!playerId,
+  });
+}
 
 export default function ChallengePage() {
   const { id } = useParams<{ id: string }>();
@@ -25,34 +41,43 @@ export default function ChallengePage() {
   const { player } = useAuthStore();
   const { data: rankings = [] } = useRankings();
 
-  const target = rankings.find((r) => r.player.id === id);
+  const target   = rankings.find((r) => r.player.id === id);
+  const myRanking = rankings.find((r) => r.player.id === player?.id);
+  const { data: weeklyCount = 0 } = useWeeklyCount(player?.id);
 
   const [step, setStep]             = useState(1);
   const [discipline, setDiscipline] = useState<Discipline | null>(null);
   const [race, setRace]             = useState(7);
-  const [feeChecked, setFeeChecked] = useState(false);
+  const [raceInput, setRaceInput]   = useState('7');
+  const [raceError, setRaceError]   = useState('');
   const [sending, setSending]       = useState(false);
   const [sent, setSent]             = useState(false);
   const [error, setError]           = useState('');
 
   if (!target) return null;
 
+  const handleRaceChange = (val: string) => {
+    setRaceInput(val);
+    const n = parseInt(val, 10);
+    if (!val || isNaN(n)) {
+      setRaceError('Enter a race length.');
+    } else if (n < 6) {
+      setRaceError('Minimum race length is 6.');
+    } else {
+      setRaceError('');
+      setRace(n);
+    }
+  };
+
   const handleSend = async () => {
-    if (!discipline) return;
+    if (!discipline || raceError || race < 6) return;
     setSending(true);
     setError('');
     const { data: { session } } = await supabase.auth.getSession();
     const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-challenge`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session?.access_token}`,
-      },
-      body: JSON.stringify({
-        challenged_player_id: id,
-        discipline,
-        race_length: race,
-      }),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ challenged_player_id: id, discipline, race_length: race }),
     });
     const json = await res.json() as { challenge_id?: string; error?: string };
     setSending(false);
@@ -78,7 +103,7 @@ export default function ChallengePage() {
           </motion.div>
           <h1 className="font-[Bebas_Neue] text-5xl text-[#E8E2D6] mb-2">Challenge Sent!</h1>
           <p className="text-[#9CA3AF] font-[Outfit] mb-8">
-            {target.player.full_name} has been challenged to {discipline}!
+            {target.player.full_name} has 48 hours to respond.
           </p>
           <PoolBall position={target.ranking.position} size={80} className="mx-auto mb-8" />
           <Button variant="secondary" onClick={() => navigate('/challenges')}>
@@ -88,6 +113,8 @@ export default function ChallengePage() {
       </div>
     );
   }
+
+  const weeklyRemaining = Math.max(0, 2 - weeklyCount);
 
   return (
     <div className="min-h-screen px-4 pt-4 pb-8">
@@ -102,6 +129,13 @@ export default function ChallengePage() {
             {step === 1 ? 'Choose Discipline' : step === 2 ? 'Set Race Length' : 'Confirm & Send'}
           </h1>
         </div>
+        {/* Weekly counter */}
+        <div className="ml-auto text-right">
+          <div className={`text-xs font-[JetBrains_Mono] font-bold ${weeklyRemaining === 0 ? 'text-[#EF4444]' : weeklyRemaining === 1 ? 'text-[#F59E0B]' : 'text-[#22C55E]'}`}>
+            {weeklyRemaining}/2
+          </div>
+          <div className="text-[#6B7280] text-xs font-[Outfit]">this week</div>
+        </div>
       </div>
 
       {/* Opponent preview */}
@@ -111,29 +145,20 @@ export default function ChallengePage() {
           <div className="font-[Outfit] font-semibold text-[#E8E2D6]">{target.player.full_name}</div>
           <div className="text-[#9CA3AF] text-xs font-[JetBrains_Mono]">Rank #{target.ranking.position}</div>
         </div>
-        <div className="ml-auto text-2xl">VS</div>
-        {player && (() => {
-          const myR = rankings.find((r) => r.player.id === player.id);
-          return myR ? <PoolBall position={myR.ranking.position} size={44} /> : null;
-        })()}
+        <div className="ml-auto text-2xl font-[Bebas_Neue] text-[#6B7280]">VS</div>
+        {myRanking && <PoolBall position={myRanking.ranking.position} size={44} />}
       </GlassCard>
 
       {/* Progress dots */}
       <div className="flex justify-center gap-2 mb-6">
-        {[1,2,3].map((s) => (
+        {[1, 2, 3].map((s) => (
           <div key={s} className={`h-1.5 rounded-full transition-all duration-300 ${s === step ? 'w-6 bg-[#C62828]' : s < step ? 'w-3 bg-[#C62828]/50' : 'w-3 bg-[#333]'}`} />
         ))}
       </div>
 
       <AnimatePresence mode="wait">
         {step === 1 && (
-          <motion.div
-            key="step1"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            className="space-y-3"
-          >
+          <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-3">
             {DISCIPLINES.map((d) => (
               <GlassCard
                 key={d.value}
@@ -159,59 +184,55 @@ export default function ChallengePage() {
         )}
 
         {step === 2 && (
-          <motion.div
-            key="step2"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            className="space-y-6"
-          >
+          <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
             <GlassCard className="p-6 text-center">
-              <div className="text-[#9CA3AF] font-[Outfit] text-sm mb-2">Race Length</div>
-              <div className="font-[JetBrains_Mono] font-bold text-6xl text-[#E8E2D6]">{race}</div>
-              <div className="text-[#C62828] font-[Outfit] text-sm mt-1">First to {race} wins</div>
+              <div className="text-[#9CA3AF] font-[Outfit] text-sm mb-4">Race Length</div>
+              <div className="flex items-center justify-center gap-5">
+                <button
+                  onClick={() => { const n = Math.max(6, race - 1); setRace(n); setRaceInput(String(n)); setRaceError(''); }}
+                  className="w-12 h-12 rounded-full bg-[#252525] border border-[#333] flex items-center justify-center active:scale-95 transition-transform"
+                >
+                  <Minus size={20} className="text-[#9CA3AF]" />
+                </button>
+                <div className="w-28 text-center">
+                  <input
+                    type="number"
+                    value={raceInput}
+                    onChange={(e) => handleRaceChange(e.target.value)}
+                    min={6}
+                    className="w-full text-center bg-transparent font-[JetBrains_Mono] font-bold text-6xl text-[#E8E2D6] focus:outline-none"
+                  />
+                </div>
+                <button
+                  onClick={() => { const n = race + 1; setRace(n); setRaceInput(String(n)); setRaceError(''); }}
+                  className="w-12 h-12 rounded-full bg-[#252525] border border-[#333] flex items-center justify-center active:scale-95 transition-transform"
+                >
+                  <Plus size={20} className="text-[#9CA3AF]" />
+                </button>
+              </div>
+              <div className={`text-sm mt-2 font-[Outfit] ${raceError ? 'text-[#EF4444]' : 'text-[#C62828]'}`}>
+                {raceError || `First to ${race} wins`}
+              </div>
+              <div className="text-[#6B7280] text-xs font-[Outfit] mt-1">Minimum race to 6 · No maximum</div>
             </GlassCard>
 
-            <div className="grid grid-cols-3 gap-3">
-              {RACE_OPTIONS.map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setRace(r)}
-                  className={[
-                    'py-4 rounded-xl font-[JetBrains_Mono] font-bold text-2xl transition-all duration-200',
-                    race === r
-                      ? 'bg-[#C62828] text-white shadow-[0_0_16px_rgba(198,40,40,0.4)]'
-                      : 'bg-[#1A1A1A] border border-[#333] text-[#9CA3AF]',
-                  ].join(' ')}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-
-            <Button variant="primary" fullWidth size="lg" onClick={() => setStep(3)}>
+            <Button variant="primary" fullWidth size="lg" disabled={!!raceError || race < 6} onClick={() => setStep(3)}>
               Next <ChevronRight size={18} />
             </Button>
           </motion.div>
         )}
 
         {step === 3 && (
-          <motion.div
-            key="step3"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            className="space-y-4"
-          >
-            {/* Summary */}
+          <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
             <GlassCard className="p-5 space-y-4">
               <h3 className="font-[Bebas_Neue] text-xl text-[#E8E2D6]">Challenge Summary</h3>
               <div className="space-y-3">
                 {[
-                  { label: 'Opponent', value: target.player.full_name },
+                  { label: 'Opponent',   value: target.player.full_name },
                   { label: 'Their Rank', value: `#${target.ranking.position}` },
                   { label: 'Discipline', value: discipline ?? '' },
-                  { label: 'Race', value: `First to ${race}` },
+                  { label: 'Race',       value: `First to ${race}` },
+                  { label: 'Expires',    value: '48 hours' },
                 ].map((row) => (
                   <div key={row.label} className="flex justify-between items-center">
                     <span className="text-[#9CA3AF] text-sm font-[Outfit]">{row.label}</span>
@@ -221,24 +242,18 @@ export default function ChallengePage() {
               </div>
             </GlassCard>
 
-            {/* Fee notice */}
+            {/* Match fee reminder */}
             <GlassCard className="p-4">
-              <div className="text-[#F59E0B] text-sm font-[Outfit] leading-relaxed mb-3">
-                💰 <strong>Entry Fee: $5</strong> via Venmo @TopOfTheCapital.
-                Please send before match day.
+              <div className="text-[#F59E0B] text-sm font-[Outfit] leading-relaxed">
+                💰 <strong>Match Fee: $5 per player.</strong> Use the envelope at the venue or pay digitally — you'll select your method when submitting the result.
               </div>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={feeChecked}
-                  onChange={(e) => setFeeChecked(e.target.checked)}
-                  className="w-5 h-5 rounded accent-[#C62828]"
-                />
-                <span className="text-[#E8E2D6] text-sm font-[Outfit]">
-                  I understand the entry fee requirement
-                </span>
-              </label>
             </GlassCard>
+
+            {weeklyRemaining === 0 && (
+              <div className="text-[#EF4444] text-sm font-[Outfit] text-center p-3 bg-[#EF4444]/10 rounded-lg border border-[#EF4444]/20">
+                You have used both challenges this week. This challenge cannot be sent.
+              </div>
+            )}
 
             {error && (
               <div className="text-[#EF4444] text-sm font-[Outfit] text-center p-3 bg-[#EF4444]/10 rounded-lg border border-[#EF4444]/20">
@@ -251,7 +266,7 @@ export default function ChallengePage() {
               fullWidth
               size="lg"
               loading={sending}
-              disabled={!feeChecked}
+              disabled={weeklyRemaining === 0}
               onClick={handleSend}
             >
               <Swords size={18} /> Send Challenge ⚔️

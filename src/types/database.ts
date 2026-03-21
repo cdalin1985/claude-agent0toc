@@ -34,6 +34,7 @@ export interface Database {
           player_id: string;
           position: number;
           previous_position: number | null;
+          rank1_since: string | null;
           updated_at: string;
         };
         Insert: Omit<Database['public']['Tables']['rankings']['Row'], 'id' | 'updated_at'>;
@@ -60,6 +61,7 @@ export interface Database {
           status: 'pending' | 'accepted' | 'scheduled' | 'in_progress' | 'submitted' | 'confirmed' | 'disputed' | 'resolved' | 'declined' | 'expired' | 'forfeited' | 'cancelled';
           venue: 'Eagles 4040' | 'Valley Hub' | null;
           scheduled_at: string | null;
+          match_deadline: string | null;
           expires_at: string;
           response_message: string | null;
           created_at: string;
@@ -86,6 +88,8 @@ export interface Database {
           player2_submitted: boolean;
           player1_confirmed: boolean;
           player2_confirmed: boolean;
+          player1_payment_method: 'envelope' | 'digital' | null;
+          player2_payment_method: 'envelope' | 'digital' | null;
           scheduled_at: string;
           started_at: string | null;
           completed_at: string | null;
@@ -139,14 +143,40 @@ export interface Database {
           player_id: string;
           wins: number;
           losses: number;
-          points: number;
           current_streak: number;
           best_streak: number;
           matches_played: number;
+          challenges_issued: number;
+          challenges_received: number;
+          defender_wins: number;
+          challenger_wins: number;
+          forfeit_wins: number;
+          best_rank_achieved: number | null;
           updated_at: string;
         };
         Insert: Omit<Database['public']['Tables']['player_season_stats']['Row'], 'id' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['player_season_stats']['Insert']>;
+      };
+      player_discipline_stats: {
+        Row: {
+          id: string;
+          player_id: string;
+          discipline: '8 Ball' | '9 Ball' | '10 Ball';
+          matches_played: number;
+          wins: number;
+          losses: number;
+          current_streak: number;
+          best_streak: number;
+          challenger_wins: number;
+          defender_wins: number;
+          challenges_issued: number;
+          challenges_received: number;
+          forfeit_wins: number;
+          total_race_length: number;
+          updated_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['player_discipline_stats']['Row'], 'id' | 'updated_at'>;
+        Update: Partial<Database['public']['Tables']['player_discipline_stats']['Insert']>;
       };
       treasury_ledger: {
         Row: {
@@ -171,6 +201,10 @@ export interface Database {
           challenge_range: number;
           cooldown_hours: number;
           challenge_expiry_days: number;
+          challenge_response_hours: number;
+          match_play_days: number;
+          challenge_weekly_limit: number;
+          first_challenge_range: number;
           updated_at: string;
         };
         Insert: Omit<Database['public']['Tables']['league_settings']['Row'], 'id' | 'updated_at'>;
@@ -207,6 +241,7 @@ export type Notification = Database['public']['Tables']['notifications']['Row'];
 export type ActivityFeedItem = Database['public']['Tables']['activity_feed']['Row'];
 export type Cooldown = Database['public']['Tables']['cooldowns']['Row'];
 export type PlayerSeasonStats = Database['public']['Tables']['player_season_stats']['Row'];
+export type PlayerDisciplineStats = Database['public']['Tables']['player_discipline_stats']['Row'];
 export type TreasuryEntry = Database['public']['Tables']['treasury_ledger']['Row'];
 export type LeagueSettings = Database['public']['Tables']['league_settings']['Row'];
 export type AuditEvent = Database['public']['Tables']['audit_events']['Row'];

@@ -3,8 +3,132 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' };
 
-async function confirmResult(supabase: ReturnType<typeof createClient>, matchId: string, winnerId: string, loserId: string, p1Score: number, p2Score: number) {
-  // Update match status
+async function checkRank1Compliance(supabase: ReturnType<typeof createClient>) {
+  // Get current #1 player
+  const { data: rank1 } = await supabase
+    .from('rankings')
+    .select('player_id, rank1_since')
+    .eq('position', 1)
+    .single();
+  if (!rank1 || !rank1.rank1_since) return;
+
+  const rank1Since = new Date(rank1.rank1_since);
+  const now = new Date();
+  const daysSince = (now.getTime() - rank1Since.getTime()) / (1000 * 3600 * 24);
+
+  // Count confirmed matches vs top-5 players within the 30-day window
+  const { data: top5 } = await supabase
+    .from('rankings')
+    .select('player_id')
+    .gte('position', 2)
+    .lte('position', 5);
+  const top5Ids = (top5 ?? []).map((r: { player_id: string }) => r.player_id);
+
+  const { count: top5Matches } = await supabase
+    .from('matches')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'confirmed')
+    .gte('completed_at', rank1.rank1_since)
+    .or(
+      `and(player1_id.eq.${rank1.player_id},player2_id.in.(${top5Ids.join(',')})),` +
+      `and(player2_id.eq.${rank1.player_id},player1_id.in.(${top5Ids.join(',')}))`
+    );
+
+  const matchCount = top5Matches ?? 0;
+
+  // Send warnings at 20, 25, 28 days if under requirement
+  if (matchCount < 2) {
+    const { data: rank1Player } = await supabase.from('players').select('id, full_name').eq('id', rank1.player_id).single();
+
+    if (daysSince >= 30) {
+      // Penalty: move #1 to #10, cascade #2–#9 up
+      const { data: affectedRanks } = await supabase
+        .from('rankings')
+        .select('id, player_id, position')
+        .gte('position', 2)
+        .lte('position', 10)
+        .order('position');
+
+      if (affectedRanks) {
+        for (const r of affectedRanks) {
+          await supabase.from('rankings').update({
+            previous_position: r.position,
+            position: r.position - 1,
+          }).eq('id', r.id);
+        }
+      }
+
+      // Move #1 to #10, reset rank1_since
+      await supabase.from('rankings').update({
+        previous_position: 1,
+        position: 10,
+        rank1_since: null,
+      }).eq('player_id', rank1.player_id);
+
+      // Notify the penalized player
+      if (rank1Player) {
+        await supabase.from('notifications').insert({
+          player_id: rank1Player.id,
+          type: 'rank1_penalty',
+          title: '📉 Rank 1 obligation not met',
+          body: 'You did not play a top-5 opponent twice in your 30-day window. You have been moved to #10.',
+          reference_type: 'ranking',
+        });
+      }
+
+      await supabase.from('activity_feed').insert({
+        event_type: 'rank1_penalty',
+        headline: `${rank1Player?.full_name} was moved to #10 for failing the #1 top-5 obligation.`,
+        actor_player_id: rank1.player_id,
+      });
+
+    } else if (daysSince >= 28 && matchCount < 2) {
+      if (rank1Player) {
+        await supabase.from('notifications').insert({
+          player_id: rank1Player.id,
+          type: 'rank1_warning',
+          title: '⚠️ #1 Obligation — 2 days left',
+          body: `You have ${matchCount}/2 top-5 matches played. You have ~2 days to play another top-5 opponent or you'll be moved to #10.`,
+          reference_type: 'ranking',
+        });
+      }
+    } else if (daysSince >= 25 && matchCount < 2) {
+      if (rank1Player) {
+        await supabase.from('notifications').insert({
+          player_id: rank1Player.id,
+          type: 'rank1_warning',
+          title: '⚠️ #1 Obligation — 5 days left',
+          body: `You have ${matchCount}/2 top-5 matches played. You have ~5 days remaining in your 30-day window.`,
+          reference_type: 'ranking',
+        });
+      }
+    } else if (daysSince >= 20 && matchCount < 2) {
+      if (rank1Player) {
+        await supabase.from('notifications').insert({
+          player_id: rank1Player.id,
+          type: 'rank1_warning',
+          title: '⚠️ #1 Obligation — 10 days left',
+          body: `You have ${matchCount}/2 top-5 matches played. You have ~10 days remaining in your 30-day window.`,
+          reference_type: 'ranking',
+        });
+      }
+    }
+  } else if (matchCount >= 2) {
+    // Obligation met — reset the 30-day window
+    await supabase.from('rankings').update({ rank1_since: new Date().toISOString() })
+      .eq('player_id', rank1.player_id);
+  }
+}
+
+async function confirmResult(
+  supabase: ReturnType<typeof createClient>,
+  matchId: string,
+  winnerId: string,
+  loserId: string,
+  p1Score: number,
+  p2Score: number,
+  match: { discipline: string; race_length: number; player1_id: string; player2_id: string; challenge_id: string }
+) {
   await supabase.from('matches').update({
     status: 'confirmed',
     winner_id: winnerId,
@@ -14,13 +138,11 @@ async function confirmResult(supabase: ReturnType<typeof createClient>, matchId:
     completed_at: new Date().toISOString(),
   }).eq('id', matchId);
 
-  // Update challenge status
-  const { data: match } = await supabase.from('matches').select('challenge_id').eq('id', matchId).single();
-  if (match) await supabase.from('challenges').update({ status: 'confirmed' }).eq('id', match.challenge_id);
+  await supabase.from('challenges').update({ status: 'confirmed' }).eq('id', match.challenge_id);
 
   // Get current rankings
   const [winnerRank, loserRank] = await Promise.all([
-    supabase.from('rankings').select('position').eq('player_id', winnerId).single(),
+    supabase.from('rankings').select('position, rank1_since').eq('player_id', winnerId).single(),
     supabase.from('rankings').select('position').eq('player_id', loserId).single(),
   ]);
 
@@ -28,9 +150,8 @@ async function confirmResult(supabase: ReturnType<typeof createClient>, matchId:
     const wPos = winnerRank.data.position;
     const lPos = loserRank.data.position;
 
-    // Ranking cascade: only if lower-ranked player (higher position number) wins
     if (wPos > lPos) {
-      // Move everyone between lPos and wPos down by 1
+      // Lower-ranked player beat higher-ranked: cascade everyone between down 1
       const { data: middlePlayers } = await supabase
         .from('rankings')
         .select('id, position')
@@ -40,30 +161,51 @@ async function confirmResult(supabase: ReturnType<typeof createClient>, matchId:
 
       if (middlePlayers) {
         for (const p of middlePlayers) {
-          await supabase.from('rankings').update({ previous_position: p.position, position: p.position + 1 }).eq('id', p.id);
+          await supabase.from('rankings').update({
+            previous_position: p.position,
+            position: p.position + 1,
+          }).eq('id', p.id);
         }
       }
 
       // Move winner to loser's old position
-      await supabase.from('rankings').update({ previous_position: wPos, position: lPos }).eq('player_id', winnerId);
+      const rank1Since = lPos === 1 ? new Date().toISOString() : null;
+      await supabase.from('rankings').update({
+        previous_position: wPos,
+        position: lPos,
+        ...(lPos === 1 ? { rank1_since: rank1Since } : {}),
+      }).eq('player_id', winnerId);
+
+      // If winner is now #1 and didn't have rank1_since, set it
+      if (lPos === 1 && !winnerRank.data.rank1_since) {
+        await supabase.from('rankings').update({ rank1_since: rank1Since }).eq('player_id', winnerId);
+      }
     }
   }
 
-  // Update stats
+  // Update overall season stats
   const [winnerStats, loserStats] = await Promise.all([
     supabase.from('player_season_stats').select('*').eq('player_id', winnerId).single(),
     supabase.from('player_season_stats').select('*').eq('player_id', loserId).single(),
   ]);
 
+  const winnerIsChallenger = match.player1_id === winnerId;
+
   if (winnerStats.data) {
     const s = winnerStats.data;
     const newStreak = s.current_streak >= 0 ? s.current_streak + 1 : 1;
+    const currentRank = winnerRank.data?.position ?? null;
+    const bestRank = currentRank !== null
+      ? (s.best_rank_achieved === null || currentRank < s.best_rank_achieved ? currentRank : s.best_rank_achieved)
+      : s.best_rank_achieved;
     await supabase.from('player_season_stats').update({
       wins: s.wins + 1,
       matches_played: s.matches_played + 1,
-      points: s.points + 3, // +1 played, +2 won
       current_streak: newStreak,
       best_streak: Math.max(s.best_streak, newStreak),
+      challenger_wins: winnerIsChallenger ? s.challenger_wins + 1 : s.challenger_wins,
+      defender_wins: !winnerIsChallenger ? s.defender_wins + 1 : s.defender_wins,
+      best_rank_achieved: bestRank,
     }).eq('player_id', winnerId);
   }
 
@@ -72,18 +214,40 @@ async function confirmResult(supabase: ReturnType<typeof createClient>, matchId:
     await supabase.from('player_season_stats').update({
       losses: s.losses + 1,
       matches_played: s.matches_played + 1,
-      points: s.points + 1, // +1 played
-      current_streak: -1,
+      current_streak: 0,
     }).eq('player_id', loserId);
   }
 
-  // Set 24h cooldowns on both players
-  const now = Date.now();
-  const exp = new Date(now + 24 * 3600 * 1000).toISOString();
-  await supabase.from('cooldowns').insert([
-    { player_id: winnerId, type: 'post_match', expires_at: exp },
-    { player_id: loserId, type: 'post_match', expires_at: exp },
-  ]);
+  // Update per-discipline stats
+  const disc = match.discipline;
+  for (const [pid, isWinner, isChallenger] of [
+    [winnerId, true, winnerIsChallenger],
+    [loserId, false, !winnerIsChallenger],
+  ] as [string, boolean, boolean][]) {
+    const { data: ds } = await supabase.from('player_discipline_stats')
+      .select('*').eq('player_id', pid).eq('discipline', disc).single();
+    if (ds) {
+      const newStreak = isWinner ? (ds.current_streak >= 0 ? ds.current_streak + 1 : 1) : 0;
+      await supabase.from('player_discipline_stats').update({
+        matches_played: ds.matches_played + 1,
+        wins: isWinner ? ds.wins + 1 : ds.wins,
+        losses: isWinner ? ds.losses : ds.losses + 1,
+        current_streak: newStreak,
+        best_streak: isWinner ? Math.max(ds.best_streak, newStreak) : ds.best_streak,
+        challenger_wins: isWinner && isChallenger ? ds.challenger_wins + 1 : ds.challenger_wins,
+        defender_wins: isWinner && !isChallenger ? ds.defender_wins + 1 : ds.defender_wins,
+        total_race_length: ds.total_race_length + match.race_length,
+        updated_at: new Date().toISOString(),
+      }).eq('player_id', pid).eq('discipline', disc);
+    }
+  }
+
+  // 24h post-match cooldown only on the winner (must wait before challenging up)
+  await supabase.from('cooldowns').insert({
+    player_id: winnerId,
+    type: 'post_match',
+    expires_at: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+  });
 
   // Notifications
   const [wp, lp] = await Promise.all([
@@ -92,16 +256,18 @@ async function confirmResult(supabase: ReturnType<typeof createClient>, matchId:
   ]);
 
   await supabase.from('notifications').insert([
-    { player_id: winnerId, type: 'result_confirmed', title: '🏆 Match confirmed — Victory!', body: `Final score: ${p1Score}–${p2Score}`, reference_id: matchId, reference_type: 'match' },
-    { player_id: loserId,  type: 'result_confirmed', title: '📊 Match confirmed',            body: `Final score: ${p1Score}–${p2Score}`, reference_id: matchId, reference_type: 'match' },
+    { player_id: winnerId, type: 'result_confirmed', title: '🏆 Match confirmed — Victory!', body: `Final: ${p1Score}–${p2Score}`, reference_id: matchId, reference_type: 'match' },
+    { player_id: loserId,  type: 'result_confirmed', title: '📊 Match confirmed',             body: `Final: ${p1Score}–${p2Score}`, reference_id: matchId, reference_type: 'match' },
   ]);
 
-  // Activity feed
   await supabase.from('activity_feed').insert({
     event_type: 'match_confirmed',
     headline: `${wp.data?.full_name} defeated ${lp.data?.full_name} (${p1Score}–${p2Score})`,
     actor_player_id: winnerId,
   });
+
+  // Check #1 compliance after every confirmed match
+  await checkRank1Compliance(supabase);
 }
 
 serve(async (req) => {
@@ -111,11 +277,17 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser(req.headers.get('Authorization')?.replace('Bearer ', ''));
     if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: cors });
 
-    const { match_id, winner_id, final_score_player1, final_score_player2 } = await req.json();
+    const { match_id, winner_id, final_score_player1, final_score_player2, payment_method } = await req.json();
+
+    if (payment_method && !['envelope', 'digital'].includes(payment_method)) {
+      return new Response(JSON.stringify({ error: 'Invalid payment method.' }), { headers: cors });
+    }
 
     const { data: match } = await supabase.from('matches').select('*').eq('id', match_id).single();
     if (!match) return new Response(JSON.stringify({ error: 'Match not found.' }), { headers: cors });
-    if (!['in_progress', 'scheduled'].includes(match.status)) return new Response(JSON.stringify({ error: 'Match is not in progress.' }), { headers: cors });
+    if (!['in_progress', 'scheduled'].includes(match.status)) {
+      return new Response(JSON.stringify({ error: 'Match is not in progress.' }), { headers: cors });
+    }
 
     const { data: caller } = await supabase.from('players').select('id').eq('profile_id', user.id).single();
     if (!caller) return new Response(JSON.stringify({ error: 'Player not found.' }), { headers: cors });
@@ -124,29 +296,27 @@ serve(async (req) => {
     const isP2 = match.player2_id === caller.id;
     if (!isP1 && !isP2) return new Response(JSON.stringify({ error: 'Not a participant.' }), { headers: cors });
 
-    // Mark this player's submission
     const submissionUpdates: Record<string, unknown> = {};
-    if (isP1) submissionUpdates.player1_submitted = true;
-    else      submissionUpdates.player2_submitted = true;
-
-    // Also update scores from this player's perspective
+    if (isP1) {
+      submissionUpdates.player1_submitted = true;
+      if (payment_method) submissionUpdates.player1_payment_method = payment_method;
+    } else {
+      submissionUpdates.player2_submitted = true;
+      if (payment_method) submissionUpdates.player2_payment_method = payment_method;
+    }
     submissionUpdates.player1_score = final_score_player1;
     submissionUpdates.player2_score = final_score_player2;
     submissionUpdates.status = 'submitted';
 
     await supabase.from('matches').update(submissionUpdates).eq('id', match_id);
 
-    // Re-fetch to check if both submitted
     const { data: updated } = await supabase.from('matches').select('*').eq('id', match_id).single();
     if (!updated) return new Response(JSON.stringify({ error: 'Update failed.' }), { headers: cors });
 
     if (updated.player1_submitted && updated.player2_submitted) {
-      // Both submitted — check if they match
-      // We trust the most recently submitted scores
       const loser_id = winner_id === match.player1_id ? match.player2_id : match.player1_id;
-      await confirmResult(supabase, match_id, winner_id, loser_id, final_score_player1, final_score_player2);
+      await confirmResult(supabase, match_id, winner_id, loser_id, final_score_player1, final_score_player2, match);
     } else {
-      // Notify other player to submit
       const otherId = isP1 ? match.player2_id : match.player1_id;
       const { data: callerPlayer } = await supabase.from('players').select('full_name').eq('id', caller.id).single();
       await supabase.from('notifications').insert({

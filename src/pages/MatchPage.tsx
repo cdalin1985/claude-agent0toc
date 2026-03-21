@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Plus, Minus, Flag, CheckCircle } from 'lucide-react';
+import { ChevronLeft, Plus, Flag, CheckCircle, Wallet, Mail } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
@@ -13,7 +13,6 @@ import { Badge } from '../components/Badge';
 import { formatDateTime } from '../utils/time';
 import type { Match } from '../types/database';
 
-// Animated score counter
 function ScoreDisplay({ value, color }: { value: number; color: string }) {
   return (
     <motion.div
@@ -29,16 +28,19 @@ function ScoreDisplay({ value, color }: { value: number; color: string }) {
   );
 }
 
+type PaymentMethod = 'envelope' | 'digital';
+
 export default function MatchPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qc       = useQueryClient();
   const { player } = useAuthStore();
   const { data: rankings = [] } = useRankings();
-  const [submitting, setSubmitting]     = useState(false);
-  const [submitModal, setSubmitModal]   = useState(false);
-  const [submitError, setSubmitError]   = useState('');
+  const [submitting, setSubmitting]           = useState(false);
+  const [submitStep, setSubmitStep]           = useState<'winner' | 'payment' | null>(null);
+  const [submitError, setSubmitError]         = useState('');
   const [submittedWinner, setSubmittedWinner] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod]     = useState<PaymentMethod | null>(null);
 
   const { data: match, isLoading } = useQuery<Match>({
     queryKey: ['match', id],
@@ -69,10 +71,10 @@ export default function MatchPage() {
   const p1Pos  = rankings.find((r) => r.player.id === match.player1_id)?.ranking.position ?? 1;
   const p2Pos  = rankings.find((r) => r.player.id === match.player2_id)?.ranking.position ?? 2;
 
-  const myScore       = isPlayer1 ? match.player1_score : match.player2_score;
-  const theirScore    = isPlayer1 ? match.player2_score : match.player1_score;
-  const myId          = isPlayer1 ? match.player1_id : match.player2_id;
-  const theirId       = isPlayer1 ? match.player2_id : match.player1_id;
+  const myScore    = isPlayer1 ? match.player1_score : match.player2_score;
+  const theirScore = isPlayer1 ? match.player2_score : match.player1_score;
+  const myId       = isPlayer1 ? match.player1_id : match.player2_id;
+  const theirId    = isPlayer1 ? match.player2_id : match.player1_id;
 
   const callFn = async (path: string, body: object) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -101,30 +103,25 @@ export default function MatchPage() {
   };
 
   const handleSubmitResult = async () => {
-    if (!submittedWinner) return;
+    if (!submittedWinner || !paymentMethod) return;
     setSubmitting(true);
     setSubmitError('');
-    const p1Score = match.player1_score;
-    const p2Score = match.player2_score;
     const json = await callFn('submit-result', {
       match_id: match.id,
       winner_id: submittedWinner,
-      final_score_player1: p1Score,
-      final_score_player2: p2Score,
+      final_score_player1: match.player1_score,
+      final_score_player2: match.player2_score,
+      payment_method: paymentMethod,
     });
     setSubmitting(false);
     if (json.error) { setSubmitError(json.error); return; }
-    setSubmitModal(false);
+    setSubmitStep(null);
     qc.invalidateQueries({ queryKey: ['match', id] });
     qc.invalidateQueries({ queryKey: ['rankings'] });
   };
 
   const hasSubmitted = (isPlayer1 && match.player1_submitted) || (isPlayer2 && match.player2_submitted);
   const isWinner    = match.winner_id === player?.id;
-  const statusColor = match.status === 'confirmed' ? '#22C55E'
-                    : match.status === 'disputed'  ? '#EF4444'
-                    : match.status === 'in_progress' ? '#F59E0B'
-                    : '#9CA3AF';
 
   return (
     <div className="min-h-screen px-4 pt-4 pb-8">
@@ -132,7 +129,6 @@ export default function MatchPage() {
         <ChevronLeft size={18} /> Back
       </button>
 
-      {/* Match header */}
       <div className="text-center mb-5">
         <Badge variant={match.status === 'confirmed' ? 'win' : match.status === 'disputed' ? 'loss' : 'pending'}>
           {match.status.replace('_', ' ').toUpperCase()}
@@ -148,7 +144,6 @@ export default function MatchPage() {
       {/* Scoreboard */}
       <GlassCard className="p-6 mb-5">
         <div className="flex items-center justify-around">
-          {/* Player 1 */}
           <div className="flex flex-col items-center gap-2">
             <PoolBall position={p1Pos} size={52} />
             <div className="font-[Outfit] font-semibold text-sm text-[#E8E2D6] text-center max-w-[80px] leading-tight">
@@ -160,7 +155,6 @@ export default function MatchPage() {
                    : match.winner_id && match.winner_id !== match.player1_id ? '#EF4444'
                    : '#E8E2D6'}
             />
-            {/* Score button */}
             {match.status === 'in_progress' && amInMatch && !hasSubmitted && (
               <button
                 onClick={() => handleScoreUpdate(match.player1_id)}
@@ -172,10 +166,8 @@ export default function MatchPage() {
             )}
           </div>
 
-          {/* VS */}
           <div className="font-[Bebas_Neue] text-3xl text-[#6B7280]">VS</div>
 
-          {/* Player 2 */}
           <div className="flex flex-col items-center gap-2">
             <PoolBall position={p2Pos} size={52} />
             <div className="font-[Outfit] font-semibold text-sm text-[#E8E2D6] text-center max-w-[80px] leading-tight">
@@ -199,7 +191,6 @@ export default function MatchPage() {
           </div>
         </div>
 
-        {/* Race progress bar */}
         <div className="mt-6">
           <div className="flex justify-between text-xs text-[#6B7280] font-[Outfit] mb-1">
             <span>Race to {match.race_length}</span>
@@ -214,22 +205,14 @@ export default function MatchPage() {
         </div>
       </GlassCard>
 
-      {/* Actions */}
       {amInMatch && (
         <div className="space-y-3">
           {match.status === 'scheduled' && (
             <Button
-              variant="primary"
-              fullWidth
-              size="lg"
-              loading={submitting}
+              variant="primary" fullWidth size="lg" loading={submitting}
               onClick={async () => {
                 setSubmitting(true);
-                await callFn('update-match-score', {
-                  match_id: match.id,
-                  my_score: 0,
-                  opponent_score: 0,
-                });
+                await callFn('update-match-score', { match_id: match.id, my_score: 0, opponent_score: 0 });
                 setSubmitting(false);
                 qc.invalidateQueries({ queryKey: ['match', id] });
               }}
@@ -239,12 +222,7 @@ export default function MatchPage() {
           )}
 
           {match.status === 'in_progress' && !hasSubmitted && (
-            <Button
-              variant="primary"
-              fullWidth
-              size="lg"
-              onClick={() => setSubmitModal(true)}
-            >
+            <Button variant="primary" fullWidth size="lg" onClick={() => { setSubmitStep('winner'); setSubmitError(''); }}>
               <Flag size={18} /> Submit Final Result
             </Button>
           )}
@@ -282,14 +260,14 @@ export default function MatchPage() {
         </div>
       )}
 
-      {/* Submit result modal */}
+      {/* Submit result modal — two steps: winner then payment */}
       <AnimatePresence>
-        {submitModal && (
+        {submitStep && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-end justify-center p-4"
             style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
-            onClick={() => setSubmitModal(false)}
+            onClick={() => setSubmitStep(null)}
           >
             <motion.div
               initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }}
@@ -297,47 +275,103 @@ export default function MatchPage() {
               className="glass-card p-6 w-full max-w-sm"
               onClick={(e) => e.stopPropagation()}
             >
-              <h2 className="font-[Bebas_Neue] text-2xl text-[#E8E2D6] mb-2">Who Won?</h2>
-              <p className="text-[#9CA3AF] text-sm font-[Outfit] mb-5">
-                Final score: {match.player1_score}–{match.player2_score}
-              </p>
-              <div className="space-y-3 mb-5">
-                {[
-                  { id: match.player1_id, name: p1Name, score: match.player1_score, pos: p1Pos },
-                  { id: match.player2_id, name: p2Name, score: match.player2_score, pos: p2Pos },
-                ].map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => setSubmittedWinner(p.id)}
-                    className={[
-                      'w-full flex items-center gap-3 p-4 rounded-xl border transition-all',
-                      submittedWinner === p.id
-                        ? 'border-[#22C55E] bg-[#22C55E]/10'
-                        : 'border-[#333] bg-[#252525]/50',
-                    ].join(' ')}
-                  >
-                    <PoolBall position={p.pos} size={36} />
-                    <div className="flex-1 text-left">
-                      <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">{p.name}</div>
-                      <div className="text-[#9CA3AF] text-xs font-[JetBrains_Mono]">{p.score} games</div>
-                    </div>
-                    {submittedWinner === p.id && <CheckCircle size={20} className="text-[#22C55E]" />}
-                  </button>
-                ))}
-              </div>
-              {submitError && <p className="text-[#EF4444] text-xs font-[Outfit] mb-3">{submitError}</p>}
-              <div className="flex gap-2">
-                <Button variant="ghost" fullWidth onClick={() => setSubmitModal(false)}>Cancel</Button>
-                <Button
-                  variant="primary"
-                  fullWidth
-                  loading={submitting}
-                  disabled={!submittedWinner}
-                  onClick={handleSubmitResult}
-                >
-                  Submit
-                </Button>
-              </div>
+              {submitStep === 'winner' && (
+                <>
+                  <h2 className="font-[Bebas_Neue] text-2xl text-[#E8E2D6] mb-2">Who Won?</h2>
+                  <p className="text-[#9CA3AF] text-sm font-[Outfit] mb-5">
+                    Final score: {match.player1_score}–{match.player2_score}
+                  </p>
+                  <div className="space-y-3 mb-5">
+                    {[
+                      { id: match.player1_id, name: p1Name, score: match.player1_score, pos: p1Pos },
+                      { id: match.player2_id, name: p2Name, score: match.player2_score, pos: p2Pos },
+                    ].map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => setSubmittedWinner(p.id)}
+                        className={[
+                          'w-full flex items-center gap-3 p-4 rounded-xl border transition-all',
+                          submittedWinner === p.id
+                            ? 'border-[#22C55E] bg-[#22C55E]/10'
+                            : 'border-[#333] bg-[#252525]/50',
+                        ].join(' ')}
+                      >
+                        <PoolBall position={p.pos} size={36} />
+                        <div className="flex-1 text-left">
+                          <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">{p.name}</div>
+                          <div className="text-[#9CA3AF] text-xs font-[JetBrains_Mono]">{p.score} games</div>
+                        </div>
+                        {submittedWinner === p.id && <CheckCircle size={20} className="text-[#22C55E]" />}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" fullWidth onClick={() => setSubmitStep(null)}>Cancel</Button>
+                    <Button
+                      variant="primary" fullWidth
+                      disabled={!submittedWinner}
+                      onClick={() => setSubmitStep('payment')}
+                    >
+                      Next →
+                    </Button>
+                  </div>
+                </>
+              )}
+
+              {submitStep === 'payment' && (
+                <>
+                  <h2 className="font-[Bebas_Neue] text-2xl text-[#E8E2D6] mb-2">Match Fee — $5</h2>
+                  <p className="text-[#9CA3AF] text-sm font-[Outfit] mb-5">
+                    How are you paying your $5 match fee?
+                  </p>
+                  <div className="space-y-3 mb-5">
+                    <button
+                      onClick={() => setPaymentMethod('envelope')}
+                      className={[
+                        'w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left',
+                        paymentMethod === 'envelope'
+                          ? 'border-[#C62828] bg-[#C62828]/10'
+                          : 'border-[#333] bg-[#252525]/50',
+                      ].join(' ')}
+                    >
+                      <Mail size={24} className="text-[#9CA3AF] shrink-0" />
+                      <div>
+                        <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">Used the envelope</div>
+                        <div className="text-[#6B7280] text-xs font-[Outfit] mt-0.5">Cash in the drop box at the venue</div>
+                      </div>
+                      {paymentMethod === 'envelope' && <CheckCircle size={20} className="text-[#C62828] ml-auto" />}
+                    </button>
+                    <button
+                      onClick={() => setPaymentMethod('digital')}
+                      className={[
+                        'w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left',
+                        paymentMethod === 'digital'
+                          ? 'border-[#C62828] bg-[#C62828]/10'
+                          : 'border-[#333] bg-[#252525]/50',
+                      ].join(' ')}
+                    >
+                      <Wallet size={24} className="text-[#9CA3AF] shrink-0" />
+                      <div>
+                        <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">Paid digitally</div>
+                        <div className="text-[#6B7280] text-xs font-[Outfit] mt-0.5">Venmo, Cash App, or PayPal</div>
+                      </div>
+                      {paymentMethod === 'digital' && <CheckCircle size={20} className="text-[#C62828] ml-auto" />}
+                    </button>
+                  </div>
+                  {submitError && <p className="text-[#EF4444] text-xs font-[Outfit] mb-3">{submitError}</p>}
+                  <div className="flex gap-2">
+                    <Button variant="ghost" fullWidth onClick={() => setSubmitStep('winner')}>Back</Button>
+                    <Button
+                      variant="primary" fullWidth
+                      loading={submitting}
+                      disabled={!paymentMethod}
+                      onClick={handleSubmitResult}
+                    >
+                      Submit Result
+                    </Button>
+                  </div>
+                </>
+              )}
             </motion.div>
           </motion.div>
         )}
