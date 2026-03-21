@@ -1,73 +1,60 @@
-# React + TypeScript + Vite
+# Top of the Capital 🎱
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**A competitive pool league tracker for Helena, Montana.**
 
-Currently, two official plugins are available:
+TOC is a live-ranked challenge league where 70 players fight for the top spot, one rack at a time. No brackets, no seasons — just a living leaderboard that shifts every time someone wins.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## How It Works
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Every player holds a numbered rank. You challenge someone within 5 spots of you. You play. The winner moves up, the loser shifts down, and the whole table rebalances automatically — in real time.
 
-## Expanding the ESLint configuration
+- **Challenge anyone ±5 ranks from you** — pick 8-ball, 9-ball, or 10-ball, set the race length, agree on a venue
+- **Both players submit the score independently** — no he-said-she-said, the system only confirms when both sides agree
+- **Rankings cascade instantly** — beat someone ranked above you and you take their spot; everyone in between drops one
+- **Cooldowns keep it fair** — 24 hours between challenges after a match so people can't be sandbagged repeatedly
+- **Points accumulate all season** — 2 for a win, 1 for showing up, so consistency matters even if you don't always win
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+---
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## The League
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+70 real players. Real Fargo ratings. Real stakes.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Based out of **Eagles 4040** and **Valley Hub** in Helena, MT. If you shoot pool in Helena and you're not on this list, you probably know someone who is.
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## The App
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Built to feel like something more than a spreadsheet. Dark glass UI, animated rankings, live challenge notifications, and a leaderboard that updates the moment a match is confirmed.
+
+- **Magic link login** — no passwords, just your email
+- **Claim your profile** — find your name, tap it, it's yours
+- **Real-time updates** — rankings shift live as matches are confirmed
+- **Works on your phone** — installable PWA, designed mobile-first
+
+---
+
+## Want In?
+
+Contact the league admin or show up to open table night at Eagles 4040. If you can run a rack, there's a spot for you.
+
+---
+
+## Tech Stack
+
+For the developers who stumbled here:
+
+- **React 18 + TypeScript + Vite** — frontend
+- **Tailwind CSS v4** — styling
+- **Framer Motion** — animations
+- **Supabase** — Postgres, Auth, Realtime, Edge Functions
+- **TanStack Query + Zustand** — data fetching and state
+
+All mutations (challenges, results, ranking updates) go through Supabase Edge Functions. The client never writes directly to ranked tables.
+
+---
+
+*Helena, Montana · Est. 2025*
