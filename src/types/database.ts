@@ -1,0 +1,220 @@
+export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
+
+export interface Database {
+  public: {
+    Tables: {
+      profiles: {
+        Row: {
+          id: string;
+          email: string;
+          display_name: string | null;
+          role: 'player' | 'admin' | 'super_admin';
+          avatar_url: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at' | 'updated_at'>;
+        Update: Partial<Database['public']['Tables']['profiles']['Insert']>;
+      };
+      players: {
+        Row: {
+          id: string;
+          profile_id: string | null;
+          full_name: string;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['players']['Row'], 'created_at' | 'updated_at'>;
+        Update: Partial<Database['public']['Tables']['players']['Insert']>;
+      };
+      rankings: {
+        Row: {
+          id: string;
+          player_id: string;
+          position: number;
+          previous_position: number | null;
+          updated_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['rankings']['Row'], 'id' | 'updated_at'>;
+        Update: Partial<Database['public']['Tables']['rankings']['Insert']>;
+      };
+      player_reference_metrics: {
+        Row: {
+          id: string;
+          player_id: string;
+          fargo_rating: number | null;
+          fargo_robustness: number | null;
+          updated_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['player_reference_metrics']['Row'], 'id' | 'updated_at'>;
+        Update: Partial<Database['public']['Tables']['player_reference_metrics']['Insert']>;
+      };
+      challenges: {
+        Row: {
+          id: string;
+          challenger_id: string;
+          challenged_id: string;
+          discipline: '8 Ball' | '9 Ball' | '10 Ball';
+          race_length: number;
+          status: 'pending' | 'accepted' | 'scheduled' | 'in_progress' | 'submitted' | 'confirmed' | 'disputed' | 'resolved' | 'declined' | 'expired' | 'forfeited' | 'cancelled';
+          venue: 'Eagles 4040' | 'Valley Hub' | null;
+          scheduled_at: string | null;
+          expires_at: string;
+          response_message: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['challenges']['Row'], 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Database['public']['Tables']['challenges']['Insert']>;
+      };
+      matches: {
+        Row: {
+          id: string;
+          challenge_id: string;
+          player1_id: string;
+          player2_id: string;
+          discipline: string;
+          race_length: number;
+          venue: string;
+          player1_score: number;
+          player2_score: number;
+          winner_id: string | null;
+          loser_id: string | null;
+          status: 'scheduled' | 'in_progress' | 'submitted' | 'confirmed' | 'disputed' | 'resolved';
+          player1_submitted: boolean;
+          player2_submitted: boolean;
+          player1_confirmed: boolean;
+          player2_confirmed: boolean;
+          scheduled_at: string;
+          started_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['matches']['Row'], 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Database['public']['Tables']['matches']['Insert']>;
+      };
+      notifications: {
+        Row: {
+          id: string;
+          player_id: string;
+          type: string;
+          title: string;
+          body: string;
+          reference_id: string | null;
+          reference_type: string | null;
+          is_read: boolean;
+          created_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['notifications']['Row'], 'id' | 'created_at'>;
+        Update: Partial<Database['public']['Tables']['notifications']['Insert']>;
+      };
+      activity_feed: {
+        Row: {
+          id: string;
+          event_type: string;
+          headline: string;
+          detail: string | null;
+          actor_player_id: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['activity_feed']['Row'], 'id' | 'created_at'>;
+        Update: Partial<Database['public']['Tables']['activity_feed']['Insert']>;
+      };
+      cooldowns: {
+        Row: {
+          id: string;
+          player_id: string;
+          type: 'post_match' | 'post_decline';
+          expires_at: string;
+          created_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['cooldowns']['Row'], 'id' | 'created_at'>;
+        Update: Partial<Database['public']['Tables']['cooldowns']['Insert']>;
+      };
+      player_season_stats: {
+        Row: {
+          id: string;
+          player_id: string;
+          wins: number;
+          losses: number;
+          points: number;
+          current_streak: number;
+          best_streak: number;
+          matches_played: number;
+          updated_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['player_season_stats']['Row'], 'id' | 'updated_at'>;
+        Update: Partial<Database['public']['Tables']['player_season_stats']['Insert']>;
+      };
+      treasury_ledger: {
+        Row: {
+          id: string;
+          entry_type: 'credit' | 'debit' | 'correction' | 'reversal';
+          amount_cents: number;
+          description: string;
+          created_by: string;
+          reversed_entry_id: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['treasury_ledger']['Row'], 'id' | 'created_at'>;
+        Update: Partial<Database['public']['Tables']['treasury_ledger']['Insert']>;
+      };
+      league_settings: {
+        Row: {
+          id: string;
+          venues: string[];
+          disciplines: string[];
+          min_race: number;
+          max_race: number;
+          challenge_range: number;
+          cooldown_hours: number;
+          challenge_expiry_days: number;
+          updated_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['league_settings']['Row'], 'id' | 'updated_at'>;
+        Update: Partial<Database['public']['Tables']['league_settings']['Insert']>;
+      };
+      audit_events: {
+        Row: {
+          id: string;
+          actor_profile_id: string | null;
+          action: string;
+          target_type: string | null;
+          target_id: string | null;
+          detail: Json | null;
+          created_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['audit_events']['Row'], 'id' | 'created_at'>;
+        Update: Partial<Database['public']['Tables']['audit_events']['Insert']>;
+      };
+    };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
+  };
+}
+
+// Convenience type aliases
+export type Profile = Database['public']['Tables']['profiles']['Row'];
+export type Player = Database['public']['Tables']['players']['Row'];
+export type Ranking = Database['public']['Tables']['rankings']['Row'];
+export type PlayerMetrics = Database['public']['Tables']['player_reference_metrics']['Row'];
+export type Challenge = Database['public']['Tables']['challenges']['Row'];
+export type Match = Database['public']['Tables']['matches']['Row'];
+export type Notification = Database['public']['Tables']['notifications']['Row'];
+export type ActivityFeedItem = Database['public']['Tables']['activity_feed']['Row'];
+export type Cooldown = Database['public']['Tables']['cooldowns']['Row'];
+export type PlayerSeasonStats = Database['public']['Tables']['player_season_stats']['Row'];
+export type TreasuryEntry = Database['public']['Tables']['treasury_ledger']['Row'];
+export type LeagueSettings = Database['public']['Tables']['league_settings']['Row'];
+export type AuditEvent = Database['public']['Tables']['audit_events']['Row'];
+
+// Composite types used across the app
+export interface RankedPlayer {
+  player: Player;
+  ranking: Ranking;
+  metrics: PlayerMetrics | null;
+  stats: PlayerSeasonStats | null;
+}

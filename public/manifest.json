@@ -1,0 +1,14 @@
+{
+  "name": "Top of the Capital",
+  "short_name": "TOC",
+  "description": "Helena Pool League — Competitive rankings and challenges",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0D0D0D",
+  "theme_color": "#C62828",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

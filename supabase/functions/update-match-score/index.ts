@@ -1,0 +1,47 @@
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' };
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+  try {
+    const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
+    const { data: { user } } = await supabase.auth.getUser(req.headers.get('Authorization')?.replace('Bearer ', ''));
+    if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: cors });
+
+    const { match_id, my_score, opponent_score } = await req.json();
+
+    const { data: match } = await supabase.from('matches').select('*').eq('id', match_id).single();
+    if (!match) return new Response(JSON.stringify({ error: 'Match not found.' }), { headers: cors });
+
+    const { data: caller } = await supabase.from('players').select('id').eq('profile_id', user.id).single();
+    if (!caller) return new Response(JSON.stringify({ error: 'Player not found.' }), { headers: cors });
+
+    const isP1 = match.player1_id === caller.id;
+    const isP2 = match.player2_id === caller.id;
+    if (!isP1 && !isP2) return new Response(JSON.stringify({ error: 'Not a participant in this match.' }), { headers: cors });
+
+    const updates: Record<string, unknown> = {};
+
+    // Transition to in_progress if needed
+    if (match.status === 'scheduled') {
+      updates.status = 'in_progress';
+      updates.started_at = new Date().toISOString();
+    }
+
+    if (isP1) {
+      updates.player1_score = my_score;
+      updates.player2_score = opponent_score;
+    } else {
+      updates.player2_score = my_score;
+      updates.player1_score = opponent_score;
+    }
+
+    await supabase.from('matches').update(updates).eq('id', match_id);
+
+    return new Response(JSON.stringify({ success: true }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+  } catch (e) {
+    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: cors });
+  }
+});

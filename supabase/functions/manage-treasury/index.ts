@@ -1,0 +1,42 @@
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' };
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+  try {
+    const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
+    const { data: { user } } = await supabase.auth.getUser(req.headers.get('Authorization')?.replace('Bearer ', ''));
+    if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: cors });
+
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    if (!profile || profile.role !== 'super_admin') {
+      return new Response(JSON.stringify({ error: 'Super admin access required.' }), { status: 403, headers: cors });
+    }
+
+    const { entry_type, amount_cents, description, reversed_entry_id } = await req.json();
+
+    const { data: entry, error } = await supabase.from('treasury_ledger').insert({
+      entry_type,
+      amount_cents,
+      description,
+      created_by: user.id,
+      reversed_entry_id: reversed_entry_id ?? null,
+    }).select().single();
+
+    if (error) throw error;
+
+    await supabase.from('audit_events').insert({
+      actor_profile_id: user.id,
+      action: 'treasury_entry',
+      target_type: 'treasury_ledger',
+      target_id: entry.id,
+      detail: { entry_type, amount_cents, description },
+    });
+
+    return new Response(JSON.stringify({ entry_id: entry.id }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+  } catch (e) {
+    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: cors });
+  }
+});
