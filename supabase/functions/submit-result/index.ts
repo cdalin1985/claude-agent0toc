@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { sendPush } from '../_shared/sendPush.ts';
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' };
 
@@ -120,6 +121,7 @@ async function checkRank1Compliance(supabase: ReturnType<typeof createClient>) {
   }
 }
 
+// deno-lint-ignore-file no-explicit-any
 async function confirmResult(
   supabase: ReturnType<typeof createClient>,
   matchId: string,
@@ -259,6 +261,10 @@ async function confirmResult(
     { player_id: winnerId, type: 'result_confirmed', title: '🏆 Match confirmed — Victory!', body: `Final: ${p1Score}–${p2Score}`, reference_id: matchId, reference_type: 'match' },
     { player_id: loserId,  type: 'result_confirmed', title: '📊 Match confirmed',             body: `Final: ${p1Score}–${p2Score}`, reference_id: matchId, reference_type: 'match' },
   ]);
+  await Promise.all([
+    sendPush(supabase, winnerId, '🏆 Match confirmed — Victory!', `Final: ${p1Score}–${p2Score}`, `/match/${matchId}`),
+    sendPush(supabase, loserId,  '📊 Match confirmed',            `Final: ${p1Score}–${p2Score}`, `/match/${matchId}`),
+  ]);
 
   await supabase.from('activity_feed').insert({
     event_type: 'match_confirmed',
@@ -285,7 +291,7 @@ serve(async (req) => {
 
     const { data: match } = await supabase.from('matches').select('*').eq('id', match_id).single();
     if (!match) return new Response(JSON.stringify({ error: 'Match not found.' }), { headers: cors });
-    if (!['in_progress', 'scheduled'].includes(match.status)) {
+    if (!['in_progress', 'scheduled', 'submitted'].includes(match.status)) {
       return new Response(JSON.stringify({ error: 'Match is not in progress.' }), { headers: cors });
     }
 
@@ -327,6 +333,7 @@ serve(async (req) => {
         reference_id: match_id,
         reference_type: 'match',
       });
+      await sendPush(supabase, otherId, '📊 Opponent submitted result', `${callerPlayer?.full_name} submitted. Tap to confirm.`, `/match/${match_id}`);
     }
 
     return new Response(JSON.stringify({ success: true }), { headers: { ...cors, 'Content-Type': 'application/json' } });

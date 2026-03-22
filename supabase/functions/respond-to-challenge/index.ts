@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { sendPush } from '../_shared/sendPush.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -57,6 +58,7 @@ serve(async (req) => {
         reference_id: match?.id,
         reference_type: 'match',
       });
+      await sendPush(supabase, challenge.challenger_id, `✅ Challenge accepted!`, `${challengedPlayer?.full_name} accepted. Match at ${venue}.`, `/match/${match?.id}`);
 
       const { data: challengerPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenger_id).single();
       await supabase.from('activity_feed').insert({
@@ -112,6 +114,7 @@ serve(async (req) => {
         reference_id: challenge_id,
         reference_type: 'challenge',
       });
+      await sendPush(supabase, challenge.challenger_id, `❌ Challenge declined`, `${challengedPlayer?.full_name} declined. An admin will confirm your spot move.`, '/challenges');
 
     } else if (action === 'wash') {
       // Either player can declare a scheduling wash — treated as if the challenge never happened

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { LogOut, User, Volume2, VolumeX, Shield } from 'lucide-react';
+import { LogOut, User, Volume2, VolumeX, Shield, Bell, BellOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useUIStore } from '../stores/uiStore';
 import { useRankings } from '../hooks/useRankings';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 import { PoolBall } from '../components/PoolBall';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
@@ -14,6 +15,7 @@ export default function SettingsPage() {
   const navigate  = useNavigate();
   const { profile, player, reset } = useAuthStore();
   const { soundEnabled, setSoundEnabled } = useUIStore();
+  const { supported: pushSupported, subscribed: pushSubscribed, permission: pushPermission, loading: pushLoading, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications();
   const { data: rankings = [] } = useRankings();
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '');
   const [saving, setSaving]           = useState(false);
@@ -99,6 +101,31 @@ export default function SettingsPage() {
               <div className={`w-5 h-5 rounded-full bg-white absolute top-0.5 transition-transform ${soundEnabled ? 'translate-x-6' : 'translate-x-0.5'}`} />
             </button>
           </div>
+
+          {pushSupported && (
+            <div className="flex items-center justify-between py-3">
+              <div className="flex items-center gap-3">
+                {pushSubscribed ? <Bell size={18} className="text-[#9CA3AF]" /> : <BellOff size={18} className="text-[#9CA3AF]" />}
+                <div>
+                  <div className="font-[Outfit] font-medium text-[#E8E2D6] text-sm">Push Notifications</div>
+                  <div className="text-[#6B7280] text-xs font-[Outfit]">
+                    {pushPermission === 'denied'
+                      ? 'Blocked in browser settings'
+                      : pushSubscribed
+                      ? 'Challenges, results & more'
+                      : 'Get notified when action is needed'}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={pushSubscribed ? pushUnsubscribe : pushSubscribe}
+                disabled={pushLoading || pushPermission === 'denied'}
+                className={`w-12 h-6 rounded-full transition-colors relative disabled:opacity-40 ${pushSubscribed ? 'bg-[#C62828]' : 'bg-[#333]'}`}
+              >
+                <div className={`w-5 h-5 rounded-full bg-white absolute top-0.5 transition-transform ${pushSubscribed ? 'translate-x-6' : 'translate-x-0.5'}`} />
+              </button>
+            </div>
+          )}
         </GlassCard>
       </motion.div>
 

@@ -7,6 +7,8 @@ Go to: https://supabase.com/dashboard/project/kdpyisylihlvxvinzgyr/sql/new
 Copy and paste the contents of `supabase/migrations/001_schema.sql` → Run
 Copy and paste the contents of `supabase/migrations/002_seed.sql` → Run
 Copy and paste the contents of `supabase/migrations/003_rls.sql` → Run
+Copy and paste the contents of `supabase/migrations/004_rule_changes.sql` → Run
+Copy and paste the contents of `supabase/migrations/005_push_subscriptions.sql` → Run
 
 ## Step 2: Get Your Service Role Key
 
@@ -22,6 +24,9 @@ export SUPABASE_ACCESS_TOKEN=your_token_here
 
 npx supabase link --project-ref kdpyisylihlvxvinzgyr
 npx supabase secrets set SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+npx supabase secrets set VAPID_PUBLIC_KEY=BHHat2gvH5WsnvGVD2ee6mRvHK49_i1DebNLU8eJXKxtuFslJ71VhdGB7Q8cMJaQ3r3kPJzOVi0GIo_PmbFgmVI
+npx supabase secrets set VAPID_PRIVATE_KEY=-4YzExiusaW81sHR2kZdux-Tgj66nF3GVy7IJWOFhZc
+npx supabase secrets set VAPID_SUBJECT=chase.dalin@gmail.com
 
 npx supabase functions deploy claim-player
 npx supabase functions deploy create-challenge
@@ -30,6 +35,9 @@ npx supabase functions deploy update-match-score
 npx supabase functions deploy submit-result
 npx supabase functions deploy resolve-dispute
 npx supabase functions deploy manage-treasury
+npx supabase functions deploy rank1-compliance
+npx supabase functions deploy add-player
+npx supabase functions deploy send-push
 ```
 
 ## Step 4: Set Chase as Super Admin
@@ -47,4 +55,5 @@ UPDATE profiles SET role = 'super_admin' WHERE email = 'chase.dalin@gmail.com';
 4. Add env vars:
    - VITE_SUPABASE_URL = https://kdpyisylihlvxvinzgyr.supabase.co
    - VITE_SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   - VITE_VAPID_PUBLIC_KEY = BHHat2gvH5WsnvGVD2ee6mRvHK49_i1DebNLU8eJXKxtuFslJ71VhdGB7Q8cMJaQ3r3kPJzOVi0GIo_PmbFgmVI
 5. Deploy!

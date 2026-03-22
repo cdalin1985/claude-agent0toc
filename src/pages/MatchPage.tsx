@@ -45,7 +45,12 @@ export default function MatchPage() {
   const { data: match, isLoading } = useQuery<Match>({
     queryKey: ['match', id],
     queryFn: async () => {
-      const { data } = await supabase.from('matches').select('*').eq('id', id).single();
+      // id may be either a match UUID (from MatchesPage) or a challenge UUID (from ChallengesPage)
+      const { data } = await supabase
+        .from('matches')
+        .select('*')
+        .or(`id.eq.${id},challenge_id.eq.${id}`)
+        .single();
       return data!;
     },
     enabled: !!id,
@@ -158,8 +163,8 @@ export default function MatchPage() {
             {match.status === 'in_progress' && amInMatch && !hasSubmitted && (
               <button
                 onClick={() => handleScoreUpdate(match.player1_id)}
-                disabled={submitting}
-                className="w-10 h-10 rounded-full bg-[#22C55E]/20 border border-[#22C55E]/40 flex items-center justify-center active:scale-95 transition-transform"
+                disabled={submitting || match.player1_score >= match.race_length || match.player2_score >= match.race_length}
+                className="w-10 h-10 rounded-full bg-[#22C55E]/20 border border-[#22C55E]/40 flex items-center justify-center active:scale-95 transition-transform disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <Plus size={20} className="text-[#22C55E]" />
               </button>
@@ -182,8 +187,8 @@ export default function MatchPage() {
             {match.status === 'in_progress' && amInMatch && !hasSubmitted && (
               <button
                 onClick={() => handleScoreUpdate(match.player2_id)}
-                disabled={submitting}
-                className="w-10 h-10 rounded-full bg-[#22C55E]/20 border border-[#22C55E]/40 flex items-center justify-center active:scale-95 transition-transform"
+                disabled={submitting || match.player1_score >= match.race_length || match.player2_score >= match.race_length}
+                className="w-10 h-10 rounded-full bg-[#22C55E]/20 border border-[#22C55E]/40 flex items-center justify-center active:scale-95 transition-transform disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <Plus size={20} className="text-[#22C55E]" />
               </button>
@@ -221,7 +226,7 @@ export default function MatchPage() {
             </Button>
           )}
 
-          {match.status === 'in_progress' && !hasSubmitted && (
+          {(match.status === 'in_progress' || match.status === 'submitted') && !hasSubmitted && (
             <Button variant="primary" fullWidth size="lg" onClick={() => { setSubmitStep('winner'); setSubmitError(''); }}>
               <Flag size={18} /> Submit Final Result
             </Button>

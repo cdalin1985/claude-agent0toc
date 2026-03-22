@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { sendPush } from '../_shared/sendPush.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -168,6 +169,7 @@ serve(async (req) => {
       reference_id: challenge.id,
       reference_type: 'challenge',
     });
+    await sendPush(supabase, challenged_player_id, `⚔️ ${challengerPlayer?.full_name} challenged you!`, `${discipline} · Race to ${race_length}. Tap to respond.`, '/challenges');
 
     // Activity feed
     const { data: challengedPlayer } = await supabase.from('players').select('full_name').eq('id', challenged_player_id).single();

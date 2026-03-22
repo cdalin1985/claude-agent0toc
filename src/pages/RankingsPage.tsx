@@ -11,20 +11,26 @@ import { RankingRowSkeleton } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
 import type { RankedPlayer } from '../types/database';
 
-function canChallenge(myPos: number, theirPos: number): boolean {
-  return Math.abs(myPos - theirPos) <= 5 && myPos !== theirPos;
+function canChallenge(myPos: number, theirPos: number, isFirstChallenge: boolean): boolean {
+  if (myPos === theirPos) return false;
+  if (myPos === 1) return true; // #1 can challenge anyone (top-5 obligation)
+  if (myPos <= 10) return Math.abs(myPos - theirPos) <= 5; // top-10: ±5 in either direction
+  if (isFirstChallenge) return theirPos < myPos && (myPos - theirPos) <= 10;
+  return theirPos < myPos && (myPos - theirPos) <= 5;
 }
 
 function RankCard({
   rp,
   myPosition,
   myPlayerId,
+  isFirstChallenge,
   index,
   challengeMode,
 }: {
   rp: RankedPlayer;
   myPosition: number | null;
   myPlayerId: string | null;
+  isFirstChallenge: boolean;
   index: number;
   challengeMode: boolean;
 }) {
@@ -32,7 +38,7 @@ function RankCard({
   const pos       = rp.ranking.position;
   const isMe      = rp.player.id === myPlayerId;
   const isTop3    = pos <= 3;
-  const eligible  = myPosition !== null && canChallenge(myPosition, pos) && !isMe;
+  const eligible  = myPosition !== null && canChallenge(myPosition, pos, isFirstChallenge) && !isMe;
   const rankChange = rp.ranking.previous_position !== null
     ? rp.ranking.previous_position - pos  // positive = moved up
     : 0;
@@ -121,6 +127,7 @@ export default function RankingsPage() {
 
   const myRanking = rankings.find((r) => r.player.id === player?.id);
   const myPosition = myRanking?.ranking.position ?? null;
+  const isFirstChallenge = (myRanking?.stats?.challenges_issued ?? 0) === 0;
 
   const filtered = useMemo(() => {
     let list = rankings;
@@ -200,6 +207,7 @@ export default function RankingsPage() {
                 rp={rp}
                 myPosition={myPosition}
                 myPlayerId={player?.id ?? null}
+                isFirstChallenge={isFirstChallenge}
                 index={i}
                 challengeMode={challengeMode}
               />
