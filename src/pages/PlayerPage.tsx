@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useRankings } from '../hooks/useRankings';
-import { PoolBall } from '../components/PoolBall';
+import { Avatar } from '../components/Avatar';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
@@ -17,6 +17,7 @@ import type { Match, PlayerDisciplineStats } from '../types/database';
 type Discipline = '8 Ball' | '9 Ball' | '10 Ball';
 const DISCIPLINES: Discipline[] = ['8 Ball', '9 Ball', '10 Ball'];
 const DISC_EMOJI: Record<Discipline, string> = { '8 Ball': '🎱', '9 Ball': '🔵', '10 Ball': '🟡' };
+type HistoryFilter = 'All' | 'Wins' | 'Losses' | '8 Ball' | '9 Ball' | '10 Ball';
 
 function canChallenge(myPos: number, theirPos: number, myRank: number) {
   if (myPos === theirPos) return false;
@@ -30,7 +31,8 @@ export default function PlayerPage() {
   const navigate = useNavigate();
   const { player: myPlayer } = useAuthStore();
   const { data: rankings = [] } = useRankings();
-  const [discTab, setDiscTab] = useState<Discipline>('8 Ball');
+  const [discTab, setDiscTab]         = useState<Discipline>('8 Ball');
+  const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('All');
 
   const targetRanking = rankings.find((r) => r.player.id === id);
   const myRanking     = rankings.find((r) => r.player.id === myPlayer?.id);
@@ -105,7 +107,7 @@ export default function PlayerPage() {
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
         <GlassCard className="p-6 text-center relative overflow-hidden mb-4">
           <div className="absolute inset-0 bg-gradient-to-br from-[#C62828]/5 to-transparent pointer-events-none" />
-          <PoolBall position={ranking.position} size={80} className="mx-auto mb-4" />
+          <Avatar player={player} size={80} className="mx-auto mb-4" />
           <h1 className="font-[Bebas_Neue] text-4xl text-[#E8E2D6]">{player.full_name}</h1>
           <div className="flex items-center justify-center flex-wrap gap-2 mt-2">
             <span className="font-[JetBrains_Mono] text-2xl font-bold text-[#C62828]">
@@ -250,25 +252,50 @@ export default function PlayerPage() {
           ) : matches.length === 0 ? (
             <p className="text-[#6B7280] text-sm font-[Outfit] py-4 text-center">No matches yet.</p>
           ) : (
-            <div className="space-y-2">
-              {matches.map((m) => {
-                const won = m.winner_id === id;
-                const s1  = m.player1_id === id ? m.player1_score : m.player2_score;
-                const s2  = m.player1_id === id ? m.player2_score : m.player1_score;
-                return (
-                  <div key={m.id} className="flex items-center gap-3 p-3 rounded-lg bg-[#252525]/50">
-                    <div className={`w-1 h-8 rounded-full ${won ? 'bg-[#22C55E]' : 'bg-[#EF4444]'}`} />
-                    <div className="flex-1">
-                      <div className="text-sm font-[Outfit] font-medium text-[#E8E2D6]">{m.discipline}</div>
-                      <div className="text-xs text-[#6B7280] font-[Outfit]">{formatDate(m.completed_at ?? m.scheduled_at)}</div>
-                    </div>
-                    <div className="font-[JetBrains_Mono] font-bold text-lg text-[#E8E2D6]">
-                      <span style={{ color: won ? '#22C55E' : '#EF4444' }}>{s1}</span>–{s2}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <>
+              {/* Filters */}
+              <div className="flex gap-1.5 mb-3 overflow-x-auto pb-0.5">
+                {(['All', 'Wins', 'Losses', '8 Ball', '9 Ball', '10 Ball'] as HistoryFilter[]).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setHistoryFilter(f)}
+                    className={[
+                      'px-3 py-1 rounded-full text-xs font-[Outfit] font-medium whitespace-nowrap transition-all shrink-0',
+                      historyFilter === f ? 'bg-[#C62828] text-white' : 'bg-[#1A1A1A] text-[#9CA3AF] border border-[#333]',
+                    ].join(' ')}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+              <div className="space-y-2">
+                {matches
+                  .filter((m) => {
+                    if (historyFilter === 'Wins')   return m.winner_id === id;
+                    if (historyFilter === 'Losses') return m.loser_id  === id;
+                    if (historyFilter === '8 Ball' || historyFilter === '9 Ball' || historyFilter === '10 Ball')
+                      return m.discipline === historyFilter;
+                    return true;
+                  })
+                  .map((m) => {
+                    const won = m.winner_id === id;
+                    const s1  = m.player1_id === id ? m.player1_score : m.player2_score;
+                    const s2  = m.player1_id === id ? m.player2_score : m.player1_score;
+                    return (
+                      <div key={m.id} className="flex items-center gap-3 p-3 rounded-lg bg-[#252525]/50">
+                        <div className={`w-1 h-8 rounded-full ${won ? 'bg-[#22C55E]' : 'bg-[#EF4444]'}`} />
+                        <div className="flex-1">
+                          <div className="text-sm font-[Outfit] font-medium text-[#E8E2D6]">{m.discipline}</div>
+                          <div className="text-xs text-[#6B7280] font-[Outfit]">{formatDate(m.completed_at ?? m.scheduled_at)}</div>
+                        </div>
+                        <div className="font-[JetBrains_Mono] font-bold text-lg text-[#E8E2D6]">
+                          <span style={{ color: won ? '#22C55E' : '#EF4444' }}>{s1}</span>–{s2}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </>
           )}
         </GlassCard>
       </motion.div>

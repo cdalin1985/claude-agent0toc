@@ -9,6 +9,7 @@ import { AmbientBackground } from './AmbientBackground';
 import { BottomNav } from './BottomNav';
 import { LoadingScreen } from './LoadingScreen';
 import { OfflineBanner } from './OfflineBanner';
+import { PWAInstallBanner } from './PWAInstallBanner';
 import { useQuery } from '@tanstack/react-query';
 
 // Screens that show bottom nav
@@ -128,6 +129,7 @@ export const Layout: React.FC = () => {
   return (
     <div className="relative min-h-screen bg-[#0D0D0D] overflow-hidden">
       <LoadingScreen visible={!appReady} />
+      <PWAInstallBanner />
       <AmbientBackground />
       <OfflineBanner show={isOffline} />
 

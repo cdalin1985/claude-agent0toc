@@ -295,10 +295,17 @@ export default function ChallengesPage() {
                           ⏰ Must be played by {new Date(c.match_deadline).toLocaleDateString()}
                         </div>
                       )}
-                      {c.status === 'pending' && (
-                        <div className="text-[#F59E0B] text-xs font-[Outfit] mt-1">
-                          ⏰ Expires in {hoursLeft}h
+                      {c.status === 'pending' && hoursLeft > 0 && (
+                        <div className={`text-xs font-[Outfit] mt-1 ${hoursLeft <= 24 ? 'text-[#EF4444]' : hoursLeft <= 72 ? 'text-[#F59E0B]' : 'text-[#6B7280]'}`}>
+                          {hoursLeft <= 24 ? '⚠️' : '⏰'}{' '}
+                          Expires in{' '}
+                          {hoursLeft >= 48
+                            ? `${Math.floor(hoursLeft / 24)}d ${hoursLeft % 24}h`
+                            : `${hoursLeft}h`}
                         </div>
+                      )}
+                      {c.status === 'pending' && hoursLeft === 0 && (
+                        <div className="text-[#EF4444] text-xs font-[Outfit] mt-1">⚠️ Expiring soon</div>
                       )}
                     </div>
 

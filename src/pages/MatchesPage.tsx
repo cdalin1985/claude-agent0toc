@@ -9,16 +9,19 @@ import { GlassCard } from '../components/GlassCard';
 import { Badge } from '../components/Badge';
 import { EmptyState } from '../components/EmptyState';
 import { RankingRowSkeleton } from '../components/Skeleton';
-import { PoolBall } from '../components/PoolBall';
+import { Avatar } from '../components/Avatar';
 import { Button } from '../components/Button';
 import { formatDateTime } from '../utils/time';
 import type { Match } from '../types/database';
+
+type DiscFilter = 'All' | '8 Ball' | '9 Ball' | '10 Ball';
 
 export default function MatchesPage() {
   const { player } = useAuthStore();
   const { data: rankings = [] } = useRankings();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<'active' | 'history'>('active');
+  const [tab, setTab]   = useState<'active' | 'history'>('active');
+  const [disc, setDisc] = useState<DiscFilter>('All');
 
   const { data: matches = [], isLoading } = useQuery<Match[]>({
     queryKey: ['matches', player?.id],
@@ -36,12 +39,11 @@ export default function MatchesPage() {
 
   const getPlayerName = (id: string) =>
     rankings.find((r) => r.player.id === id)?.player.full_name ?? 'Unknown';
-  const getPosition = (id: string) =>
-    rankings.find((r) => r.player.id === id)?.ranking.position ?? 1;
 
   const active  = matches.filter((m) => ['scheduled', 'in_progress', 'submitted', 'disputed'].includes(m.status));
   const history = matches.filter((m) => ['confirmed', 'resolved'].includes(m.status));
-  const list    = tab === 'active' ? active : history;
+  const baseList = tab === 'active' ? active : history;
+  const list     = disc === 'All' ? baseList : baseList.filter((m) => m.discipline === disc);
 
   const statusBadge = (status: string) => {
     if (status === 'scheduled') return 'pending';
@@ -71,6 +73,24 @@ export default function MatchesPage() {
         ))}
       </div>
 
+      {/* Discipline filter — only show on history tab where it's useful */}
+      {tab === 'history' && history.length > 0 && (
+        <div className="flex gap-1.5 mb-4 overflow-x-auto pb-0.5">
+          {(['All', '8 Ball', '9 Ball', '10 Ball'] as DiscFilter[]).map((d) => (
+            <button
+              key={d}
+              onClick={() => setDisc(d)}
+              className={[
+                'px-3 py-1.5 rounded-full text-xs font-[Outfit] font-medium whitespace-nowrap transition-all shrink-0',
+                disc === d ? 'bg-[#C62828] text-white' : 'bg-[#1A1A1A] text-[#9CA3AF] border border-[#333]',
+              ].join(' ')}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
+      )}
+
       {isLoading ? (
         <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <RankingRowSkeleton key={i} />)}</div>
       ) : list.length === 0 ? (
@@ -87,7 +107,6 @@ export default function MatchesPage() {
           {list.map((m, i) => {
             const opponentId   = m.player1_id === player?.id ? m.player2_id : m.player1_id;
             const opponentName = getPlayerName(opponentId);
-            const opponentPos  = getPosition(opponentId);
             const myScore      = m.player1_id === player?.id ? m.player1_score : m.player2_score;
             const theirScore   = m.player1_id === player?.id ? m.player2_score : m.player1_score;
             const won          = m.winner_id === player?.id;
@@ -101,7 +120,7 @@ export default function MatchesPage() {
               >
                 <GlassCard hover className="p-4" onClick={() => navigate(`/match/${m.id}`)}>
                   <div className="flex items-center gap-3">
-                    <PoolBall position={opponentPos} size={44} />
+                    <Avatar player={{ full_name: opponentName, avatar_url: rankings.find((r) => r.player.id === opponentId)?.player.avatar_url }} size={44} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-[Outfit] font-semibold text-[#E8E2D6] truncate">{opponentName}</span>

@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Swords, Trophy, TrendingUp, AlertTriangle, DollarSign } from 'lucide-react';
+import { Swords, Trophy, TrendingUp, AlertTriangle, DollarSign, X } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { useRankings } from '../hooks/useRankings';
@@ -11,15 +11,57 @@ import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { Skeleton } from '../components/Skeleton';
-import type { ActivityFeedItem, Notification } from '../types/database';
+import type { ActivityFeedItem, Match, Notification, Challenge } from '../types/database';
 import { formatDistanceToNow } from '../utils/time';
 
 export default function HomePage() {
   const navigate   = useNavigate();
   const { player, profile } = useAuthStore();
   const { data: rankings = [] } = useRankings();
+  const [welcomeDismissed, setWelcomeDismissed] = useState(
+    () => localStorage.getItem('toc-welcome-dismissed') === '1'
+  );
+  const showWelcome = localStorage.getItem('toc-new-user') === '1' && !welcomeDismissed;
+
+  const dismissWelcome = () => {
+    localStorage.removeItem('toc-new-user');
+    localStorage.setItem('toc-welcome-dismissed', '1');
+    setWelcomeDismissed(true);
+  };
 
   const myRanking = rankings.find((r) => r.player.id === player?.id);
+
+  // Pending incoming challenges
+  const { data: pendingChallenges = [] } = useQuery<Challenge[]>({
+    queryKey: ['home-pending-challenges', player?.id],
+    queryFn: async () => {
+      if (!player) return [];
+      const { data } = await supabase
+        .from('challenges')
+        .select('*')
+        .eq('challenged_id', player.id)
+        .eq('status', 'pending');
+      return data ?? [];
+    },
+    enabled: !!player,
+    refetchInterval: 30000,
+  });
+
+  // Active matches needing action
+  const { data: actionMatches = [] } = useQuery<Match[]>({
+    queryKey: ['home-action-matches', player?.id],
+    queryFn: async () => {
+      if (!player) return [];
+      const { data } = await supabase
+        .from('matches')
+        .select('*')
+        .or(`player1_id.eq.${player.id},player2_id.eq.${player.id}`)
+        .in('status', ['in_progress', 'submitted', 'scheduled']);
+      return data ?? [];
+    },
+    enabled: !!player,
+    refetchInterval: 30000,
+  });
 
   const { data: notifications = [] } = useQuery<Notification[]>({
     queryKey: ['notifications', 'preview', player?.id],
@@ -49,30 +91,26 @@ export default function HomePage() {
     },
   });
 
-  // #1 compliance info (only relevant if player is ranked #1)
+  // #1 compliance
   const isRank1 = myRanking?.ranking.position === 1;
   const { data: rank1Compliance } = useQuery({
     queryKey: ['rank1-compliance', player?.id],
     queryFn: async () => {
       if (!player || !isRank1) return null;
-      // Get rank1_since and count top-5 matches
       const { data: rankRow } = await supabase
         .from('rankings')
         .select('rank1_since')
         .eq('player_id', player.id)
         .single();
       if (!rankRow?.rank1_since) return null;
-
       const rank1Since = new Date(rankRow.rank1_since);
-      const daysSince = (Date.now() - rank1Since.getTime()) / (1000 * 3600 * 24);
-
+      const daysSince  = (Date.now() - rank1Since.getTime()) / (1000 * 3600 * 24);
       const { data: top5 } = await supabase
         .from('rankings')
         .select('player_id')
         .gte('position', 2)
         .lte('position', 5);
       const top5Ids = (top5 ?? []).map((r: { player_id: string }) => r.player_id);
-
       let matchCount = 0;
       if (top5Ids.length > 0) {
         const { count } = await supabase
@@ -86,12 +124,11 @@ export default function HomePage() {
           );
         matchCount = count ?? 0;
       }
-
       return {
-        daysElapsed: Math.floor(daysSince),
+        daysElapsed:   Math.floor(daysSince),
         daysRemaining: Math.max(0, Math.floor(30 - daysSince)),
         matchCount,
-        compliant: matchCount >= 2,
+        compliant:     matchCount >= 2,
       };
     },
     enabled: !!player && isRank1,
@@ -114,8 +151,152 @@ export default function HomePage() {
     ? Math.round((myStats.wins / myStats.matches_played) * 100)
     : 0;
 
+  // Matches needing MY action (submitted by opponent, waiting on me)
+  const needsConfirm = actionMatches.filter((m) => {
+    if (m.status !== 'submitted') return false;
+    const isP1 = m.player1_id === player.id;
+    return isP1 ? !m.player1_submitted : !m.player2_submitted;
+  });
+
+  const inProgress = actionMatches.filter((m) => m.status === 'in_progress');
+  const scheduled  = actionMatches.filter((m) => m.status === 'scheduled');
+
+  const getOpponentName = (m: Match) => {
+    const oppId = m.player1_id === player.id ? m.player2_id : m.player1_id;
+    return rankings.find((r) => r.player.id === oppId)?.player.full_name ?? 'Opponent';
+  };
+
   return (
-    <div className="min-h-screen px-4 pt-8 pb-4 space-y-5">
+    <div className="min-h-screen px-4 pt-8 pb-4 space-y-4">
+
+      {/* Welcome card for new users */}
+      {showWelcome && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+          <GlassCard className="p-4 border border-[#D4AF37]/30">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl shrink-0">🎱</span>
+              <div className="flex-1">
+                <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm mb-1">
+                  Welcome to Top of the Capital!
+                </div>
+                <div className="text-[#9CA3AF] text-xs font-[Outfit] space-y-1">
+                  <p>You can challenge any player ranked within <span className="text-[#E8E2D6]">5 spots</span> above you.</p>
+                  <p>Win to move up the ladder. Defend your rank or drop.</p>
+                  <p>Head to <span className="text-[#C62828] font-semibold">The List</span> to find your first opponent.</p>
+                </div>
+              </div>
+              <button onClick={dismissWelcome} className="text-[#6B7280] shrink-0 -mt-0.5">
+                <X size={16} />
+              </button>
+            </div>
+          </GlassCard>
+        </motion.div>
+      )}
+
+      {/* Action banners — pending challenges */}
+      {pendingChallenges.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+          <GlassCard
+            className="p-4 border border-[#C62828]/40"
+            hover
+            onClick={() => navigate('/challenges')}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl shrink-0">⚔️</span>
+              <div className="flex-1">
+                <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">
+                  {pendingChallenges.length === 1
+                    ? 'You have been challenged!'
+                    : `${pendingChallenges.length} challenges waiting for you`}
+                </div>
+                <div className="text-[#9CA3AF] text-xs font-[Outfit] mt-0.5">Tap to respond</div>
+              </div>
+              <span className="bg-[#C62828] text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center font-[JetBrains_Mono] shrink-0">
+                {pendingChallenges.length}
+              </span>
+            </div>
+          </GlassCard>
+        </motion.div>
+      )}
+
+      {/* Action banners — confirm result */}
+      {needsConfirm.map((m) => (
+        <motion.div key={m.id} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+          <GlassCard
+            className="p-4 border border-[#F59E0B]/40"
+            hover
+            onClick={() => navigate(`/match/${m.id}`)}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl shrink-0">📋</span>
+              <div className="flex-1">
+                <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">
+                  Confirm result vs {getOpponentName(m)}
+                </div>
+                <div className="text-[#9CA3AF] text-xs font-[Outfit] mt-0.5">
+                  {getOpponentName(m)} submitted — your confirmation needed
+                </div>
+              </div>
+              <div className="text-[#F59E0B] text-xs font-[Outfit] font-semibold shrink-0">Confirm →</div>
+            </div>
+          </GlassCard>
+        </motion.div>
+      ))}
+
+      {/* Action banners — match in progress */}
+      {inProgress.map((m) => (
+        <motion.div key={m.id} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+          <GlassCard
+            className="p-4 border border-[#22C55E]/30"
+            hover
+            onClick={() => navigate(`/match/${m.id}`)}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl shrink-0">🎱</span>
+              <div className="flex-1">
+                <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">
+                  Match in progress vs {getOpponentName(m)}
+                </div>
+                <div className="text-[#9CA3AF] text-xs font-[Outfit] mt-0.5">
+                  {m.discipline} · Race to {m.race_length} · {m.venue}
+                </div>
+              </div>
+              <div className="font-[JetBrains_Mono] font-bold text-lg text-[#22C55E] shrink-0">
+                {m.player1_id === player.id ? m.player1_score : m.player2_score}
+                <span className="text-[#6B7280] mx-0.5">–</span>
+                <span className="text-[#E8E2D6]">
+                  {m.player1_id === player.id ? m.player2_score : m.player1_score}
+                </span>
+              </div>
+            </div>
+          </GlassCard>
+        </motion.div>
+      ))}
+
+      {/* Upcoming scheduled match (first one) */}
+      {scheduled.length > 0 && needsConfirm.length === 0 && inProgress.length === 0 && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+          <GlassCard
+            className="p-4 border border-white/10"
+            hover
+            onClick={() => navigate(`/match/${scheduled[0].id}`)}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl shrink-0">📅</span>
+              <div className="flex-1">
+                <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">
+                  Upcoming match vs {getOpponentName(scheduled[0])}
+                </div>
+                <div className="text-[#9CA3AF] text-xs font-[Outfit] mt-0.5">
+                  {scheduled[0].discipline} · {scheduled[0].venue}
+                </div>
+              </div>
+              <div className="text-[#9CA3AF] text-xs font-[Outfit] shrink-0">View →</div>
+            </div>
+          </GlassCard>
+        </motion.div>
+      )}
+
       {/* #1 compliance banner */}
       {isRank1 && rank1Compliance && (
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
@@ -261,11 +442,11 @@ export default function HomePage() {
               {feed.map((item) => (
                 <div key={item.id} className="flex gap-2 items-start py-1.5 border-b border-white/5 last:border-0">
                   <div className="text-lg shrink-0">
-                    {item.event_type === 'challenge_issued'  ? '⚔️'
+                    {item.event_type === 'challenge_issued'   ? '⚔️'
                       : item.event_type === 'challenge_accepted' ? '✅'
-                      : item.event_type === 'match_confirmed'   ? '🏆'
-                      : item.event_type === 'rank_change'       ? '📈'
-                      : item.event_type === 'rank1_penalty'     ? '📉'
+                      : item.event_type === 'match_confirmed'    ? '🏆'
+                      : item.event_type === 'rank_change'        ? '📈'
+                      : item.event_type === 'rank1_penalty'      ? '📉'
                       : '🎱'}
                   </div>
                   <div className="flex-1 min-w-0">

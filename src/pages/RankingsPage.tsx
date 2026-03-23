@@ -4,7 +4,7 @@ import { Search, X, Swords } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useRankings } from '../hooks/useRankings';
 import { useAuthStore } from '../stores/authStore';
-import { PoolBall } from '../components/PoolBall';
+import { Avatar } from '../components/Avatar';
 import { EKGLine } from '../components/EKGLine';
 import { Badge } from '../components/Badge';
 import { RankingRowSkeleton } from '../components/Skeleton';
@@ -71,8 +71,8 @@ function RankCard({
           </span>
         </div>
 
-        {/* Pool ball */}
-        <PoolBall position={pos} size={44} />
+        {/* Avatar */}
+        <Avatar player={rp.player} size={44} />
 
         {/* Name + info */}
         <div className="flex-1 min-w-0">

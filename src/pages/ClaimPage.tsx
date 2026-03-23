@@ -64,7 +64,10 @@ export default function ClaimPage() {
     if (json.error) { setClaimError(json.error); return; }
     // Refresh player in store
     const { data } = await supabase.from('players').select('*').eq('id', selected.player.id).single();
-    if (data) setPlayer(data);
+    if (data) {
+      setPlayer(data);
+      localStorage.setItem('toc-new-user', '1');
+    }
   };
 
   return (

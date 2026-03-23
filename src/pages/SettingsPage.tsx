@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { LogOut, User, Volume2, VolumeX, Shield, Bell, BellOff, FileText } from 'lucide-react';
+import { LogOut, User, Volume2, VolumeX, Shield, Bell, BellOff, FileText, Camera, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
@@ -8,26 +8,33 @@ import { useUIStore } from '../stores/uiStore';
 import { useRankings } from '../hooks/useRankings';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { PoolBall } from '../components/PoolBall';
+import { Avatar } from '../components/Avatar';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 
 const DISCIPLINES = ['8 Ball', '9 Ball', '10 Ball'] as const;
 
+const PRESET_ICONS = ['🎱','🔵','🟡','🦁','🐺','🦅','🐉','⚡','🔥','🎯','💀','🌙'];
+
 export default function SettingsPage() {
   const navigate  = useNavigate();
-  const { profile, player, reset } = useAuthStore();
+  const { profile, player, setPlayer, reset } = useAuthStore();
   const { soundEnabled, setSoundEnabled } = useUIStore();
   const { supported: pushSupported, subscribed: pushSubscribed, permission: pushPermission, loading: pushLoading, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications();
   const { data: rankings = [] } = useRankings();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [displayName,   setDisplayName]   = useState(profile?.display_name ?? '');
   const [bio,           setBio]           = useState('');
   const [preferredDisc, setPreferredDisc] = useState<typeof DISCIPLINES[number] | ''>('');
   const [saving,        setSaving]        = useState(false);
   const [signingOut,    setSigningOut]    = useState(false);
+  const [avatarSaving,  setAvatarSaving]  = useState(false);
+  const [avatarError,   setAvatarError]   = useState('');
+  const [showIconPicker, setShowIconPicker] = useState(false);
 
   const myRanking = rankings.find((r) => r.player.id === player?.id);
 
-  // Load bio and preferred_discipline from fresh player data
   useEffect(() => {
     if (!player) return;
     supabase.from('players').select('bio, preferred_discipline').eq('id', player.id).single()
@@ -56,6 +63,44 @@ export default function SettingsPage() {
     setSaving(false);
   };
 
+  const handleSelectIcon = async (icon: string) => {
+    if (!player) return;
+    setAvatarSaving(true);
+    setAvatarError('');
+    await supabase.from('players').update({ avatar_url: icon }).eq('id', player.id);
+    // Refresh player in store
+    const { data } = await supabase.from('players').select('*').eq('id', player.id).single();
+    if (data) setPlayer(data);
+    setAvatarSaving(false);
+    setShowIconPicker(false);
+  };
+
+  const handlePhotoUpload = async (file: File) => {
+    if (!player || !profile) return;
+    if (file.size > 5 * 1024 * 1024) { setAvatarError('Photo must be under 5 MB.'); return; }
+    setAvatarSaving(true);
+    setAvatarError('');
+    const ext  = file.name.split('.').pop() ?? 'jpg';
+    const path = `${profile.id}/avatar.${ext}`;
+    const { error: uploadErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
+    if (uploadErr) { setAvatarError(uploadErr.message); setAvatarSaving(false); return; }
+    const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
+    await supabase.from('players').update({ avatar_url: publicUrl }).eq('id', player.id);
+    const { data } = await supabase.from('players').select('*').eq('id', player.id).single();
+    if (data) setPlayer(data);
+    setAvatarSaving(false);
+    setShowIconPicker(false);
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!player) return;
+    setAvatarSaving(true);
+    await supabase.from('players').update({ avatar_url: null }).eq('id', player.id);
+    const { data } = await supabase.from('players').select('*').eq('id', player.id).single();
+    if (data) setPlayer(data);
+    setAvatarSaving(false);
+  };
+
   const handleSignOut = async () => {
     setSigningOut(true);
     await supabase.auth.signOut();
@@ -71,8 +116,18 @@ export default function SettingsPage() {
       {player && myRanking && (
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
           <GlassCard className="p-5">
+
+            {/* Avatar section */}
             <div className="flex items-center gap-4 mb-5">
-              <PoolBall position={myRanking.ranking.position} size={56} />
+              <div className="relative">
+                <Avatar player={player} size={64} />
+                <button
+                  onClick={() => setShowIconPicker(!showIconPicker)}
+                  className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#C62828] flex items-center justify-center border-2 border-[#0D0D0D]"
+                >
+                  <Camera size={11} className="text-white" />
+                </button>
+              </div>
               <div>
                 <div className="font-[Bebas_Neue] text-2xl text-[#E8E2D6]">{player.full_name}</div>
                 <div className="text-[#9CA3AF] text-sm font-[Outfit]">{profile?.email}</div>
@@ -81,6 +136,68 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
+
+            {/* Avatar picker */}
+            {showIconPicker && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-5 bg-[#1A1A1A] rounded-xl p-4"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[#9CA3AF] text-sm font-[Outfit]">Choose an icon or upload a photo</span>
+                  <button onClick={() => setShowIconPicker(false)} className="text-[#6B7280]"><X size={16} /></button>
+                </div>
+
+                {/* Preset icons */}
+                <div className="grid grid-cols-6 gap-2 mb-3">
+                  {PRESET_ICONS.map((icon) => (
+                    <button
+                      key={icon}
+                      onClick={() => handleSelectIcon(icon)}
+                      disabled={avatarSaving}
+                      className={`aspect-square rounded-xl flex items-center justify-center text-2xl transition-all active:scale-95 ${
+                        player.avatar_url === icon
+                          ? 'bg-[#C62828]/30 border border-[#C62828]/60'
+                          : 'bg-[#252525] border border-[#333] hover:border-[#555]'
+                      }`}
+                    >
+                      {icon}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Upload button */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handlePhotoUpload(file);
+                  }}
+                />
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    fullWidth
+                    loading={avatarSaving}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Camera size={14} /> Upload Photo
+                  </Button>
+                  {player.avatar_url && (
+                    <Button variant="ghost" size="sm" loading={avatarSaving} onClick={handleRemoveAvatar}>
+                      Remove
+                    </Button>
+                  )}
+                </div>
+                {avatarError && <p className="text-[#EF4444] text-xs font-[Outfit] mt-2">{avatarError}</p>}
+              </motion.div>
+            )}
 
             {/* Display name */}
             <div className="mb-4">

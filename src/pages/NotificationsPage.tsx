@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -25,6 +25,100 @@ const TYPE_ICONS: Record<string, string> = {
   rank_changed:       '📈',
 };
 
+const VENUES = ['Eagles 4040', 'Valley Hub'] as const;
+type Venue = typeof VENUES[number];
+
+function RespondInline({
+  challengeId,
+  onDone,
+}: {
+  challengeId: string;
+  onDone: () => void;
+}) {
+  const [open, setOpen]   = useState(false);
+  const [venue, setVenue] = useState<Venue | ''>('');
+  const [date, setDate]   = useState('');
+  const [time, setTime]   = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const callFn = async (body: object) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/respond-to-challenge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify(body),
+    });
+    return res.json() as Promise<{ success?: boolean; error?: string }>;
+  };
+
+  const handleDecline = async () => {
+    setLoading(true);
+    await callFn({ challenge_id: challengeId, action: 'decline' });
+    setLoading(false);
+    onDone();
+  };
+
+  const handleAccept = async () => {
+    if (!venue || !date || !time) { setError('Fill in all fields.'); return; }
+    setLoading(true);
+    setError('');
+    const scheduledAt = new Date(`${date}T${time}`).toISOString();
+    const json = await callFn({ challenge_id: challengeId, action: 'accept', venue, scheduled_at: scheduledAt });
+    setLoading(false);
+    if (json.error) { setError(json.error); return; }
+    onDone();
+  };
+
+  if (!open) {
+    return (
+      <div className="flex gap-2 mt-2">
+        <Button variant="danger" size="sm" loading={loading} onClick={handleDecline}>
+          Decline
+        </Button>
+        <Button variant="success" size="sm" onClick={() => setOpen(true)}>
+          Accept ✓
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 space-y-2 bg-[#1A1A1A] rounded-xl p-3">
+      <select
+        value={venue}
+        onChange={(e) => setVenue(e.target.value as Venue)}
+        className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Outfit] text-sm focus:outline-none focus:border-[#C62828]"
+      >
+        <option value="">Select venue…</option>
+        {VENUES.map((v) => <option key={v} value={v}>{v}</option>)}
+      </select>
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          min={new Date().toISOString().split('T')[0]}
+          className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Outfit] text-sm focus:outline-none focus:border-[#C62828]"
+        />
+        <input
+          type="time"
+          value={time}
+          onChange={(e) => setTime(e.target.value)}
+          className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Outfit] text-sm focus:outline-none focus:border-[#C62828]"
+        />
+      </div>
+      {error && <p className="text-[#EF4444] text-xs font-[Outfit]">{error}</p>}
+      <div className="flex gap-2">
+        <Button variant="ghost" size="sm" fullWidth onClick={() => setOpen(false)}>Back</Button>
+        <Button variant="success" size="sm" fullWidth loading={loading} onClick={handleAccept}>
+          Confirm Accept
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function NotificationsPage() {
   const { player } = useAuthStore();
   const navigate   = useNavigate();
@@ -49,9 +143,7 @@ export default function NotificationsPage() {
     if (n.is_read) return;
     await supabase.from('notifications').update({ is_read: true }).eq('id', n.id);
     qc.invalidateQueries({ queryKey: ['notifications'] });
-    // Navigate to related content
-    if (n.reference_type === 'challenge') navigate(`/challenges`);
-    else if (n.reference_type === 'match') navigate(`/match/${n.reference_id}`);
+    if (n.reference_type === 'match') navigate(`/match/${n.reference_id}`);
   };
 
   const markAllRead = async () => {
@@ -62,6 +154,13 @@ export default function NotificationsPage() {
       .eq('player_id', player.id)
       .eq('is_read', false);
     qc.invalidateQueries({ queryKey: ['notifications'] });
+  };
+
+  const handleChallengeActioned = () => {
+    qc.invalidateQueries({ queryKey: ['notifications'] });
+    qc.invalidateQueries({ queryKey: ['challenges'] });
+    qc.invalidateQueries({ queryKey: ['matches'] });
+    qc.invalidateQueries({ queryKey: ['home-pending-challenges'] });
   };
 
   const unread = notifications.filter((n) => !n.is_read).length;
@@ -102,34 +201,59 @@ export default function NotificationsPage() {
         />
       ) : (
         <div className="space-y-2">
-          {notifications.map((n, i) => (
-            <motion.div
-              key={n.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.03 }}
-            >
-              <GlassCard
-                hover
-                onClick={() => markRead(n)}
-                className={`p-4 flex items-start gap-3 ${!n.is_read ? 'border-[#C62828]/20' : ''}`}
+          {notifications.map((n, i) => {
+            const isChallengeReceived = n.type === 'challenge_received' && !n.is_read && !!n.reference_id;
+            const isResultSubmitted   = n.type === 'result_submitted' && !n.is_read && !!n.reference_id;
+
+            return (
+              <motion.div
+                key={n.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.03 }}
               >
-                <span className="text-2xl shrink-0">{TYPE_ICONS[n.type] ?? '🎱'}</span>
-                <div className="flex-1 min-w-0">
-                  <div className={`font-[Outfit] font-semibold text-sm ${n.is_read ? 'text-[#9CA3AF]' : 'text-[#E8E2D6]'}`}>
-                    {n.title}
+                <GlassCard
+                  className={`p-4 ${!n.is_read ? 'border-[#C62828]/20' : ''}`}
+                  hover={!isChallengeReceived}
+                  onClick={!isChallengeReceived ? () => markRead(n) : undefined}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl shrink-0">{TYPE_ICONS[n.type] ?? '🎱'}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className={`font-[Outfit] font-semibold text-sm ${n.is_read ? 'text-[#9CA3AF]' : 'text-[#E8E2D6]'}`}>
+                        {n.title}
+                      </div>
+                      <div className="text-[#9CA3AF] text-xs font-[Outfit] mt-0.5 leading-relaxed">{n.body}</div>
+                      <div className="text-[#6B7280] text-xs font-[Outfit] mt-1">
+                        {formatDistanceToNow(n.created_at)}
+                      </div>
+
+                      {/* Inline challenge response */}
+                      {isChallengeReceived && (
+                        <RespondInline
+                          challengeId={n.reference_id!}
+                          onDone={handleChallengeActioned}
+                        />
+                      )}
+
+                      {/* Quick navigate to match for result submitted */}
+                      {isResultSubmitted && (
+                        <button
+                          onClick={() => navigate(`/match/${n.reference_id}`)}
+                          className="mt-2 px-3 py-1.5 rounded-lg bg-[#F59E0B]/20 border border-[#F59E0B]/40 text-[#F59E0B] text-xs font-[Outfit] font-semibold"
+                        >
+                          Confirm Result →
+                        </button>
+                      )}
+                    </div>
+                    {!n.is_read && !isChallengeReceived && !isResultSubmitted && (
+                      <div className="w-2 h-2 rounded-full bg-[#C62828] shrink-0 mt-1" />
+                    )}
                   </div>
-                  <div className="text-[#9CA3AF] text-xs font-[Outfit] mt-0.5 leading-relaxed">{n.body}</div>
-                  <div className="text-[#6B7280] text-xs font-[Outfit] mt-1">
-                    {formatDistanceToNow(n.created_at)}
-                  </div>
-                </div>
-                {!n.is_read && (
-                  <div className="w-2 h-2 rounded-full bg-[#C62828] shrink-0 mt-1" />
-                )}
-              </GlassCard>
-            </motion.div>
-          ))}
+                </GlassCard>
+              </motion.div>
+            );
+          })}
         </div>
       )}
     </div>
