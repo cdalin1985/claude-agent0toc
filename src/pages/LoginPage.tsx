@@ -1,33 +1,75 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Mail, CheckCircle, AlertCircle } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Mail, KeyRound, AlertCircle, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { EKGLine } from '../components/EKGLine';
 import { Button } from '../components/Button';
 
-type State = 'idle' | 'sending' | 'sent' | 'error';
+type Step = 'email' | 'code';
 
 export default function LoginPage() {
+  const navigate            = useNavigate();
+  const [step, setStep]     = useState<Step>('email');
   const [email, setEmail]   = useState('');
-  const [state, setState]   = useState<State>('idle');
+  const [code, setCode]     = useState('');
+  const [loading, setLoading] = useState(false);
   const [error, setError]   = useState('');
+  const [resent, setResent]  = useState(false);
+  const codeRef = useRef<HTMLInputElement>(null);
 
-  const handleSend = async (e: React.FormEvent) => {
+  useEffect(() => {
+    if (step === 'code') {
+      setTimeout(() => codeRef.current?.focus(), 150);
+    }
+  }, [step]);
+
+  const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
-    setState('sending');
+    setLoading(true);
     setError('');
     const { error: err } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     });
-    if (err) { setState('error'); setError(err.message); }
-    else       setState('sent');
+    setLoading(false);
+    if (err) { setError(err.message); }
+    else     { setStep('code'); setResent(false); }
+  };
+
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = code.replace(/\s/g, '');
+    if (trimmed.length !== 6) return;
+    setLoading(true);
+    setError('');
+    const { error: err } = await supabase.auth.verifyOtp({
+      email: email.trim().toLowerCase(),
+      token: trimmed,
+      type: 'email',
+    });
+    setLoading(false);
+    if (err) { setError('Invalid or expired code. Try again.'); }
+    else     { navigate('/', { replace: true }); }
+  };
+
+  const handleResend = async () => {
+    setError('');
+    setCode('');
+    const { error: err } = await supabase.auth.signInWithOtp({
+      email: email.trim().toLowerCase(),
+    });
+    if (!err) setResent(true);
+  };
+
+  const handleCodeChange = (val: string) => {
+    const digits = val.replace(/\D/g, '').slice(0, 6);
+    setCode(digits);
+    setError('');
   };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden">
-      {/* Background crimson pulse */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -65,72 +107,140 @@ export default function LoginPage() {
           <EKGLine className="mx-auto mt-3" />
         </div>
 
-        {state === 'sent' ? (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="glass-card p-8 text-center"
-          >
-            <CheckCircle size={48} className="text-[#22C55E] mx-auto mb-4" />
-            <h2 className="font-[Bebas_Neue] text-3xl text-[#E8E2D6] mb-2">Check Your Email</h2>
-            <p className="text-[#9CA3AF] font-[Outfit] text-sm leading-relaxed">
-              We sent a magic link to <strong className="text-[#E8E2D6]">{email}</strong>.
-              <br />Tap the link to sign in — no password needed.
-            </p>
-            <button
-              onClick={() => setState('idle')}
-              className="mt-6 text-[#9CA3AF] text-sm underline underline-offset-2"
+        <AnimatePresence mode="wait">
+          {step === 'email' ? (
+            <motion.form
+              key="email-step"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.25 }}
+              onSubmit={handleSendCode}
+              className="glass-card p-6 space-y-4"
             >
-              Use a different email
-            </button>
-          </motion.div>
-        ) : (
-          <form onSubmit={handleSend} className="glass-card p-6 space-y-4">
-            <div>
-              <label className="block text-[#9CA3AF] text-sm font-[Outfit] mb-2">
-                Email Address
-              </label>
-              <div className="relative">
-                <Mail
-                  size={18}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280]"
-                />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  autoFocus
-                  className="w-full pl-10 pr-4 py-3 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Outfit] text-base placeholder-[#6B7280] focus:outline-none focus:border-[#C62828] focus:ring-1 focus:ring-[#C62828]/30 transition-colors"
-                />
+              <div>
+                <label className="block text-[#9CA3AF] text-sm font-[Outfit] mb-2">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280]" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                    placeholder="your@email.com"
+                    autoFocus
+                    className="w-full pl-10 pr-4 py-3 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Outfit] text-base placeholder-[#6B7280] focus:outline-none focus:border-[#C62828] focus:ring-1 focus:ring-[#C62828]/30 transition-colors"
+                  />
+                </div>
+                {error && (
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex items-center gap-1.5 text-[#EF4444] text-xs mt-2 font-[Outfit]"
+                  >
+                    <AlertCircle size={12} /> {error}
+                  </motion.p>
+                )}
               </div>
-              {state === 'error' && (
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="flex items-center gap-1.5 text-[#EF4444] text-xs mt-2 font-[Outfit]"
-                >
-                  <AlertCircle size={12} /> {error}
-                </motion.p>
-              )}
-            </div>
 
-            <Button
-              type="submit"
-              variant="primary"
-              fullWidth
-              size="lg"
-              loading={state === 'sending'}
-              disabled={!email.trim()}
+              <Button
+                type="submit"
+                variant="primary"
+                fullWidth
+                size="lg"
+                loading={loading}
+                disabled={!email.trim()}
+              >
+                <Mail size={16} /> Send Sign-In Code
+              </Button>
+
+              <p className="text-center text-[#6B7280] text-xs font-[Outfit] leading-relaxed">
+                We'll email you a 6-digit code. No password needed.
+              </p>
+            </motion.form>
+          ) : (
+            <motion.form
+              key="code-step"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.25 }}
+              onSubmit={handleVerifyCode}
+              className="glass-card p-6 space-y-5"
             >
-              Send Magic Link ✨
-            </Button>
+              <div className="flex items-center gap-2 mb-1">
+                <button
+                  type="button"
+                  onClick={() => { setStep('email'); setCode(''); setError(''); }}
+                  className="text-[#9CA3AF] hover:text-[#E8E2D6] transition-colors"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <div>
+                  <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">
+                    Check your email
+                  </div>
+                  <div className="text-[#6B7280] text-xs font-[Outfit]">
+                    Code sent to {email}
+                  </div>
+                </div>
+              </div>
 
-            <p className="text-center text-[#6B7280] text-xs font-[Outfit] leading-relaxed">
-              No password needed. We'll email you a one-tap login link.
-            </p>
-          </form>
-        )}
+              <div>
+                <label className="flex items-center gap-1.5 text-[#9CA3AF] text-sm font-[Outfit] mb-3">
+                  <KeyRound size={14} /> 6-Digit Code
+                </label>
+                <input
+                  ref={codeRef}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="one-time-code"
+                  value={code}
+                  onChange={(e) => handleCodeChange(e.target.value)}
+                  placeholder="000000"
+                  maxLength={6}
+                  className="w-full px-4 py-4 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[JetBrains_Mono] text-3xl text-center tracking-[0.5em] placeholder-[#3A3A3A] focus:outline-none focus:border-[#C62828] focus:ring-1 focus:ring-[#C62828]/30 transition-colors"
+                />
+                {error && (
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex items-center gap-1.5 text-[#EF4444] text-xs mt-2 font-[Outfit]"
+                  >
+                    <AlertCircle size={12} /> {error}
+                  </motion.p>
+                )}
+              </div>
+
+              <Button
+                type="submit"
+                variant="primary"
+                fullWidth
+                size="lg"
+                loading={loading}
+                disabled={code.replace(/\s/g, '').length !== 6}
+              >
+                Sign In
+              </Button>
+
+              <div className="text-center">
+                {resent ? (
+                  <p className="text-[#22C55E] text-xs font-[Outfit]">Code resent!</p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleResend}
+                    className="text-[#9CA3AF] text-xs font-[Outfit] underline underline-offset-2 hover:text-[#E8E2D6] transition-colors"
+                  >
+                    Resend code
+                  </button>
+                )}
+              </div>
+            </motion.form>
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
   );
