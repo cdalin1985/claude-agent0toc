@@ -226,9 +226,26 @@ export default function MatchPage() {
             </Button>
           )}
 
+          {/* Opponent submitted — needs confirmation from this player */}
+          {match.status === 'submitted' && !hasSubmitted && (
+            <GlassCard className="p-4 mb-1" style={{ borderColor: 'rgba(245,158,11,0.4)', border: '1px solid rgba(245,158,11,0.4)' }}>
+              <div className="flex items-start gap-3">
+                <div className="text-2xl shrink-0">📋</div>
+                <div>
+                  <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">
+                    Opponent submitted — your confirmation needed
+                  </div>
+                  <div className="text-[#9CA3AF] text-xs font-[Outfit] mt-1">
+                    Recorded score: {match.player1_score}–{match.player2_score}. Submit your result below to confirm or dispute.
+                  </div>
+                </div>
+              </div>
+            </GlassCard>
+          )}
+
           {(match.status === 'in_progress' || match.status === 'submitted') && !hasSubmitted && (
             <Button variant="primary" fullWidth size="lg" onClick={() => { setSubmitStep('winner'); setSubmitError(''); }}>
-              <Flag size={18} /> Submit Final Result
+              <Flag size={18} /> {match.status === 'submitted' ? 'Confirm Result' : 'Submit Final Result'}
             </Button>
           )}
 

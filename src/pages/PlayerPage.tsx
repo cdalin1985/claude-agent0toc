@@ -107,11 +107,12 @@ export default function PlayerPage() {
           <div className="absolute inset-0 bg-gradient-to-br from-[#C62828]/5 to-transparent pointer-events-none" />
           <PoolBall position={ranking.position} size={80} className="mx-auto mb-4" />
           <h1 className="font-[Bebas_Neue] text-4xl text-[#E8E2D6]">{player.full_name}</h1>
-          <div className="flex items-center justify-center gap-4 mt-2">
+          <div className="flex items-center justify-center flex-wrap gap-2 mt-2">
             <span className="font-[JetBrains_Mono] text-2xl font-bold text-[#C62828]">
               #{ranking.position}
             </span>
             {metrics?.fargo_rating && <Badge variant="default">FR {metrics.fargo_rating}</Badge>}
+            {player.preferred_discipline && <Badge variant="default">{player.preferred_discipline}</Badge>}
             {!player.profile_id && <Badge variant="default">Unclaimed</Badge>}
             {stats?.best_rank_achieved && stats.best_rank_achieved < ranking.position && (
               <Badge variant="default">Best #{stats.best_rank_achieved}</Badge>
@@ -121,6 +122,11 @@ export default function PlayerPage() {
             <div className="text-[#6B7280] text-xs font-[JetBrains_Mono] mt-1">
               Robustness: {metrics.fargo_robustness}
             </div>
+          )}
+          {player.bio && (
+            <p className="text-[#9CA3AF] text-sm font-[Outfit] mt-3 max-w-xs mx-auto leading-snug">
+              {player.bio}
+            </p>
           )}
           {eligible && myPlayer && (
             <div className="mt-4">

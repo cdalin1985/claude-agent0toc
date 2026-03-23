@@ -18,6 +18,8 @@ const NotificationsPage= React.lazy(() => import('./pages/NotificationsPage'));
 const SettingsPage     = React.lazy(() => import('./pages/SettingsPage'));
 const AdminPage        = React.lazy(() => import('./pages/AdminPage'));
 const AuthCallbackPage = React.lazy(() => import('./pages/AuthCallbackPage'));
+const TreasuryPage     = React.lazy(() => import('./pages/TreasuryPage'));
+const ActivityPage     = React.lazy(() => import('./pages/ActivityPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -58,6 +60,8 @@ export default function App() {
               <Route path="/notifications" element={<Suspense><NotificationsPage /></Suspense>} />
               <Route path="/settings"      element={<Suspense><SettingsPage /></Suspense>} />
               <Route path="/admin"         element={<Suspense><AdminPage /></Suspense>} />
+              <Route path="/treasury"      element={<Suspense><TreasuryPage /></Suspense>} />
+              <Route path="/activity"      element={<Suspense><ActivityPage /></Suspense>} />
               <Route path="*"              element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

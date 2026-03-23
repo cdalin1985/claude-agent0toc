@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Swords, Trophy, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Swords, Trophy, TrendingUp, AlertTriangle, DollarSign } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { useRankings } from '../hooks/useRankings';
@@ -220,12 +220,37 @@ export default function HomePage() {
         </motion.div>
       )}
 
+      {/* Quick links — Treasury + Activity */}
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18, duration: 0.4 }}>
+        <div className="grid grid-cols-2 gap-3">
+          <GlassCard className="p-4" hover onClick={() => navigate('/activity')}>
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingUp size={16} className="text-[#9CA3AF]" />
+              <span className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">Activity</span>
+            </div>
+            <div className="text-[#6B7280] text-xs font-[Outfit]">Full league journal</div>
+          </GlassCard>
+          <GlassCard className="p-4" hover onClick={() => navigate('/treasury')}>
+            <div className="flex items-center gap-2 mb-1">
+              <DollarSign size={16} className="text-[#9CA3AF]" />
+              <span className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">Treasury</span>
+            </div>
+            <div className="text-[#6B7280] text-xs font-[Outfit]">League funds</div>
+          </GlassCard>
+        </div>
+      </motion.div>
+
       {/* Activity feed */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.4 }}>
         <GlassCard className="p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <TrendingUp size={18} className="text-[#9CA3AF]" />
-            <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6]">League Activity</h2>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <TrendingUp size={18} className="text-[#9CA3AF]" />
+              <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6]">League Activity</h2>
+            </div>
+            <button onClick={() => navigate('/activity')} className="text-[#C62828] text-xs font-[Outfit]">
+              View all →
+            </button>
           </div>
           {feed.length === 0 ? (
             <p className="text-[#6B7280] text-sm font-[Outfit] py-4 text-center">

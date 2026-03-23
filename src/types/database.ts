@@ -21,6 +21,8 @@ export interface Database {
           id: string;
           profile_id: string | null;
           full_name: string;
+          bio: string | null;
+          preferred_discipline: '8 Ball' | '9 Ball' | '10 Ball' | null;
           is_active: boolean;
           created_at: string;
           updated_at: string;

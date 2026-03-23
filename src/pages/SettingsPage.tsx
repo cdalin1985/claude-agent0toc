@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { LogOut, User, Volume2, VolumeX, Shield, Bell, BellOff } from 'lucide-react';
+import { LogOut, User, Volume2, VolumeX, Shield, Bell, BellOff, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
@@ -11,22 +11,48 @@ import { PoolBall } from '../components/PoolBall';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 
+const DISCIPLINES = ['8 Ball', '9 Ball', '10 Ball'] as const;
+
 export default function SettingsPage() {
   const navigate  = useNavigate();
   const { profile, player, reset } = useAuthStore();
   const { soundEnabled, setSoundEnabled } = useUIStore();
   const { supported: pushSupported, subscribed: pushSubscribed, permission: pushPermission, loading: pushLoading, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications();
   const { data: rankings = [] } = useRankings();
-  const [displayName, setDisplayName] = useState(profile?.display_name ?? '');
-  const [saving, setSaving]           = useState(false);
-  const [signingOut, setSigningOut]   = useState(false);
+  const [displayName,   setDisplayName]   = useState(profile?.display_name ?? '');
+  const [bio,           setBio]           = useState('');
+  const [preferredDisc, setPreferredDisc] = useState<typeof DISCIPLINES[number] | ''>('');
+  const [saving,        setSaving]        = useState(false);
+  const [signingOut,    setSigningOut]    = useState(false);
 
   const myRanking = rankings.find((r) => r.player.id === player?.id);
+
+  // Load bio and preferred_discipline from fresh player data
+  useEffect(() => {
+    if (!player) return;
+    supabase.from('players').select('bio, preferred_discipline').eq('id', player.id).single()
+      .then(({ data }) => {
+        if (data) {
+          setBio(data.bio ?? '');
+          setPreferredDisc((data.preferred_discipline as typeof DISCIPLINES[number] | null) ?? '');
+        }
+      });
+  }, [player?.id]);
 
   const handleSaveName = async () => {
     if (!profile || !displayName.trim()) return;
     setSaving(true);
     await supabase.from('profiles').update({ display_name: displayName.trim() }).eq('id', profile.id);
+    setSaving(false);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!player) return;
+    setSaving(true);
+    await supabase.from('players').update({
+      bio: bio.trim() || null,
+      preferred_discipline: preferredDisc || null,
+    }).eq('id', player.id);
     setSaving(false);
   };
 
@@ -74,7 +100,52 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="text-xs text-[#6B7280] font-[Outfit]">
+            {/* Bio */}
+            <div className="mb-4">
+              <label className="block text-[#9CA3AF] text-sm font-[Outfit] mb-2 flex items-center gap-1">
+                <FileText size={14} /> Bio
+              </label>
+              <textarea
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                maxLength={200}
+                rows={3}
+                placeholder="A few words about your game…"
+                className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Outfit] text-sm focus:outline-none focus:border-[#C62828] transition-colors resize-none"
+              />
+              <div className="text-right text-xs text-[#6B7280] font-[Outfit] mt-1">
+                {bio.length}/200
+              </div>
+            </div>
+
+            {/* Preferred discipline */}
+            <div className="mb-5">
+              <label className="block text-[#9CA3AF] text-sm font-[Outfit] mb-2">
+                Preferred Discipline
+              </label>
+              <div className="flex gap-2">
+                {DISCIPLINES.map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setPreferredDisc(preferredDisc === d ? '' : d)}
+                    className={[
+                      'flex-1 py-2 rounded-lg text-xs font-[Outfit] font-medium border transition-all',
+                      preferredDisc === d
+                        ? 'bg-[#C62828] border-[#C62828] text-white'
+                        : 'border-[#333] text-[#9CA3AF]',
+                    ].join(' ')}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <Button variant="primary" fullWidth loading={saving} onClick={handleSaveProfile}>
+              Save Profile
+            </Button>
+
+            <div className="text-xs text-[#6B7280] font-[Outfit] mt-3">
               Email (read-only): {profile?.email}
             </div>
           </GlassCard>

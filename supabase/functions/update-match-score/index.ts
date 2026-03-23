@@ -22,6 +22,19 @@ serve(async (req) => {
     const isP2 = match.player2_id === caller.id;
     if (!isP1 && !isP2) return new Response(JSON.stringify({ error: 'Not a participant in this match.' }), { headers: cors });
 
+    const newP1Score = isP1 ? my_score : opponent_score;
+    const newP2Score = isP1 ? opponent_score : my_score;
+
+    // Prevent scores exceeding race_length
+    if (newP1Score > match.race_length || newP2Score > match.race_length) {
+      return new Response(JSON.stringify({ error: 'Score cannot exceed race length.' }), { headers: cors });
+    }
+
+    // Prevent ties — once one player reaches race_length the other cannot also reach it
+    if (newP1Score >= match.race_length && newP2Score >= match.race_length) {
+      return new Response(JSON.stringify({ error: 'Tie not possible. Only one player can win.' }), { headers: cors });
+    }
+
     const updates: Record<string, unknown> = {};
 
     // Transition to in_progress if needed
@@ -30,13 +43,8 @@ serve(async (req) => {
       updates.started_at = new Date().toISOString();
     }
 
-    if (isP1) {
-      updates.player1_score = my_score;
-      updates.player2_score = opponent_score;
-    } else {
-      updates.player2_score = my_score;
-      updates.player1_score = opponent_score;
-    }
+    updates.player1_score = newP1Score;
+    updates.player2_score = newP2Score;
 
     await supabase.from('matches').update(updates).eq('id', match_id);
 
