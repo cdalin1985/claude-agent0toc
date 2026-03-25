@@ -79,17 +79,6 @@ serve(async (req) => {
       }
     }
 
-    // Check weekly challenge limit (2 per rolling 7-day window)
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-    const { count: weeklyCount } = await supabase
-      .from('challenges')
-      .select('id', { count: 'exact', head: true })
-      .eq('challenger_id', challenger.id)
-      .gte('created_at', sevenDaysAgo);
-    if ((weeklyCount ?? 0) >= 2) {
-      return new Response(JSON.stringify({ error: 'You have reached your limit of 2 challenges per week.' }), { headers: corsHeaders });
-    }
-
     // Check no pending outgoing challenge
     const { data: existingOut } = await supabase
       .from('challenges')
