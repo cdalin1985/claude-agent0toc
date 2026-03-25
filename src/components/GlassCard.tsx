@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 interface GlassCardProps {
   children: React.ReactNode;
   className?: string;
+  style?: React.CSSProperties;
   hover?: boolean;
   onClick?: () => void;
   gold?: boolean; // top-3 gold shimmer
@@ -14,6 +15,7 @@ interface GlassCardProps {
 export const GlassCard: React.FC<GlassCardProps> = ({
   children,
   className = '',
+  style,
   hover = false,
   onClick,
   gold = false,
@@ -27,13 +29,15 @@ export const GlassCard: React.FC<GlassCardProps> = ({
     (glow ? 'border-[#C62828]/40 shadow-[0_0_20px_rgba(198,40,40,0.15)] ' : '') +
     className;
 
+  const resolvedStyle = { ...(glow ? { borderColor: 'rgba(198,40,40,0.35)' } : {}), ...style };
+
   if (onClick) {
     return (
       <motion.div
         className={base}
         onClick={onClick}
         whileTap={{ scale: 0.98 }}
-        style={glow ? { borderColor: 'rgba(198,40,40,0.35)' } : undefined}
+        style={resolvedStyle}
       >
         {children}
       </motion.div>
@@ -41,7 +45,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   }
 
   return (
-    <div className={base} style={glow ? { borderColor: 'rgba(198,40,40,0.35)' } : undefined}>
+    <div className={base} style={resolvedStyle}>
       {children}
     </div>
   );
