@@ -123,6 +123,11 @@ export default function MatchPage() {
     setSubmitStep(null);
     qc.invalidateQueries({ queryKey: ['match', id] });
     qc.invalidateQueries({ queryKey: ['rankings'] });
+    qc.invalidateQueries({ queryKey: ['matches'] });
+    qc.invalidateQueries({ queryKey: ['home-action-matches'] });
+    qc.invalidateQueries({ queryKey: ['home-pending-challenges'] });
+    qc.invalidateQueries({ queryKey: ['notifications'] });
+    qc.invalidateQueries({ queryKey: ['activity-feed'] });
   };
 
   const hasSubmitted = (isPlayer1 && match.player1_submitted) || (isPlayer2 && match.player2_submitted);
