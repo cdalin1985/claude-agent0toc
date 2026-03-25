@@ -40,7 +40,7 @@ export default function LoginPage() {
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = code.replace(/\s/g, '');
-    if (trimmed.length !== 6) return;
+    if (trimmed.length !== 8) return;
     setLoading(true);
     setError('');
     const { error: err } = await supabase.auth.verifyOtp({
@@ -63,7 +63,7 @@ export default function LoginPage() {
   };
 
   const handleCodeChange = (val: string) => {
-    const digits = val.replace(/\D/g, '').slice(0, 6);
+    const digits = val.replace(/\D/g, '').slice(0, 8);
     setCode(digits);
     setError('');
   };
@@ -189,7 +189,7 @@ export default function LoginPage() {
 
               <div>
                 <label className="flex items-center gap-1.5 text-[#9CA3AF] text-sm font-[Outfit] mb-3">
-                  <KeyRound size={14} /> 6-Digit Code
+                  <KeyRound size={14} /> 8-Digit Code
                 </label>
                 <input
                   ref={codeRef}
@@ -199,8 +199,8 @@ export default function LoginPage() {
                   autoComplete="one-time-code"
                   value={code}
                   onChange={(e) => handleCodeChange(e.target.value)}
-                  placeholder="000000"
-                  maxLength={6}
+                  placeholder="00000000"
+                  maxLength={8}
                   className="w-full px-4 py-4 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[JetBrains_Mono] text-3xl text-center tracking-[0.5em] placeholder-[#3A3A3A] focus:outline-none focus:border-[#C62828] focus:ring-1 focus:ring-[#C62828]/30 transition-colors"
                 />
                 {error && (
@@ -220,7 +220,7 @@ export default function LoginPage() {
                 fullWidth
                 size="lg"
                 loading={loading}
-                disabled={code.replace(/\s/g, '').length !== 6}
+                disabled={code.replace(/\s/g, '').length !== 8}
               >
                 Sign In
               </Button>
