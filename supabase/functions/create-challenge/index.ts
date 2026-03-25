@@ -90,16 +90,6 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'You have reached your limit of 2 challenges per week.' }), { headers: corsHeaders });
     }
 
-    // Check post-match cooldown (24h after a win)
-    const { data: cooldown } = await supabase
-      .from('cooldowns')
-      .select('id')
-      .eq('player_id', challenger.id)
-      .eq('type', 'post_match')
-      .gt('expires_at', new Date().toISOString())
-      .single();
-    if (cooldown) return new Response(JSON.stringify({ error: 'You must wait 24 hours after a match win before challenging again.' }), { headers: corsHeaders });
-
     // Check no pending outgoing challenge
     const { data: existingOut } = await supabase
       .from('challenges')
@@ -118,8 +108,8 @@ serve(async (req) => {
       .single();
     if (existingIn) return new Response(JSON.stringify({ error: 'That player already has a pending challenge they must respond to first.' }), { headers: corsHeaders });
 
-    // Create challenge — 48 hour response window
-    const expiresAt = new Date(Date.now() + 48 * 3600 * 1000).toISOString();
+    // Create challenge — 7 day response window
+    const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
     const { data: challenge, error: insertErr } = await supabase.from('challenges').insert({
       challenger_id: challenger.id,
       challenged_id: challenged_player_id,
@@ -165,7 +155,7 @@ serve(async (req) => {
       player_id: challenged_player_id,
       type: 'challenge_received',
       title: `⚔️ ${challengerPlayer?.full_name} challenged you!`,
-      body: `${discipline} · Race to ${race_length}. You have 48 hours to respond.`,
+      body: `${discipline} · Race to ${race_length}. You have 7 days to respond.`,
       reference_id: challenge.id,
       reference_type: 'challenge',
     });

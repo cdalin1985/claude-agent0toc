@@ -244,13 +244,6 @@ async function confirmResult(
     }
   }
 
-  // 24h post-match cooldown only on the winner (must wait before challenging up)
-  await supabase.from('cooldowns').insert({
-    player_id: winnerId,
-    type: 'post_match',
-    expires_at: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
-  });
-
   // Notifications
   const [wp, lp] = await Promise.all([
     supabase.from('players').select('full_name').eq('id', winnerId).single(),
