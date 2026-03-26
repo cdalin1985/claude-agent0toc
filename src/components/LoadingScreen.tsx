@@ -16,21 +16,30 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ visible }) => (
       >
         {/* TOC wordmark */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="text-center"
+          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.6, ease: 'easeOut' }}
+          className="text-center relative"
         >
+          {/* Crimson halo behind text */}
           <div
-            className="font-[Bebas_Neue] text-8xl tracking-widest"
+            className="absolute inset-0 flex items-center justify-center pointer-events-none"
+            style={{
+              filter: 'blur(48px)',
+              background: 'radial-gradient(ellipse at center, rgba(198,40,40,0.35) 0%, transparent 70%)',
+            }}
+          />
+          <div
+            className="font-[Bebas_Neue] text-8xl tracking-widest relative"
             style={{
               color: '#E8E2D6',
-              textShadow: '0 0 60px rgba(198,40,40,0.5), 0 0 20px rgba(198,40,40,0.3)',
+              textShadow:
+                '0 0 60px rgba(198,40,40,0.7), 0 0 20px rgba(198,40,40,0.4), 0 2px 0 rgba(0,0,0,0.5)',
             }}
           >
             TOC
           </div>
-          <div className="text-[#9CA3AF] text-sm font-[Outfit] tracking-[0.3em] mt-1 uppercase">
+          <div className="text-[#9CA3AF] text-sm font-[Outfit] tracking-[0.35em] mt-1 uppercase">
             Helena Pool League
           </div>
         </motion.div>

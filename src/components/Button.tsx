@@ -11,11 +11,11 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const VARIANT_STYLES: Record<Variant, string> = {
-  primary:   'bg-[#C62828] hover:bg-[#EF5350] text-[#E8E2D6] shadow-lg hover:shadow-[0_0_20px_rgba(198,40,40,0.4)]',
-  secondary: 'bg-[#252525] hover:bg-[#333] text-[#E8E2D6] border border-[#333]',
-  danger:    'bg-[#EF4444]/20 hover:bg-[#EF4444]/30 text-[#EF4444] border border-[#EF4444]/30',
-  ghost:     'bg-transparent hover:bg-white/5 text-[#9CA3AF] border border-[#333]',
-  success:   'bg-[#22C55E]/20 hover:bg-[#22C55E]/30 text-[#22C55E] border border-[#22C55E]/30',
+  primary:   'bg-gradient-to-b from-[#E53935] to-[#B71C1C] hover:from-[#EF5350] hover:to-[#C62828] text-white border border-[#EF5350]/20 shadow-[0_4px_18px_rgba(198,40,40,0.45)] hover:shadow-[0_4px_28px_rgba(198,40,40,0.7)]',
+  secondary: 'bg-[#202020] hover:bg-[#2A2A2A] text-[#E8E2D6] border border-[#383838] hover:border-[#444]',
+  danger:    'bg-[#EF4444]/15 hover:bg-[#EF4444]/25 text-[#EF4444] border border-[#EF4444]/30',
+  ghost:     'bg-transparent hover:bg-white/5 text-[#9CA3AF] border border-[#333] hover:border-[#444]',
+  success:   'bg-[#22C55E]/15 hover:bg-[#22C55E]/25 text-[#22C55E] border border-[#22C55E]/30',
 };
 
 const SIZE_STYLES = {
@@ -41,7 +41,7 @@ export const Button: React.FC<ButtonProps> = ({
       whileTap={isDisabled ? undefined : { scale: 0.97 }}
       whileHover={isDisabled ? undefined : { y: -1 }}
       className={[
-        'rounded-[8px] font-semibold font-[Outfit] tracking-wide transition-all duration-200',
+        'rounded-[10px] font-semibold font-[Outfit] tracking-wide transition-all duration-200',
         'flex items-center justify-center gap-2 select-none',
         VARIANT_STYLES[variant],
         SIZE_STYLES[size],

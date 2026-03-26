@@ -10,6 +10,7 @@ export const EKGLine: React.FC<EKGLineProps> = ({ className = '', animated = tru
     viewBox="0 0 200 20"
     xmlns="http://www.w3.org/2000/svg"
     className={`w-[120px] h-[12px] ${className}`}
+    style={{ filter: 'drop-shadow(0 0 3px rgba(198,40,40,0.65))' }}
     aria-hidden
   >
     {animated && (

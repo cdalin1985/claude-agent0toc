@@ -57,15 +57,22 @@ export const BottomNav: React.FC<{ unreadCount: number }> = ({ unreadCount }) =>
               className="flex flex-col items-center -mt-4 relative"
               aria-label="Challenge"
             >
-              <div
-                className="w-14 h-14 rounded-full flex items-center justify-center relative"
-                style={{
-                  background: 'linear-gradient(135deg, #EF5350, #C62828)',
-                  boxShadow: '0 4px 20px rgba(198,40,40,0.5)',
-                  animation: !player ? 'pulse-glow 2.5s ease-in-out infinite' : undefined,
-                }}
-              >
-                <Icon size={24} strokeWidth={2.5} />
+              <div className="relative">
+                {/* Pulsing ring */}
+                <div
+                  className="absolute inset-0 rounded-full border border-[#C62828]/60"
+                  style={{ animation: 'ring-pulse 2s ease-out infinite' }}
+                />
+                {/* Button */}
+                <div
+                  className="w-14 h-14 rounded-full flex items-center justify-center relative z-10"
+                  style={{
+                    background: 'linear-gradient(145deg, #EF5350 0%, #C62828 55%, #8B0000 100%)',
+                    boxShadow: '0 4px 24px rgba(198,40,40,0.6), inset 0 1px 0 rgba(255,255,255,0.15)',
+                  }}
+                >
+                  <Icon size={24} strokeWidth={2.5} />
+                </div>
               </div>
               <span className="text-[10px] text-[#9CA3AF] mt-1 font-[Outfit]">{item.label}</span>
             </motion.button>

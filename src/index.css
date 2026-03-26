@@ -35,41 +35,65 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ── Glass Cards ──────────────────────────────────────────────── */
+
 .glass-card {
-  background: rgba(26, 26, 26, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05);
-  transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+  background: linear-gradient(160deg, rgba(30,24,24,0.93) 0%, rgba(18,13,13,0.89) 100%);
+  backdrop-filter: blur(24px) saturate(1.1);
+  -webkit-backdrop-filter: blur(24px) saturate(1.1);
+  border: 1px solid rgba(255,255,255,0.075);
+  border-radius: 14px;
+  box-shadow:
+    0 2px 4px rgba(0,0,0,0.25),
+    0 8px 32px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,255,255,0.055);
+  transition: all 0.28s cubic-bezier(0.4,0,0.2,1);
 }
 
 .glass-card-hover:hover {
-  border-color: rgba(255,255,255,0.15);
-  box-shadow: 0 12px 48px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.13);
+  box-shadow:
+    0 4px 8px rgba(0,0,0,0.3),
+    0 16px 48px rgba(0,0,0,0.65),
+    inset 0 1px 0 rgba(255,255,255,0.08);
   transform: translateY(-2px);
 }
 
+/* ── Gold shimmer (top-3) ─────────────────────────────────────── */
+
 .gold-shimmer { position: relative; overflow: hidden; }
+.gold-shimmer::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(155deg, rgba(212,175,55,0.08) 0%, transparent 55%);
+  pointer-events: none;
+  z-index: 0;
+}
 .gold-shimmer::after {
   content: '';
   position: absolute;
   top: 0; left: -100%;
-  width: 50%; height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(212,175,55,0.12), transparent);
-  animation: shimmer-gold 3s ease-in-out infinite;
+  width: 55%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(212,175,55,0.22), transparent);
+  animation: shimmer-gold 3.5s ease-in-out infinite;
   pointer-events: none;
+  z-index: 1;
 }
-@keyframes shimmer-gold { 0% { left: -100%; } 100% { left: 200%; } }
+@keyframes shimmer-gold { 0% { left: -100%; } 100% { left: 210%; } }
+
+/* ── Skeleton ─────────────────────────────────────────────────── */
 
 .skeleton {
-  background: linear-gradient(90deg, #1A1A1A 25%, #2A2A2A 50%, #1A1A1A 75%);
+  background: linear-gradient(90deg, #1A1A1A 25%, #242222 50%, #1A1A1A 75%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s infinite;
   border-radius: 8px;
 }
 @keyframes skeleton-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* ── Ambient animations ───────────────────────────────────────── */
 
 @keyframes drift1 {
   0%,100% { transform: translate(0,0) scale(1); }
@@ -81,17 +105,26 @@ body {
   33% { transform: translate(-40px,-20px) scale(1.03); }
   66% { transform: translate(30px,-40px) scale(0.98); }
 }
+@keyframes drift3 {
+  0%,100% { transform: translate(0,0) scale(1); }
+  50% { transform: translate(25px,-40px) scale(1.04); }
+}
 
 @keyframes float-up {
-  0% { opacity: 0; transform: translateY(0) scale(0.5); }
-  10% { opacity: 0.5; }
-  90% { opacity: 0.2; }
-  100% { opacity: 0; transform: translateY(-80px) scale(1); }
+  0% { opacity: 0; transform: translateY(0) scale(0.4); }
+  8% { opacity: 0.45; }
+  85% { opacity: 0.12; }
+  100% { opacity: 0; transform: translateY(-110px) scale(1.1); }
 }
 
 @keyframes pulse-glow {
-  0%,100% { box-shadow: 0 0 8px rgba(198,40,40,0.4); }
-  50% { box-shadow: 0 0 18px rgba(198,40,40,0.7); }
+  0%,100% { box-shadow: 0 4px 20px rgba(198,40,40,0.45), 0 0 8px rgba(198,40,40,0.3); }
+  50% { box-shadow: 0 4px 32px rgba(198,40,40,0.8), 0 0 20px rgba(198,40,40,0.6); }
+}
+
+@keyframes ring-pulse {
+  0% { transform: scale(1); opacity: 0.55; }
+  100% { transform: scale(1.75); opacity: 0; }
 }
 
 @keyframes ekg {
@@ -99,6 +132,9 @@ body {
   100% { stroke-dashoffset: 0; }
 }
 
-::-webkit-scrollbar { width: 4px; }
+/* ── Scrollbar ────────────────────────────────────────────────── */
+
+::-webkit-scrollbar { width: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: rgba(198,40,40,0.35); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(198,40,40,0.55); }
