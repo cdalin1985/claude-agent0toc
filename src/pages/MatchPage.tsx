@@ -20,7 +20,7 @@ function ScoreDisplay({ value, color }: { value: number; color: string }) {
       initial={{ scale: 1.3, opacity: 0.5 }}
       animate={{ scale: 1, opacity: 1 }}
       transition={{ type: 'spring', stiffness: 600, damping: 25 }}
-      className="font-[JetBrains_Mono] font-bold leading-none"
+      className="font-[Azeret_Mono] font-bold leading-none"
       style={{ fontSize: '72px', color }}
     >
       {value}
@@ -143,10 +143,10 @@ export default function MatchPage() {
         <Badge variant={match.status === 'confirmed' ? 'win' : match.status === 'disputed' ? 'loss' : 'pending'}>
           {match.status.replace('_', ' ').toUpperCase()}
         </Badge>
-        <div className="text-[#9CA3AF] text-xs font-[Outfit] mt-2">
+        <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-2">
           {match.discipline} · Race to {match.race_length}
         </div>
-        <div className="text-[#6B7280] text-xs font-[Outfit] mt-1">
+        <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">
           {formatDateTime(match.scheduled_at)} @ {match.venue}
         </div>
       </div>
@@ -156,7 +156,7 @@ export default function MatchPage() {
         <div className="flex items-center justify-around">
           <div className="flex flex-col items-center gap-2">
             <PoolBall position={p1Pos} size={52} />
-            <div className="font-[Outfit] font-semibold text-sm text-[#E8E2D6] text-center max-w-[80px] leading-tight">
+            <div className="font-[Barlow] font-semibold text-sm text-[#E8E2D6] text-center max-w-[80px] leading-tight">
               {p1Name.split(' ')[0]}
             </div>
             <ScoreDisplay
@@ -180,7 +180,7 @@ export default function MatchPage() {
 
           <div className="flex flex-col items-center gap-2">
             <PoolBall position={p2Pos} size={52} />
-            <div className="font-[Outfit] font-semibold text-sm text-[#E8E2D6] text-center max-w-[80px] leading-tight">
+            <div className="font-[Barlow] font-semibold text-sm text-[#E8E2D6] text-center max-w-[80px] leading-tight">
               {p2Name.split(' ')[0]}
             </div>
             <ScoreDisplay
@@ -202,7 +202,7 @@ export default function MatchPage() {
         </div>
 
         <div className="mt-6">
-          <div className="flex justify-between text-xs text-[#6B7280] font-[Outfit] mb-1">
+          <div className="flex justify-between text-xs text-[#6B7280] font-[Barlow] mb-1">
             <span>Race to {match.race_length}</span>
             <span>{Math.max(match.player1_score, match.player2_score)}/{match.race_length} games played</span>
           </div>
@@ -237,10 +237,10 @@ export default function MatchPage() {
               <div className="flex items-start gap-3">
                 <div className="text-2xl shrink-0">📋</div>
                 <div>
-                  <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">
+                  <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">
                     Opponent submitted — your confirmation needed
                   </div>
-                  <div className="text-[#9CA3AF] text-xs font-[Outfit] mt-1">
+                  <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-1">
                     Recorded score: {match.player1_score}–{match.player2_score}. Submit your result below to confirm or dispute.
                   </div>
                 </div>
@@ -257,8 +257,8 @@ export default function MatchPage() {
           {hasSubmitted && match.status === 'submitted' && (
             <GlassCard className="p-4 text-center">
               <CheckCircle size={32} className="text-[#22C55E] mx-auto mb-2" />
-              <div className="font-[Outfit] font-semibold text-[#E8E2D6]">Result submitted!</div>
-              <div className="text-[#9CA3AF] text-sm font-[Outfit] mt-1">
+              <div className="font-[Barlow] font-semibold text-[#E8E2D6]">Result submitted!</div>
+              <div className="text-[#9CA3AF] text-sm font-[Barlow] mt-1">
                 Waiting for your opponent to confirm…
               </div>
             </GlassCard>
@@ -270,7 +270,7 @@ export default function MatchPage() {
               <div className="font-[Bebas_Neue] text-4xl" style={{ color: isWinner ? '#22C55E' : '#EF4444' }}>
                 {isWinner ? 'Victory!' : 'Defeat'}
               </div>
-              <div className="text-[#9CA3AF] font-[Outfit] text-sm mt-2">
+              <div className="text-[#9CA3AF] font-[Barlow] text-sm mt-2">
                 Final: {match.player1_score}–{match.player2_score}
               </div>
             </GlassCard>
@@ -278,8 +278,8 @@ export default function MatchPage() {
 
           {match.status === 'disputed' && (
             <GlassCard className="p-4">
-              <div className="text-[#EF4444] font-[Outfit] font-semibold mb-1">⚠️ Result Disputed</div>
-              <div className="text-[#9CA3AF] text-sm font-[Outfit]">
+              <div className="text-[#EF4444] font-[Barlow] font-semibold mb-1">⚠️ Result Disputed</div>
+              <div className="text-[#9CA3AF] text-sm font-[Barlow]">
                 The submitted scores don't match. An admin will review and resolve this match.
               </div>
             </GlassCard>
@@ -305,7 +305,7 @@ export default function MatchPage() {
               {submitStep === 'winner' && (
                 <>
                   <h2 className="font-[Bebas_Neue] text-2xl text-[#E8E2D6] mb-2">Who Won?</h2>
-                  <p className="text-[#9CA3AF] text-sm font-[Outfit] mb-5">
+                  <p className="text-[#9CA3AF] text-sm font-[Barlow] mb-5">
                     Final score: {match.player1_score}–{match.player2_score}
                   </p>
                   <div className="space-y-3 mb-5">
@@ -325,8 +325,8 @@ export default function MatchPage() {
                       >
                         <PoolBall position={p.pos} size={36} />
                         <div className="flex-1 text-left">
-                          <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">{p.name}</div>
-                          <div className="text-[#9CA3AF] text-xs font-[JetBrains_Mono]">{p.score} games</div>
+                          <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">{p.name}</div>
+                          <div className="text-[#9CA3AF] text-xs font-[Azeret_Mono]">{p.score} games</div>
                         </div>
                         {submittedWinner === p.id && <CheckCircle size={20} className="text-[#22C55E]" />}
                       </button>
@@ -348,7 +348,7 @@ export default function MatchPage() {
               {submitStep === 'payment' && (
                 <>
                   <h2 className="font-[Bebas_Neue] text-2xl text-[#E8E2D6] mb-2">Match Fee — $5</h2>
-                  <p className="text-[#9CA3AF] text-sm font-[Outfit] mb-5">
+                  <p className="text-[#9CA3AF] text-sm font-[Barlow] mb-5">
                     How are you paying your $5 match fee?
                   </p>
                   <div className="space-y-3 mb-5">
@@ -363,8 +363,8 @@ export default function MatchPage() {
                     >
                       <Mail size={24} className="text-[#9CA3AF] shrink-0" />
                       <div>
-                        <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">Used the envelope</div>
-                        <div className="text-[#6B7280] text-xs font-[Outfit] mt-0.5">Cash in the drop box at the venue</div>
+                        <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">Used the envelope</div>
+                        <div className="text-[#6B7280] text-xs font-[Barlow] mt-0.5">Cash in the drop box at the venue</div>
                       </div>
                       {paymentMethod === 'envelope' && <CheckCircle size={20} className="text-[#C62828] ml-auto" />}
                     </button>
@@ -379,13 +379,13 @@ export default function MatchPage() {
                     >
                       <Wallet size={24} className="text-[#9CA3AF] shrink-0" />
                       <div>
-                        <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">Paid digitally</div>
-                        <div className="text-[#6B7280] text-xs font-[Outfit] mt-0.5">Venmo, Cash App, or PayPal</div>
+                        <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">Paid digitally</div>
+                        <div className="text-[#6B7280] text-xs font-[Barlow] mt-0.5">Venmo, Cash App, or PayPal</div>
                       </div>
                       {paymentMethod === 'digital' && <CheckCircle size={20} className="text-[#C62828] ml-auto" />}
                     </button>
                   </div>
-                  {submitError && <p className="text-[#EF4444] text-xs font-[Outfit] mb-3">{submitError}</p>}
+                  {submitError && <p className="text-[#EF4444] text-xs font-[Barlow] mb-3">{submitError}</p>}
                   <div className="flex gap-2">
                     <Button variant="ghost" fullWidth onClick={() => setSubmitStep('winner')}>Back</Button>
                     <Button

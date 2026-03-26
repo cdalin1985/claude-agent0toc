@@ -98,7 +98,7 @@ export default function PlayerPage() {
     <div className="min-h-screen px-4 pt-4 pb-4">
       <button
         onClick={() => navigate(-1)}
-        className="flex items-center gap-1 text-[#9CA3AF] font-[Outfit] text-sm mb-4 p-2 -ml-2"
+        className="flex items-center gap-1 text-[#9CA3AF] font-[Barlow] text-sm mb-4 p-2 -ml-2"
       >
         <ChevronLeft size={18} /> Back
       </button>
@@ -110,7 +110,7 @@ export default function PlayerPage() {
           <Avatar player={player} size={80} className="mx-auto mb-4" />
           <h1 className="font-[Bebas_Neue] text-4xl text-[#E8E2D6]">{player.full_name}</h1>
           <div className="flex items-center justify-center flex-wrap gap-2 mt-2">
-            <span className="font-[JetBrains_Mono] text-2xl font-bold text-[#C62828]">
+            <span className="font-[Azeret_Mono] text-2xl font-bold text-[#C62828]">
               #{ranking.position}
             </span>
             {metrics?.fargo_rating && <Badge variant="default">FR {metrics.fargo_rating}</Badge>}
@@ -121,12 +121,12 @@ export default function PlayerPage() {
             )}
           </div>
           {metrics?.fargo_robustness && (
-            <div className="text-[#6B7280] text-xs font-[JetBrains_Mono] mt-1">
+            <div className="text-[#6B7280] text-xs font-[Azeret_Mono] mt-1">
               Robustness: {metrics.fargo_robustness}
             </div>
           )}
           {player.bio && (
-            <p className="text-[#9CA3AF] text-sm font-[Outfit] mt-3 max-w-xs mx-auto leading-snug">
+            <p className="text-[#9CA3AF] text-sm font-[Barlow] mt-3 max-w-xs mx-auto leading-snug">
               {player.bio}
             </p>
           )}
@@ -154,8 +154,8 @@ export default function PlayerPage() {
               { label: 'Matches',      value: totalMatches,                  color: '#9CA3AF' },
             ].map((s) => (
               <div key={s.label} className="text-center bg-[#252525]/60 rounded-xl p-3">
-                <div className="font-[JetBrains_Mono] font-bold text-2xl" style={{ color: s.color }}>{s.value}</div>
-                <div className="text-[#6B7280] text-xs font-[Outfit] mt-1">{s.label}</div>
+                <div className="font-[Azeret_Mono] font-bold text-2xl" style={{ color: s.color }}>{s.value}</div>
+                <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">{s.label}</div>
               </div>
             ))}
           </div>
@@ -167,8 +167,8 @@ export default function PlayerPage() {
               { label: 'Forfeit W',     value: stats?.forfeit_wins ?? 0,     color: '#D4AF37' },
             ].map((s) => (
               <div key={s.label} className="text-center bg-[#252525]/60 rounded-xl p-3">
-                <div className="font-[JetBrains_Mono] font-bold text-2xl" style={{ color: s.color }}>{s.value}</div>
-                <div className="text-[#6B7280] text-xs font-[Outfit] mt-1">{s.label}</div>
+                <div className="font-[Azeret_Mono] font-bold text-2xl" style={{ color: s.color }}>{s.value}</div>
+                <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">{s.label}</div>
               </div>
             ))}
           </div>
@@ -186,7 +186,7 @@ export default function PlayerPage() {
                 key={d}
                 onClick={() => setDiscTab(d)}
                 className={[
-                  'flex-1 py-2 rounded-lg text-xs font-[Outfit] font-medium transition-all duration-200 flex items-center justify-center gap-1',
+                  'flex-1 py-2 rounded-lg text-xs font-[Barlow] font-medium transition-all duration-200 flex items-center justify-center gap-1',
                   discTab === d ? 'bg-[#C62828] text-white' : 'text-[#9CA3AF]',
                 ].join(' ')}
               >
@@ -208,13 +208,13 @@ export default function PlayerPage() {
                 { label: 'Matches',       value: ds.matches_played,          color: '#9CA3AF' },
               ].map((s) => (
                 <div key={s.label} className="text-center bg-[#252525]/60 rounded-xl p-3">
-                  <div className="font-[JetBrains_Mono] font-bold text-2xl" style={{ color: s.color }}>{s.value}</div>
-                  <div className="text-[#6B7280] text-xs font-[Outfit] mt-1">{s.label}</div>
+                  <div className="font-[Azeret_Mono] font-bold text-2xl" style={{ color: s.color }}>{s.value}</div>
+                  <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">{s.label}</div>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-[#6B7280] text-sm font-[Outfit] text-center py-4">
+            <p className="text-[#6B7280] text-sm font-[Barlow] text-center py-4">
               No {discTab} matches played yet.
             </p>
           )}
@@ -228,13 +228,13 @@ export default function PlayerPage() {
             <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-3">Head to Head</h2>
             <div className="flex items-center justify-center gap-6">
               <div className="text-center">
-                <div className="font-[JetBrains_Mono] text-3xl font-bold text-[#22C55E]">{h2hWins}</div>
-                <div className="text-[#6B7280] text-xs font-[Outfit]">Your Wins</div>
+                <div className="font-[Azeret_Mono] text-3xl font-bold text-[#22C55E]">{h2hWins}</div>
+                <div className="text-[#6B7280] text-xs font-[Barlow]">Your Wins</div>
               </div>
               <div className="text-[#6B7280] text-lg font-[Bebas_Neue]">VS</div>
               <div className="text-center">
-                <div className="font-[JetBrains_Mono] text-3xl font-bold text-[#EF4444]">{h2hLosses}</div>
-                <div className="text-[#6B7280] text-xs font-[Outfit]">Their Wins</div>
+                <div className="font-[Azeret_Mono] text-3xl font-bold text-[#EF4444]">{h2hLosses}</div>
+                <div className="text-[#6B7280] text-xs font-[Barlow]">Their Wins</div>
               </div>
             </div>
           </GlassCard>
@@ -250,7 +250,7 @@ export default function PlayerPage() {
               {Array.from({ length: 3 }).map((_, i) => <div key={i} className="skeleton h-12 rounded-lg" />)}
             </div>
           ) : matches.length === 0 ? (
-            <p className="text-[#6B7280] text-sm font-[Outfit] py-4 text-center">No matches yet.</p>
+            <p className="text-[#6B7280] text-sm font-[Barlow] py-4 text-center">No matches yet.</p>
           ) : (
             <>
               {/* Filters */}
@@ -260,7 +260,7 @@ export default function PlayerPage() {
                     key={f}
                     onClick={() => setHistoryFilter(f)}
                     className={[
-                      'px-3 py-1 rounded-full text-xs font-[Outfit] font-medium whitespace-nowrap transition-all shrink-0',
+                      'px-3 py-1 rounded-full text-xs font-[Barlow] font-medium whitespace-nowrap transition-all shrink-0',
                       historyFilter === f ? 'bg-[#C62828] text-white' : 'bg-[#1A1A1A] text-[#9CA3AF] border border-[#333]',
                     ].join(' ')}
                   >
@@ -285,10 +285,10 @@ export default function PlayerPage() {
                       <div key={m.id} className="flex items-center gap-3 p-3 rounded-lg bg-[#252525]/50">
                         <div className={`w-1 h-8 rounded-full ${won ? 'bg-[#22C55E]' : 'bg-[#EF4444]'}`} />
                         <div className="flex-1">
-                          <div className="text-sm font-[Outfit] font-medium text-[#E8E2D6]">{m.discipline}</div>
-                          <div className="text-xs text-[#6B7280] font-[Outfit]">{formatDate(m.completed_at ?? m.scheduled_at)}</div>
+                          <div className="text-sm font-[Barlow] font-medium text-[#E8E2D6]">{m.discipline}</div>
+                          <div className="text-xs text-[#6B7280] font-[Barlow]">{formatDate(m.completed_at ?? m.scheduled_at)}</div>
                         </div>
-                        <div className="font-[JetBrains_Mono] font-bold text-lg text-[#E8E2D6]">
+                        <div className="font-[Azeret_Mono] font-bold text-lg text-[#E8E2D6]">
                           <span style={{ color: won ? '#22C55E' : '#EF4444' }}>{s1}</span>–{s2}
                         </div>
                       </div>

@@ -47,7 +47,7 @@ export default function TreasuryPage() {
       <h1 className="font-[Bebas_Neue] text-5xl tracking-wide text-[#E8E2D6] mb-1">
         League Treasury
       </h1>
-      <p className="text-[#6B7280] text-sm font-[Outfit] mb-5">
+      <p className="text-[#6B7280] text-sm font-[Barlow] mb-5">
         Transparent record of all league funds
       </p>
 
@@ -59,17 +59,17 @@ export default function TreasuryPage() {
       >
         <GlassCard className="p-4 text-center">
           <TrendingUp size={18} className="text-[#22C55E] mx-auto mb-1" />
-          <div className="font-[JetBrains_Mono] font-bold text-base text-[#22C55E]">
+          <div className="font-[Azeret_Mono] font-bold text-base text-[#22C55E]">
             {fmt(totalCredits)}
           </div>
-          <div className="text-[#6B7280] text-xs font-[Outfit] mt-1">Total In</div>
+          <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">Total In</div>
         </GlassCard>
         <GlassCard className="p-4 text-center">
           <TrendingDown size={18} className="text-[#EF4444] mx-auto mb-1" />
-          <div className="font-[JetBrains_Mono] font-bold text-base text-[#EF4444]">
+          <div className="font-[Azeret_Mono] font-bold text-base text-[#EF4444]">
             {fmt(totalDebits)}
           </div>
-          <div className="text-[#6B7280] text-xs font-[Outfit] mt-1">Total Out</div>
+          <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">Total Out</div>
         </GlassCard>
         <GlassCard className="p-4 text-center">
           <DollarSign
@@ -77,12 +77,12 @@ export default function TreasuryPage() {
             className={`mx-auto mb-1 ${balance >= 0 ? 'text-[#E8E2D6]' : 'text-[#EF4444]'}`}
           />
           <div
-            className="font-[JetBrains_Mono] font-bold text-base"
+            className="font-[Azeret_Mono] font-bold text-base"
             style={{ color: balance >= 0 ? '#E8E2D6' : '#EF4444' }}
           >
             {fmt(Math.abs(balance))}
           </div>
-          <div className="text-[#6B7280] text-xs font-[Outfit] mt-1">Balance</div>
+          <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">Balance</div>
         </GlassCard>
       </motion.div>
 
@@ -102,7 +102,7 @@ export default function TreasuryPage() {
               ))}
             </div>
           ) : entries.length === 0 ? (
-            <p className="text-[#6B7280] text-sm font-[Outfit] text-center py-8">
+            <p className="text-[#6B7280] text-sm font-[Barlow] text-center py-8">
               No treasury entries yet.
             </p>
           ) : (
@@ -122,16 +122,16 @@ export default function TreasuryPage() {
                       style={{ background: color }}
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-[Outfit] text-[#E8E2D6] leading-tight">
+                      <div className="text-sm font-[Barlow] text-[#E8E2D6] leading-tight">
                         {e.description}
                       </div>
-                      <div className="text-xs text-[#6B7280] font-[Outfit] mt-0.5">
+                      <div className="text-xs text-[#6B7280] font-[Barlow] mt-0.5">
                         {formatDate(e.created_at)}
                       </div>
                     </div>
                     <div className="text-right shrink-0">
                       <div
-                        className="font-[JetBrains_Mono] font-bold text-sm"
+                        className="font-[Azeret_Mono] font-bold text-sm"
                         style={{ color }}
                       >
                         {sign}{fmt(e.amount_cents)}

@@ -88,7 +88,7 @@ function RespondInline({
       <select
         value={venue}
         onChange={(e) => setVenue(e.target.value as Venue)}
-        className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Outfit] text-sm focus:outline-none focus:border-[#C62828]"
+        className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
       >
         <option value="">Select venue…</option>
         {VENUES.map((v) => <option key={v} value={v}>{v}</option>)}
@@ -99,16 +99,16 @@ function RespondInline({
           value={date}
           onChange={(e) => setDate(e.target.value)}
           min={new Date().toISOString().split('T')[0]}
-          className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Outfit] text-sm focus:outline-none focus:border-[#C62828]"
+          className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
         />
         <input
           type="time"
           value={time}
           onChange={(e) => setTime(e.target.value)}
-          className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Outfit] text-sm focus:outline-none focus:border-[#C62828]"
+          className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
         />
       </div>
-      {error && <p className="text-[#EF4444] text-xs font-[Outfit]">{error}</p>}
+      {error && <p className="text-[#EF4444] text-xs font-[Barlow]">{error}</p>}
       <div className="flex gap-2">
         <Button variant="ghost" size="sm" fullWidth onClick={() => setOpen(false)}>Back</Button>
         <Button variant="success" size="sm" fullWidth loading={loading} onClick={handleAccept}>
@@ -175,7 +175,7 @@ export default function NotificationsPage() {
             <motion.span
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              className="bg-[#C62828] text-white text-xs font-bold rounded-full px-2 py-0.5 font-[JetBrains_Mono]"
+              className="bg-[#C62828] text-white text-xs font-bold rounded-full px-2 py-0.5 font-[Azeret_Mono]"
             >
               {unread}
             </motion.span>
@@ -184,7 +184,7 @@ export default function NotificationsPage() {
         {unread > 0 && (
           <button
             onClick={markAllRead}
-            className="flex items-center gap-1 text-[#C62828] text-sm font-[Outfit]"
+            className="flex items-center gap-1 text-[#C62828] text-sm font-[Barlow]"
           >
             <CheckCheck size={16} /> Mark all read
           </button>
@@ -220,11 +220,11 @@ export default function NotificationsPage() {
                   <div className="flex items-start gap-3">
                     <span className="text-2xl shrink-0">{TYPE_ICONS[n.type] ?? '🎱'}</span>
                     <div className="flex-1 min-w-0">
-                      <div className={`font-[Outfit] font-semibold text-sm ${n.is_read ? 'text-[#9CA3AF]' : 'text-[#E8E2D6]'}`}>
+                      <div className={`font-[Barlow] font-semibold text-sm ${n.is_read ? 'text-[#9CA3AF]' : 'text-[#E8E2D6]'}`}>
                         {n.title}
                       </div>
-                      <div className="text-[#9CA3AF] text-xs font-[Outfit] mt-0.5 leading-relaxed">{n.body}</div>
-                      <div className="text-[#6B7280] text-xs font-[Outfit] mt-1">
+                      <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-0.5 leading-relaxed">{n.body}</div>
+                      <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">
                         {formatDistanceToNow(n.created_at)}
                       </div>
 
@@ -240,7 +240,7 @@ export default function NotificationsPage() {
                       {isResultSubmitted && (
                         <button
                           onClick={() => navigate(`/match/${n.reference_id}`)}
-                          className="mt-2 px-3 py-1.5 rounded-lg bg-[#F59E0B]/20 border border-[#F59E0B]/40 text-[#F59E0B] text-xs font-[Outfit] font-semibold"
+                          className="mt-2 px-3 py-1.5 rounded-lg bg-[#F59E0B]/20 border border-[#F59E0B]/40 text-[#F59E0B] text-xs font-[Barlow] font-semibold"
                         >
                           Confirm Result →
                         </button>

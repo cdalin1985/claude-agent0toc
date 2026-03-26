@@ -52,16 +52,16 @@ export const PWAInstallBanner: React.FC = () => {
           <div className="max-w-sm mx-auto flex items-center gap-3">
             <span className="text-xl shrink-0">🎱</span>
             <div className="flex-1 min-w-0">
-              <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm leading-tight">
+              <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm leading-tight">
                 Add to Home Screen
               </div>
-              <div className="text-[#9CA3AF] text-xs font-[Outfit]">
+              <div className="text-[#9CA3AF] text-xs font-[Barlow]">
                 Install for the best experience
               </div>
             </div>
             <button
               onClick={handleInstall}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C62828] text-white text-xs font-[Outfit] font-semibold shrink-0 active:opacity-80"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C62828] text-white text-xs font-[Barlow] font-semibold shrink-0 active:opacity-80"
             >
               <Download size={12} /> Install
             </button>

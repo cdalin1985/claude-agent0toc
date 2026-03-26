@@ -64,7 +64,7 @@ export default function ActivityPage() {
       <h1 className="font-[Bebas_Neue] text-5xl tracking-wide text-[#E8E2D6] mb-1">
         League Activity
       </h1>
-      <p className="text-[#6B7280] text-sm font-[Outfit] mb-4">
+      <p className="text-[#6B7280] text-sm font-[Barlow] mb-4">
         Live journal of every league event
       </p>
 
@@ -75,7 +75,7 @@ export default function ActivityPage() {
             key={f.key}
             onClick={() => { setFilter(f.key); setLimit(40); }}
             className={[
-              'flex-1 py-2 rounded-lg text-xs font-[Outfit] font-medium transition-all duration-200',
+              'flex-1 py-2 rounded-lg text-xs font-[Barlow] font-medium transition-all duration-200',
               filter === f.key ? 'bg-[#C62828] text-white' : 'text-[#9CA3AF]',
             ].join(' ')}
           >
@@ -92,7 +92,7 @@ export default function ActivityPage() {
             ))}
           </div>
         ) : feed.length === 0 ? (
-          <p className="text-[#6B7280] text-sm font-[Outfit] text-center py-10">
+          <p className="text-[#6B7280] text-sm font-[Barlow] text-center py-10">
             No activity yet.
           </p>
         ) : (
@@ -110,15 +110,15 @@ export default function ActivityPage() {
                     {EVENT_ICON[item.event_type] ?? '🎱'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-[Outfit] text-[#E8E2D6] leading-snug">
+                    <div className="text-sm font-[Barlow] text-[#E8E2D6] leading-snug">
                       {item.headline}
                     </div>
                     {item.detail && (
-                      <div className="text-xs text-[#9CA3AF] font-[Outfit] mt-0.5">
+                      <div className="text-xs text-[#9CA3AF] font-[Barlow] mt-0.5">
                         {item.detail}
                       </div>
                     )}
-                    <div className="text-[#6B7280] text-xs font-[Outfit] mt-0.5">
+                    <div className="text-[#6B7280] text-xs font-[Barlow] mt-0.5">
                       {formatDistanceToNow(item.created_at)}
                     </div>
                   </div>
@@ -129,7 +129,7 @@ export default function ActivityPage() {
             {feed.length >= limit && (
               <button
                 onClick={() => setLimit((l) => l + 40)}
-                className="w-full text-center text-[#C62828] text-sm font-[Outfit] font-medium py-3 mt-2 border border-[#C62828]/30 rounded-xl active:bg-[#C62828]/10 transition-colors"
+                className="w-full text-center text-[#C62828] text-sm font-[Barlow] font-medium py-3 mt-2 border border-[#C62828]/30 rounded-xl active:bg-[#C62828]/10 transition-colors"
               >
                 Load more
               </button>

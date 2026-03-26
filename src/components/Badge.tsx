@@ -19,7 +19,7 @@ interface BadgeProps {
 
 export const Badge: React.FC<BadgeProps> = ({ variant = 'default', children, className = '' }) => (
   <span
-    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold font-[Outfit] ${BADGE_STYLES[variant]} ${className}`}
+    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold font-[Barlow] ${BADGE_STYLES[variant]} ${className}`}
   >
     {children}
   </span>

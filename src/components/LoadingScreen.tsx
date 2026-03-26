@@ -39,7 +39,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ visible }) => (
           >
             TOC
           </div>
-          <div className="text-[#9CA3AF] text-sm font-[Outfit] tracking-[0.35em] mt-1 uppercase">
+          <div className="text-[#9CA3AF] text-sm font-[Barlow] tracking-[0.35em] mt-1 uppercase">
             Helena Pool League
           </div>
         </motion.div>

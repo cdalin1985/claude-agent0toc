@@ -82,7 +82,7 @@ export default function ChallengePage() {
             ⚔️
           </motion.div>
           <h1 className="font-[Bebas_Neue] text-5xl text-[#E8E2D6] mb-2">Challenge Sent!</h1>
-          <p className="text-[#9CA3AF] font-[Outfit] mb-8">
+          <p className="text-[#9CA3AF] font-[Barlow] mb-8">
             {target.player.full_name} has 7 days to respond.
           </p>
           <PoolBall position={target.ranking.position} size={80} className="mx-auto mb-8" />
@@ -102,7 +102,7 @@ export default function ChallengePage() {
           <ChevronLeft size={24} className="text-[#9CA3AF]" />
         </button>
         <div>
-          <div className="text-[#6B7280] text-xs font-[Outfit]">Step {step} of 3</div>
+          <div className="text-[#6B7280] text-xs font-[Barlow]">Step {step} of 3</div>
           <h1 className="font-[Bebas_Neue] text-3xl text-[#E8E2D6]">
             {step === 1 ? 'Choose Discipline' : step === 2 ? 'Set Race Length' : 'Confirm & Send'}
           </h1>
@@ -113,8 +113,8 @@ export default function ChallengePage() {
       <GlassCard className="p-4 flex items-center gap-3 mb-6">
         <PoolBall position={target.ranking.position} size={44} />
         <div>
-          <div className="font-[Outfit] font-semibold text-[#E8E2D6]">{target.player.full_name}</div>
-          <div className="text-[#9CA3AF] text-xs font-[JetBrains_Mono]">Rank #{target.ranking.position}</div>
+          <div className="font-[Barlow] font-semibold text-[#E8E2D6]">{target.player.full_name}</div>
+          <div className="text-[#9CA3AF] text-xs font-[Azeret_Mono]">Rank #{target.ranking.position}</div>
         </div>
         <div className="ml-auto text-2xl font-[Bebas_Neue] text-[#6B7280]">VS</div>
         {myRanking && <PoolBall position={myRanking.ranking.position} size={44} />}
@@ -141,7 +141,7 @@ export default function ChallengePage() {
                 <span className="text-4xl">{d.emoji}</span>
                 <div className="flex-1">
                   <div className="font-[Bebas_Neue] text-2xl text-[#E8E2D6]">{d.value}</div>
-                  <div className="text-[#9CA3AF] text-sm font-[Outfit]">{d.desc}</div>
+                  <div className="text-[#9CA3AF] text-sm font-[Barlow]">{d.desc}</div>
                 </div>
                 {discipline === d.value && <CheckCircle size={20} className="text-[#C62828] shrink-0" />}
               </GlassCard>
@@ -157,7 +157,7 @@ export default function ChallengePage() {
         {step === 2 && (
           <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
             <GlassCard className="p-6 text-center">
-              <div className="text-[#9CA3AF] font-[Outfit] text-sm mb-4">Race Length</div>
+              <div className="text-[#9CA3AF] font-[Barlow] text-sm mb-4">Race Length</div>
               <div className="flex items-center justify-center gap-5">
                 <button
                   onClick={() => { const n = Math.max(6, race - 1); setRace(n); setRaceInput(String(n)); setRaceError(''); }}
@@ -171,7 +171,7 @@ export default function ChallengePage() {
                     value={raceInput}
                     onChange={(e) => handleRaceChange(e.target.value)}
                     min={6}
-                    className="w-full text-center bg-transparent font-[JetBrains_Mono] font-bold text-6xl text-[#E8E2D6] focus:outline-none"
+                    className="w-full text-center bg-transparent font-[Azeret_Mono] font-bold text-6xl text-[#E8E2D6] focus:outline-none"
                   />
                 </div>
                 <button
@@ -181,10 +181,10 @@ export default function ChallengePage() {
                   <Plus size={20} className="text-[#9CA3AF]" />
                 </button>
               </div>
-              <div className={`text-sm mt-2 font-[Outfit] ${raceError ? 'text-[#EF4444]' : 'text-[#C62828]'}`}>
+              <div className={`text-sm mt-2 font-[Barlow] ${raceError ? 'text-[#EF4444]' : 'text-[#C62828]'}`}>
                 {raceError || `First to ${race} wins`}
               </div>
-              <div className="text-[#6B7280] text-xs font-[Outfit] mt-1">Minimum race to 6 · No maximum</div>
+              <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">Minimum race to 6 · No maximum</div>
             </GlassCard>
 
             <Button variant="primary" fullWidth size="lg" disabled={!!raceError || race < 6} onClick={() => setStep(3)}>
@@ -206,8 +206,8 @@ export default function ChallengePage() {
                   { label: 'Expires',    value: '7 days' },
                 ].map((row) => (
                   <div key={row.label} className="flex justify-between items-center">
-                    <span className="text-[#9CA3AF] text-sm font-[Outfit]">{row.label}</span>
-                    <span className="text-[#E8E2D6] font-[JetBrains_Mono] font-semibold text-sm">{row.value}</span>
+                    <span className="text-[#9CA3AF] text-sm font-[Barlow]">{row.label}</span>
+                    <span className="text-[#E8E2D6] font-[Azeret_Mono] font-semibold text-sm">{row.value}</span>
                   </div>
                 ))}
               </div>
@@ -215,13 +215,13 @@ export default function ChallengePage() {
 
             {/* Match fee reminder */}
             <GlassCard className="p-4">
-              <div className="text-[#F59E0B] text-sm font-[Outfit] leading-relaxed">
+              <div className="text-[#F59E0B] text-sm font-[Barlow] leading-relaxed">
                 💰 <strong>Match Fee: $5 per player.</strong> Use the envelope at the venue or pay digitally — you'll select your method when submitting the result.
               </div>
             </GlassCard>
 
             {error && (
-              <div className="text-[#EF4444] text-sm font-[Outfit] text-center p-3 bg-[#EF4444]/10 rounded-lg border border-[#EF4444]/20">
+              <div className="text-[#EF4444] text-sm font-[Barlow] text-center p-3 bg-[#EF4444]/10 rounded-lg border border-[#EF4444]/20">
                 {error}
               </div>
             )}

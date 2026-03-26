@@ -62,7 +62,7 @@ function RankCard({
         {/* Rank number */}
         <div className="w-8 text-center shrink-0">
           <span
-            className="font-[JetBrains_Mono] font-bold text-lg"
+            className="font-[Azeret_Mono] font-bold text-lg"
             style={{
               color: pos === 1 ? '#D4AF37' : pos === 2 ? '#9CA3AF' : pos === 3 ? '#CD7F32' : '#6B7280',
             }}
@@ -77,24 +77,24 @@ function RankCard({
         {/* Name + info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className={`font-[Outfit] font-semibold text-base truncate ${isMe ? 'text-[#E8E2D6]' : 'text-[#E8E2D6]'}`}>
+            <span className={`font-[Barlow] font-semibold text-base truncate ${isMe ? 'text-[#E8E2D6]' : 'text-[#E8E2D6]'}`}>
               {rp.player.full_name}
             </span>
             {isMe && <Badge variant="info" className="shrink-0">You</Badge>}
             {!rp.player.profile_id && <Badge variant="default" className="shrink-0 text-[10px]">Unclaimed</Badge>}
           </div>
           <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-[#6B7280] text-xs font-[JetBrains_Mono]">
+            <span className="text-[#6B7280] text-xs font-[Azeret_Mono]">
               {rp.metrics?.fargo_rating ?? 'Unrated'}
               {rp.metrics?.fargo_rating ? ' FR' : ''}
             </span>
             {rp.stats && (
-              <span className="text-[#6B7280] text-xs font-[JetBrains_Mono]">
+              <span className="text-[#6B7280] text-xs font-[Azeret_Mono]">
                 {rp.stats.wins}W–{rp.stats.losses}L
               </span>
             )}
             {rankChange !== 0 && (
-              <span className={`text-xs font-[JetBrains_Mono] ${rankChange > 0 ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
+              <span className={`text-xs font-[Azeret_Mono] ${rankChange > 0 ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
                 {rankChange > 0 ? `↑${rankChange}` : `↓${Math.abs(rankChange)}`}
               </span>
             )}
@@ -106,7 +106,7 @@ function RankCard({
           <motion.button
             whileTap={{ scale: 0.92 }}
             onClick={(e) => { e.stopPropagation(); navigate(`/challenge/${rp.player.id}`); }}
-            className="shrink-0 flex items-center gap-1 px-3 py-2 rounded-lg bg-[#C62828]/20 border border-[#C62828]/40 text-[#EF5350] text-xs font-[Outfit] font-semibold hover:bg-[#C62828]/30 transition-colors min-h-[40px]"
+            className="shrink-0 flex items-center gap-1 px-3 py-2 rounded-lg bg-[#C62828]/20 border border-[#C62828]/40 text-[#EF5350] text-xs font-[Barlow] font-semibold hover:bg-[#C62828]/30 transition-colors min-h-[40px]"
           >
             <Swords size={12} />
             Challenge
@@ -149,7 +149,7 @@ export default function RankingsPage() {
           The List
         </h1>
         <EKGLine className="mx-auto mt-1" />
-        <p className="text-[#9CA3AF] text-xs font-[Outfit] mt-2">
+        <p className="text-[#9CA3AF] text-xs font-[Barlow] mt-2">
           {rankings.length} players · Season Rankings
         </p>
       </div>
@@ -162,7 +162,7 @@ export default function RankingsPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search players…"
-          className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-[#1A1A1A] border border-[#333] text-[#E8E2D6] font-[Outfit] text-sm focus:outline-none focus:border-[#C62828] transition-colors"
+          className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-[#1A1A1A] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] transition-colors"
         />
         {search && (
           <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -179,7 +179,7 @@ export default function RankingsPage() {
               key={t}
               onClick={() => setTab(t)}
               className={[
-                'px-4 py-2 rounded-full text-sm font-[Outfit] font-medium transition-all',
+                'px-4 py-2 rounded-full text-sm font-[Barlow] font-medium transition-all',
                 tab === t
                   ? 'bg-[#C62828] text-white'
                   : 'bg-[#1A1A1A] text-[#9CA3AF] border border-[#333]',

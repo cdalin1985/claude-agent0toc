@@ -65,7 +65,7 @@ export const Avatar: React.FC<AvatarProps> = ({ player, size = 44, className = '
   // Initials fallback
   return (
     <div
-      className={`rounded-full flex items-center justify-center shrink-0 font-[Outfit] font-bold ${className}`}
+      className={`rounded-full flex items-center justify-center shrink-0 font-[Barlow] font-bold ${className}`}
       style={{
         width: size,
         height: size,

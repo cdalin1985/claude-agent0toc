@@ -101,7 +101,7 @@ export default function LoginPage() {
           >
             TOP OF THE<br />CAPITAL
           </h1>
-          <p className="text-[#9CA3AF] font-[Outfit] text-sm mt-2 tracking-[0.2em] uppercase">
+          <p className="text-[#9CA3AF] font-[Barlow] text-sm mt-2 tracking-[0.2em] uppercase">
             Helena Pool League
           </p>
           <EKGLine className="mx-auto mt-3" />
@@ -119,7 +119,7 @@ export default function LoginPage() {
               className="glass-card p-6 space-y-4"
             >
               <div>
-                <label className="block text-[#9CA3AF] text-sm font-[Outfit] mb-2">
+                <label className="block text-[#9CA3AF] text-sm font-[Barlow] mb-2">
                   Email Address
                 </label>
                 <div className="relative">
@@ -130,14 +130,14 @@ export default function LoginPage() {
                     onChange={(e) => { setEmail(e.target.value); setError(''); }}
                     placeholder="your@email.com"
                     autoFocus
-                    className="w-full pl-10 pr-4 py-3 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Outfit] text-base placeholder-[#6B7280] focus:outline-none focus:border-[#C62828] focus:ring-1 focus:ring-[#C62828]/30 transition-colors"
+                    className="w-full pl-10 pr-4 py-3 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-base placeholder-[#6B7280] focus:outline-none focus:border-[#C62828] focus:ring-1 focus:ring-[#C62828]/30 transition-colors"
                   />
                 </div>
                 {error && (
                   <motion.p
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="flex items-center gap-1.5 text-[#EF4444] text-xs mt-2 font-[Outfit]"
+                    className="flex items-center gap-1.5 text-[#EF4444] text-xs mt-2 font-[Barlow]"
                   >
                     <AlertCircle size={12} /> {error}
                   </motion.p>
@@ -155,7 +155,7 @@ export default function LoginPage() {
                 <Mail size={16} /> Send Sign-In Code
               </Button>
 
-              <p className="text-center text-[#6B7280] text-xs font-[Outfit] leading-relaxed">
+              <p className="text-center text-[#6B7280] text-xs font-[Barlow] leading-relaxed">
                 We'll email you a 6-digit code. No password needed.
               </p>
             </motion.form>
@@ -178,17 +178,17 @@ export default function LoginPage() {
                   <ArrowLeft size={18} />
                 </button>
                 <div>
-                  <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">
+                  <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">
                     Check your email
                   </div>
-                  <div className="text-[#6B7280] text-xs font-[Outfit]">
+                  <div className="text-[#6B7280] text-xs font-[Barlow]">
                     Code sent to {email}
                   </div>
                 </div>
               </div>
 
               <div>
-                <label className="flex items-center gap-1.5 text-[#9CA3AF] text-sm font-[Outfit] mb-3">
+                <label className="flex items-center gap-1.5 text-[#9CA3AF] text-sm font-[Barlow] mb-3">
                   <KeyRound size={14} /> 8-Digit Code
                 </label>
                 <input
@@ -201,13 +201,13 @@ export default function LoginPage() {
                   onChange={(e) => handleCodeChange(e.target.value)}
                   placeholder="00000000"
                   maxLength={8}
-                  className="w-full px-4 py-4 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[JetBrains_Mono] text-3xl text-center tracking-[0.5em] placeholder-[#3A3A3A] focus:outline-none focus:border-[#C62828] focus:ring-1 focus:ring-[#C62828]/30 transition-colors"
+                  className="w-full px-4 py-4 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Azeret_Mono] text-3xl text-center tracking-[0.5em] placeholder-[#3A3A3A] focus:outline-none focus:border-[#C62828] focus:ring-1 focus:ring-[#C62828]/30 transition-colors"
                 />
                 {error && (
                   <motion.p
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="flex items-center gap-1.5 text-[#EF4444] text-xs mt-2 font-[Outfit]"
+                    className="flex items-center gap-1.5 text-[#EF4444] text-xs mt-2 font-[Barlow]"
                   >
                     <AlertCircle size={12} /> {error}
                   </motion.p>
@@ -227,12 +227,12 @@ export default function LoginPage() {
 
               <div className="text-center">
                 {resent ? (
-                  <p className="text-[#22C55E] text-xs font-[Outfit]">Code resent!</p>
+                  <p className="text-[#22C55E] text-xs font-[Barlow]">Code resent!</p>
                 ) : (
                   <button
                     type="button"
                     onClick={handleResend}
-                    className="text-[#9CA3AF] text-xs font-[Outfit] underline underline-offset-2 hover:text-[#E8E2D6] transition-colors"
+                    className="text-[#9CA3AF] text-xs font-[Barlow] underline underline-offset-2 hover:text-[#E8E2D6] transition-colors"
                   >
                     Resend code
                   </button>

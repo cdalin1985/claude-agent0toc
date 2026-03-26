@@ -130,8 +130,8 @@ export default function SettingsPage() {
               </div>
               <div>
                 <div className="font-[Bebas_Neue] text-2xl text-[#E8E2D6]">{player.full_name}</div>
-                <div className="text-[#9CA3AF] text-sm font-[Outfit]">{profile?.email}</div>
-                <div className="text-[#C62828] font-[JetBrains_Mono] text-sm">
+                <div className="text-[#9CA3AF] text-sm font-[Barlow]">{profile?.email}</div>
+                <div className="text-[#C62828] font-[Azeret_Mono] text-sm">
                   Rank #{myRanking.ranking.position}
                 </div>
               </div>
@@ -146,7 +146,7 @@ export default function SettingsPage() {
                 className="mb-5 bg-[#1A1A1A] rounded-xl p-4"
               >
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-[#9CA3AF] text-sm font-[Outfit]">Choose an icon or upload a photo</span>
+                  <span className="text-[#9CA3AF] text-sm font-[Barlow]">Choose an icon or upload a photo</span>
                   <button onClick={() => setShowIconPicker(false)} className="text-[#6B7280]"><X size={16} /></button>
                 </div>
 
@@ -195,13 +195,13 @@ export default function SettingsPage() {
                     </Button>
                   )}
                 </div>
-                {avatarError && <p className="text-[#EF4444] text-xs font-[Outfit] mt-2">{avatarError}</p>}
+                {avatarError && <p className="text-[#EF4444] text-xs font-[Barlow] mt-2">{avatarError}</p>}
               </motion.div>
             )}
 
             {/* Display name */}
             <div className="mb-4">
-              <label className="block text-[#9CA3AF] text-sm font-[Outfit] mb-2 flex items-center gap-1">
+              <label className="block text-[#9CA3AF] text-sm font-[Barlow] mb-2 flex items-center gap-1">
                 <User size={14} /> Display Name
               </label>
               <div className="flex gap-2">
@@ -209,7 +209,7 @@ export default function SettingsPage() {
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder={player.full_name}
-                  className="flex-1 px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Outfit] text-sm focus:outline-none focus:border-[#C62828] transition-colors"
+                  className="flex-1 px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] transition-colors"
                 />
                 <Button variant="secondary" size="sm" loading={saving} onClick={handleSaveName}>
                   Save
@@ -219,7 +219,7 @@ export default function SettingsPage() {
 
             {/* Bio */}
             <div className="mb-4">
-              <label className="block text-[#9CA3AF] text-sm font-[Outfit] mb-2 flex items-center gap-1">
+              <label className="block text-[#9CA3AF] text-sm font-[Barlow] mb-2 flex items-center gap-1">
                 <FileText size={14} /> Bio
               </label>
               <textarea
@@ -228,16 +228,16 @@ export default function SettingsPage() {
                 maxLength={200}
                 rows={3}
                 placeholder="A few words about your game…"
-                className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Outfit] text-sm focus:outline-none focus:border-[#C62828] transition-colors resize-none"
+                className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] transition-colors resize-none"
               />
-              <div className="text-right text-xs text-[#6B7280] font-[Outfit] mt-1">
+              <div className="text-right text-xs text-[#6B7280] font-[Barlow] mt-1">
                 {bio.length}/200
               </div>
             </div>
 
             {/* Preferred discipline */}
             <div className="mb-5">
-              <label className="block text-[#9CA3AF] text-sm font-[Outfit] mb-2">
+              <label className="block text-[#9CA3AF] text-sm font-[Barlow] mb-2">
                 Preferred Discipline
               </label>
               <div className="flex gap-2">
@@ -246,7 +246,7 @@ export default function SettingsPage() {
                     key={d}
                     onClick={() => setPreferredDisc(preferredDisc === d ? '' : d)}
                     className={[
-                      'flex-1 py-2 rounded-lg text-xs font-[Outfit] font-medium border transition-all',
+                      'flex-1 py-2 rounded-lg text-xs font-[Barlow] font-medium border transition-all',
                       preferredDisc === d
                         ? 'bg-[#C62828] border-[#C62828] text-white'
                         : 'border-[#333] text-[#9CA3AF]',
@@ -262,7 +262,7 @@ export default function SettingsPage() {
               Save Profile
             </Button>
 
-            <div className="text-xs text-[#6B7280] font-[Outfit] mt-3">
+            <div className="text-xs text-[#6B7280] font-[Barlow] mt-3">
               Email (read-only): {profile?.email}
             </div>
           </GlassCard>
@@ -278,8 +278,8 @@ export default function SettingsPage() {
             <div className="flex items-center gap-3">
               {soundEnabled ? <Volume2 size={18} className="text-[#9CA3AF]" /> : <VolumeX size={18} className="text-[#9CA3AF]" />}
               <div>
-                <div className="font-[Outfit] font-medium text-[#E8E2D6] text-sm">Sound Effects</div>
-                <div className="text-[#6B7280] text-xs font-[Outfit]">UI sounds and celebrations</div>
+                <div className="font-[Barlow] font-medium text-[#E8E2D6] text-sm">Sound Effects</div>
+                <div className="text-[#6B7280] text-xs font-[Barlow]">UI sounds and celebrations</div>
               </div>
             </div>
             <button
@@ -295,8 +295,8 @@ export default function SettingsPage() {
               <div className="flex items-center gap-3">
                 {pushSubscribed ? <Bell size={18} className="text-[#9CA3AF]" /> : <BellOff size={18} className="text-[#9CA3AF]" />}
                 <div>
-                  <div className="font-[Outfit] font-medium text-[#E8E2D6] text-sm">Push Notifications</div>
-                  <div className="text-[#6B7280] text-xs font-[Outfit]">
+                  <div className="font-[Barlow] font-medium text-[#E8E2D6] text-sm">Push Notifications</div>
+                  <div className="text-[#6B7280] text-xs font-[Barlow]">
                     {pushPermission === 'denied'
                       ? 'Blocked in browser settings'
                       : pushSubscribed
@@ -324,8 +324,8 @@ export default function SettingsPage() {
             <div className="flex items-center gap-3">
               <Shield size={20} className="text-[#C62828]" />
               <div>
-                <div className="font-[Outfit] font-semibold text-[#E8E2D6]">Admin Dashboard</div>
-                <div className="text-[#9CA3AF] text-xs font-[Outfit]">Disputes, treasury, player management</div>
+                <div className="font-[Barlow] font-semibold text-[#E8E2D6]">Admin Dashboard</div>
+                <div className="text-[#9CA3AF] text-xs font-[Barlow]">Disputes, treasury, player management</div>
               </div>
               <div className="ml-auto text-[#6B7280]">→</div>
             </div>
@@ -337,7 +337,7 @@ export default function SettingsPage() {
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.16 }}>
         <GlassCard className="p-5">
           <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-3">About</h2>
-          <div className="space-y-1 text-[#9CA3AF] text-sm font-[Outfit]">
+          <div className="space-y-1 text-[#9CA3AF] text-sm font-[Barlow]">
             <div>Top of the Capital — Helena Pool League</div>
             <div className="text-[#6B7280] text-xs">Version 1.0.0 · Built with ❤️ in Helena, MT</div>
           </div>

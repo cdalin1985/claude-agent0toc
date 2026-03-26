@@ -176,10 +176,10 @@ export default function HomePage() {
             <div className="flex items-start gap-3">
               <span className="text-2xl shrink-0">🎱</span>
               <div className="flex-1">
-                <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm mb-1">
+                <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm mb-1">
                   Welcome to Top of the Capital!
                 </div>
-                <div className="text-[#9CA3AF] text-xs font-[Outfit] space-y-1">
+                <div className="text-[#9CA3AF] text-xs font-[Barlow] space-y-1">
                   <p>You can challenge any player ranked within <span className="text-[#E8E2D6]">5 spots</span> above you.</p>
                   <p>Win to move up the ladder. Defend your rank or drop.</p>
                   <p>Head to <span className="text-[#C62828] font-semibold">The List</span> to find your first opponent.</p>
@@ -204,14 +204,14 @@ export default function HomePage() {
             <div className="flex items-center gap-3">
               <span className="text-2xl shrink-0">⚔️</span>
               <div className="flex-1">
-                <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">
+                <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">
                   {pendingChallenges.length === 1
                     ? 'You have been challenged!'
                     : `${pendingChallenges.length} challenges waiting for you`}
                 </div>
-                <div className="text-[#9CA3AF] text-xs font-[Outfit] mt-0.5">Tap to respond</div>
+                <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-0.5">Tap to respond</div>
               </div>
-              <span className="bg-[#C62828] text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center font-[JetBrains_Mono] shrink-0">
+              <span className="bg-[#C62828] text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center font-[Azeret_Mono] shrink-0">
                 {pendingChallenges.length}
               </span>
             </div>
@@ -230,14 +230,14 @@ export default function HomePage() {
             <div className="flex items-center gap-3">
               <span className="text-2xl shrink-0">📋</span>
               <div className="flex-1">
-                <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">
+                <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">
                   Confirm result vs {getOpponentName(m)}
                 </div>
-                <div className="text-[#9CA3AF] text-xs font-[Outfit] mt-0.5">
+                <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-0.5">
                   {getOpponentName(m)} submitted — your confirmation needed
                 </div>
               </div>
-              <div className="text-[#F59E0B] text-xs font-[Outfit] font-semibold shrink-0">Confirm →</div>
+              <div className="text-[#F59E0B] text-xs font-[Barlow] font-semibold shrink-0">Confirm →</div>
             </div>
           </GlassCard>
         </motion.div>
@@ -254,14 +254,14 @@ export default function HomePage() {
             <div className="flex items-center gap-3">
               <span className="text-2xl shrink-0">🎱</span>
               <div className="flex-1">
-                <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">
+                <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">
                   Match in progress vs {getOpponentName(m)}
                 </div>
-                <div className="text-[#9CA3AF] text-xs font-[Outfit] mt-0.5">
+                <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-0.5">
                   {m.discipline} · Race to {m.race_length} · {m.venue}
                 </div>
               </div>
-              <div className="font-[JetBrains_Mono] font-bold text-lg text-[#22C55E] shrink-0">
+              <div className="font-[Azeret_Mono] font-bold text-lg text-[#22C55E] shrink-0">
                 {m.player1_id === player.id ? m.player1_score : m.player2_score}
                 <span className="text-[#6B7280] mx-0.5">–</span>
                 <span className="text-[#E8E2D6]">
@@ -284,14 +284,14 @@ export default function HomePage() {
             <div className="flex items-center gap-3">
               <span className="text-2xl shrink-0">📅</span>
               <div className="flex-1">
-                <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">
+                <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">
                   Upcoming match vs {getOpponentName(scheduled[0])}
                 </div>
-                <div className="text-[#9CA3AF] text-xs font-[Outfit] mt-0.5">
+                <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-0.5">
                   {scheduled[0].discipline} · {scheduled[0].venue}
                 </div>
               </div>
-              <div className="text-[#9CA3AF] text-xs font-[Outfit] shrink-0">View →</div>
+              <div className="text-[#9CA3AF] text-xs font-[Barlow] shrink-0">View →</div>
             </div>
           </GlassCard>
         </motion.div>
@@ -304,10 +304,10 @@ export default function HomePage() {
             <div className="flex items-start gap-3">
               <AlertTriangle size={18} className={rank1Compliance.compliant ? 'text-[#22C55E]' : rank1Compliance.daysRemaining <= 5 ? 'text-[#EF4444]' : 'text-[#F59E0B]'} />
               <div className="flex-1">
-                <div className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">
+                <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">
                   {rank1Compliance.compliant ? '✅ #1 Obligation Met' : `#1 Obligation — ${rank1Compliance.matchCount}/2 top-5 matches`}
                 </div>
-                <div className="text-[#9CA3AF] text-xs font-[Outfit] mt-0.5">
+                <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-0.5">
                   {rank1Compliance.compliant
                     ? `Window resets in ${rank1Compliance.daysRemaining} days`
                     : `${rank1Compliance.daysRemaining} days left to play a top-5 opponent or you drop to #10`}
@@ -329,11 +329,11 @@ export default function HomePage() {
                 {profile?.display_name ?? player.full_name}
               </div>
               <div className="flex items-center gap-3 mt-1">
-                <span className="font-[JetBrains_Mono] font-bold text-2xl" style={{ color: '#C62828' }}>
+                <span className="font-[Azeret_Mono] font-bold text-2xl" style={{ color: '#C62828' }}>
                   #{myRanking.ranking.position}
                 </span>
                 {myRanking.metrics?.fargo_rating && (
-                  <span className="text-[#9CA3AF] font-[JetBrains_Mono] text-sm">
+                  <span className="text-[#9CA3AF] font-[Azeret_Mono] text-sm">
                     FR {myRanking.metrics.fargo_rating}
                   </span>
                 )}
@@ -352,10 +352,10 @@ export default function HomePage() {
               { label: 'Streak', value: myStats?.current_streak ?? 0, color: (myStats?.current_streak ?? 0) > 0 ? '#22C55E' : '#9CA3AF' },
             ].map((s) => (
               <div key={s.label} className="text-center">
-                <div className="font-[JetBrains_Mono] font-bold text-xl" style={{ color: s.color }}>
+                <div className="font-[Azeret_Mono] font-bold text-xl" style={{ color: s.color }}>
                   {s.value}
                 </div>
-                <div className="text-[#6B7280] text-xs font-[Outfit] mt-0.5">{s.label}</div>
+                <div className="text-[#6B7280] text-xs font-[Barlow] mt-0.5">{s.label}</div>
               </div>
             ))}
           </div>
@@ -382,7 +382,7 @@ export default function HomePage() {
               <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6]">
                 Alerts <span className="text-[#C62828]">({notifications.length})</span>
               </h2>
-              <button onClick={() => navigate('/notifications')} className="text-[#C62828] text-xs font-[Outfit]">
+              <button onClick={() => navigate('/notifications')} className="text-[#C62828] text-xs font-[Barlow]">
                 View all →
               </button>
             </div>
@@ -391,8 +391,8 @@ export default function HomePage() {
                 <div key={n.id} className="flex items-start gap-2 py-2 border-b border-white/5 last:border-0">
                   <div className="w-2 h-2 rounded-full bg-[#C62828] mt-1.5 shrink-0" />
                   <div>
-                    <div className="text-sm font-[Outfit] font-medium text-[#E8E2D6]">{n.title}</div>
-                    <div className="text-xs text-[#9CA3AF] font-[Outfit] mt-0.5">{n.body}</div>
+                    <div className="text-sm font-[Barlow] font-medium text-[#E8E2D6]">{n.title}</div>
+                    <div className="text-xs text-[#9CA3AF] font-[Barlow] mt-0.5">{n.body}</div>
                   </div>
                 </div>
               ))}
@@ -407,16 +407,16 @@ export default function HomePage() {
           <GlassCard className="p-4" hover onClick={() => navigate('/activity')}>
             <div className="flex items-center gap-2 mb-1">
               <TrendingUp size={16} className="text-[#9CA3AF]" />
-              <span className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">Activity</span>
+              <span className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">Activity</span>
             </div>
-            <div className="text-[#6B7280] text-xs font-[Outfit]">Full league journal</div>
+            <div className="text-[#6B7280] text-xs font-[Barlow]">Full league journal</div>
           </GlassCard>
           <GlassCard className="p-4" hover onClick={() => navigate('/treasury')}>
             <div className="flex items-center gap-2 mb-1">
               <DollarSign size={16} className="text-[#9CA3AF]" />
-              <span className="font-[Outfit] font-semibold text-[#E8E2D6] text-sm">Treasury</span>
+              <span className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">Treasury</span>
             </div>
-            <div className="text-[#6B7280] text-xs font-[Outfit]">League funds</div>
+            <div className="text-[#6B7280] text-xs font-[Barlow]">League funds</div>
           </GlassCard>
         </div>
       </motion.div>
@@ -429,12 +429,12 @@ export default function HomePage() {
               <TrendingUp size={18} className="text-[#9CA3AF]" />
               <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6]">League Activity</h2>
             </div>
-            <button onClick={() => navigate('/activity')} className="text-[#C62828] text-xs font-[Outfit]">
+            <button onClick={() => navigate('/activity')} className="text-[#C62828] text-xs font-[Barlow]">
               View all →
             </button>
           </div>
           {feed.length === 0 ? (
-            <p className="text-[#6B7280] text-sm font-[Outfit] py-4 text-center">
+            <p className="text-[#6B7280] text-sm font-[Barlow] py-4 text-center">
               No activity yet. Be the first to challenge someone!
             </p>
           ) : (
@@ -450,8 +450,8 @@ export default function HomePage() {
                       : '🎱'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-[Outfit] text-[#E8E2D6] leading-snug">{item.headline}</div>
-                    <div className="text-[#6B7280] text-xs font-[Outfit] mt-0.5">
+                    <div className="text-sm font-[Barlow] text-[#E8E2D6] leading-snug">{item.headline}</div>
+                    <div className="text-[#6B7280] text-xs font-[Barlow] mt-0.5">
                       {formatDistanceToNow(item.created_at)}
                     </div>
                   </div>

@@ -97,19 +97,19 @@ function RespondModal({
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="font-[Bebas_Neue] text-2xl text-[#E8E2D6] mb-1">Respond to Challenge</h2>
-        <p className="text-[#9CA3AF] text-sm font-[Outfit] mb-4">
+        <p className="text-[#9CA3AF] text-sm font-[Barlow] mb-4">
           {challenge.discipline} · Race to {challenge.race_length}
         </p>
 
         <div className="space-y-3 mb-4">
           <div>
-            <label className="block text-[#9CA3AF] text-xs font-[Outfit] mb-1.5 flex items-center gap-1">
+            <label className="block text-[#9CA3AF] text-xs font-[Barlow] mb-1.5 flex items-center gap-1">
               <MapPin size={12} /> Venue
             </label>
             <select
               value={venue}
               onChange={(e) => setVenue(e.target.value as Venue)}
-              className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Outfit] text-sm focus:outline-none focus:border-[#C62828]"
+              className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
             >
               <option value="">Select venue…</option>
               {VENUES.map((v) => <option key={v} value={v}>{v}</option>)}
@@ -117,7 +117,7 @@ function RespondModal({
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-[#9CA3AF] text-xs font-[Outfit] mb-1.5 flex items-center gap-1">
+              <label className="block text-[#9CA3AF] text-xs font-[Barlow] mb-1.5 flex items-center gap-1">
                 <Calendar size={12} /> Date
               </label>
               <input
@@ -125,24 +125,24 @@ function RespondModal({
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 min={new Date().toISOString().split('T')[0]}
-                className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Outfit] text-sm focus:outline-none focus:border-[#C62828]"
+                className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
               />
             </div>
             <div>
-              <label className="block text-[#9CA3AF] text-xs font-[Outfit] mb-1.5 flex items-center gap-1">
+              <label className="block text-[#9CA3AF] text-xs font-[Barlow] mb-1.5 flex items-center gap-1">
                 <Clock size={12} /> Time
               </label>
               <input
                 type="time"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Outfit] text-sm focus:outline-none focus:border-[#C62828]"
+                className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
               />
             </div>
           </div>
         </div>
 
-        {error && <p className="text-[#EF4444] text-xs font-[Outfit] mb-3">{error}</p>}
+        {error && <p className="text-[#EF4444] text-xs font-[Barlow] mb-3">{error}</p>}
 
         <div className="flex gap-2 mb-2">
           <Button variant="danger" fullWidth onClick={handleDecline} loading={loading}>
@@ -218,7 +218,7 @@ export default function ChallengesPage() {
             key={t.key}
             onClick={() => setTab(t.key)}
             className={[
-              'flex-1 py-2 rounded-lg text-sm font-[Outfit] font-medium transition-all duration-200',
+              'flex-1 py-2 rounded-lg text-sm font-[Barlow] font-medium transition-all duration-200',
               tab === t.key ? 'bg-[#C62828] text-white' : 'text-[#9CA3AF]',
             ].join(' ')}
           >
@@ -275,28 +275,28 @@ export default function ChallengesPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-[Outfit] font-semibold text-[#E8E2D6] truncate">
+                        <span className="font-[Barlow] font-semibold text-[#E8E2D6] truncate">
                           {isChallenger ? `→ ${opponentName}` : `← ${opponentName}`}
                         </span>
                         <Badge variant={statusBadge(c.status)}>
                           {c.status.replace('_', ' ')}
                         </Badge>
                       </div>
-                      <div className="text-[#9CA3AF] text-xs font-[JetBrains_Mono]">
+                      <div className="text-[#9CA3AF] text-xs font-[Azeret_Mono]">
                         {c.discipline} · Race to {c.race_length}
                       </div>
                       {c.scheduled_at && (
-                        <div className="text-[#9CA3AF] text-xs font-[Outfit] mt-1">
+                        <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-1">
                           📅 {formatDateTime(c.scheduled_at)} @ {c.venue}
                         </div>
                       )}
                       {c.match_deadline && c.status === 'scheduled' && (
-                        <div className="text-[#F59E0B] text-xs font-[Outfit] mt-1">
+                        <div className="text-[#F59E0B] text-xs font-[Barlow] mt-1">
                           ⏰ Must be played by {new Date(c.match_deadline).toLocaleDateString()}
                         </div>
                       )}
                       {c.status === 'pending' && hoursLeft > 0 && (
-                        <div className={`text-xs font-[Outfit] mt-1 ${hoursLeft <= 24 ? 'text-[#EF4444]' : hoursLeft <= 72 ? 'text-[#F59E0B]' : 'text-[#6B7280]'}`}>
+                        <div className={`text-xs font-[Barlow] mt-1 ${hoursLeft <= 24 ? 'text-[#EF4444]' : hoursLeft <= 72 ? 'text-[#F59E0B]' : 'text-[#6B7280]'}`}>
                           {hoursLeft <= 24 ? '⚠️' : '⏰'}{' '}
                           Expires in{' '}
                           {hoursLeft >= 48
@@ -305,7 +305,7 @@ export default function ChallengesPage() {
                         </div>
                       )}
                       {c.status === 'pending' && hoursLeft === 0 && (
-                        <div className="text-[#EF4444] text-xs font-[Outfit] mt-1">⚠️ Expiring soon</div>
+                        <div className="text-[#EF4444] text-xs font-[Barlow] mt-1">⚠️ Expiring soon</div>
                       )}
                     </div>
 

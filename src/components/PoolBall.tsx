@@ -88,7 +88,7 @@ export const PoolBall: React.FC<PoolBallProps> = ({ position, size = 48, classNa
         x={size/2} y={size/2}
         textAnchor="middle" dominantBaseline="central"
         fontSize={fontSize}
-        fontFamily="'JetBrains Mono', monospace"
+        fontFamily="'Azeret Mono', monospace"
         fontWeight="600"
         fill={bgNumColor}
       >

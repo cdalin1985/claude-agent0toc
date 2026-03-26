@@ -66,7 +66,7 @@ export default function MatchesPage() {
           <button
             key={t.key}
             onClick={() => setTab(t.key as 'active' | 'history')}
-            className={`flex-1 py-2 rounded-lg text-sm font-[Outfit] font-medium transition-all ${tab === t.key ? 'bg-[#C62828] text-white' : 'text-[#9CA3AF]'}`}
+            className={`flex-1 py-2 rounded-lg text-sm font-[Barlow] font-medium transition-all ${tab === t.key ? 'bg-[#C62828] text-white' : 'text-[#9CA3AF]'}`}
           >
             {t.label} {t.count > 0 && <span className="ml-1 opacity-70">({t.count})</span>}
           </button>
@@ -81,7 +81,7 @@ export default function MatchesPage() {
               key={d}
               onClick={() => setDisc(d)}
               className={[
-                'px-3 py-1.5 rounded-full text-xs font-[Outfit] font-medium whitespace-nowrap transition-all shrink-0',
+                'px-3 py-1.5 rounded-full text-xs font-[Barlow] font-medium whitespace-nowrap transition-all shrink-0',
                 disc === d ? 'bg-[#C62828] text-white' : 'bg-[#1A1A1A] text-[#9CA3AF] border border-[#333]',
               ].join(' ')}
             >
@@ -123,25 +123,25 @@ export default function MatchesPage() {
                     <Avatar player={{ full_name: opponentName, avatar_url: rankings.find((r) => r.player.id === opponentId)?.player.avatar_url }} size={44} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-[Outfit] font-semibold text-[#E8E2D6] truncate">{opponentName}</span>
+                        <span className="font-[Barlow] font-semibold text-[#E8E2D6] truncate">{opponentName}</span>
                         <Badge variant={statusBadge(m.status) as never}>{m.status.replace('_', ' ')}</Badge>
                       </div>
-                      <div className="text-[#9CA3AF] text-xs font-[Outfit]">
+                      <div className="text-[#9CA3AF] text-xs font-[Barlow]">
                         {m.discipline} · Race to {m.race_length} · {m.venue}
                       </div>
-                      <div className="text-[#6B7280] text-xs font-[Outfit] mt-0.5">
+                      <div className="text-[#6B7280] text-xs font-[Barlow] mt-0.5">
                         {formatDateTime(m.scheduled_at)}
                       </div>
                     </div>
                     {(m.status === 'confirmed' || m.status === 'resolved' || m.status === 'in_progress') && (
                       <div className="text-right shrink-0">
-                        <div className="font-[JetBrains_Mono] font-bold text-2xl">
+                        <div className="font-[Azeret_Mono] font-bold text-2xl">
                           <span style={{ color: won ? '#22C55E' : '#EF4444' }}>{myScore}</span>
                           <span className="text-[#6B7280] mx-1">–</span>
                           <span className="text-[#E8E2D6]">{theirScore}</span>
                         </div>
                         {m.status !== 'in_progress' && (
-                          <div className={`text-xs font-[Outfit] font-semibold ${won ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
+                          <div className={`text-xs font-[Barlow] font-semibold ${won ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
                             {won ? 'WIN' : 'LOSS'}
                           </div>
                         )}

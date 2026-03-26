@@ -81,7 +81,7 @@ export default function ClaimPage() {
           >
             Claim Your Spot
           </h1>
-          <p className="text-[#9CA3AF] font-[Outfit] text-sm mt-2">
+          <p className="text-[#9CA3AF] font-[Barlow] text-sm mt-2">
             Find your name in the league roster and claim your profile.
           </p>
         </div>
@@ -94,7 +94,7 @@ export default function ClaimPage() {
             placeholder="Search your name…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#1A1A1A] border border-[#333] text-[#E8E2D6] font-[Outfit] focus:outline-none focus:border-[#C62828] transition-colors"
+            className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#1A1A1A] border border-[#333] text-[#E8E2D6] font-[Barlow] focus:outline-none focus:border-[#C62828] transition-colors"
           />
           {search && (
             <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -117,7 +117,7 @@ export default function ClaimPage() {
               ))
             : filtered.length === 0
             ? (
-                <div className="text-center py-12 text-[#6B7280] font-[Outfit]">
+                <div className="text-center py-12 text-[#6B7280] font-[Barlow]">
                   {players.length === 0
                     ? 'All players have been claimed. Contact the league admin.'
                     : 'No players match your search.'}
@@ -137,15 +137,15 @@ export default function ClaimPage() {
                   >
                     <PoolBall position={p.ranking?.position ?? 99} size={44} />
                     <div className="flex-1 min-w-0">
-                      <div className="font-[Outfit] font-semibold text-[#E8E2D6] truncate">
+                      <div className="font-[Barlow] font-semibold text-[#E8E2D6] truncate">
                         {p.player.full_name}
                       </div>
-                      <div className="text-[#6B7280] text-xs font-[JetBrains_Mono] mt-0.5">
+                      <div className="text-[#6B7280] text-xs font-[Azeret_Mono] mt-0.5">
                         #{p.ranking?.position}
                         {p.metrics?.fargo_rating ? ` · Fargo ${p.metrics.fargo_rating}` : ''}
                       </div>
                     </div>
-                    <div className="text-[#C62828] text-xs font-[Outfit] font-medium">Claim →</div>
+                    <div className="text-[#C62828] text-xs font-[Barlow] font-medium">Claim →</div>
                   </GlassCard>
                 </motion.div>
               ))
@@ -176,12 +176,12 @@ export default function ClaimPage() {
               <h2 className="font-[Bebas_Neue] text-3xl text-[#E8E2D6] mb-1">
                 Are you {selected.player.full_name}?
               </h2>
-              <p className="text-[#9CA3AF] text-sm font-[Outfit] mb-6">
+              <p className="text-[#9CA3AF] text-sm font-[Barlow] mb-6">
                 This will link your account to this player profile.
                 You can't undo this without contacting the admin.
               </p>
               {claimError && (
-                <p className="text-[#EF4444] text-sm mb-4 font-[Outfit]">{claimError}</p>
+                <p className="text-[#EF4444] text-sm mb-4 font-[Barlow]">{claimError}</p>
               )}
               <div className="flex gap-3">
                 <Button

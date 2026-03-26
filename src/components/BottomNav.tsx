@@ -1,24 +1,42 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, List, Swords, Trophy, Bell, User } from 'lucide-react';
+import { House, Medal, Trophy, Bell, UserCircle } from '@phosphor-icons/react';
 import { useAuthStore } from '../stores/authStore';
+
+// Custom crossed pool cues — unique to this app
+const PoolCueCrossIcon = ({ size = 24 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round">
+    {/* Cue 1: top-right to bottom-left */}
+    <line x1="19" y1="5" x2="5" y2="19" strokeWidth="2" />
+    {/* Cue 2: top-left to bottom-right */}
+    <line x1="5" y1="5" x2="19" y2="19" strokeWidth="2" />
+    {/* Tips — wide end of each cue */}
+    <circle cx="5" cy="19" r="2" fill="currentColor" stroke="none" />
+    <circle cx="19" cy="19" r="2" fill="currentColor" stroke="none" />
+    {/* Ferrules — narrow tip end */}
+    <circle cx="19" cy="5" r="1" fill="currentColor" stroke="none" opacity="0.55" />
+    <circle cx="5" cy="5" r="1" fill="currentColor" stroke="none" opacity="0.55" />
+  </svg>
+);
+
+type PhosphorWeight = 'thin' | 'light' | 'regular' | 'bold' | 'fill' | 'duotone';
 
 interface NavItem {
   label: string;
   path: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  icon: React.FC<any>;
+  Icon: React.FC<any>;
   center?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Home',     path: '/',            icon: Home },
-  { label: 'Rankings', path: '/rankings',     icon: List },
-  { label: 'Challenge',path: '/rankings',     icon: Swords, center: true },
-  { label: 'Matches',  path: '/matches',      icon: Trophy },
-  { label: 'Alerts',   path: '/notifications',icon: Bell },
-  { label: 'Settings', path: '/settings',     icon: User },
+  { label: 'Home',      path: '/',             Icon: House },
+  { label: 'Rankings',  path: '/rankings',      Icon: Medal },
+  { label: 'Challenge', path: '/rankings',      Icon: PoolCueCrossIcon, center: true },
+  { label: 'Matches',   path: '/matches',       Icon: Trophy },
+  { label: 'Alerts',    path: '/notifications', Icon: Bell },
+  { label: 'Profile',   path: '/settings',      Icon: UserCircle },
 ];
 
 export const BottomNav: React.FC<{ unreadCount: number }> = ({ unreadCount }) => {
@@ -27,17 +45,17 @@ export const BottomNav: React.FC<{ unreadCount: number }> = ({ unreadCount }) =>
   const { player } = useAuthStore();
 
   const isActive = (path: string, center?: boolean) => {
-    if (center) return false; // center button never shows as "active"
+    if (center) return false;
     return location.pathname === path || (path !== '/' && location.pathname.startsWith(path));
   };
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 flex items-end justify-around px-2 pb-safe"
+      className="fixed bottom-0 left-0 right-0 z-50 flex items-end justify-around px-2"
       style={{
-        background: 'rgba(13,13,13,0.85)',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
+        background: 'rgba(10,8,8,0.94)',
+        backdropFilter: 'blur(28px)',
+        WebkitBackdropFilter: 'blur(28px)',
         borderTop: '1px solid rgba(255,255,255,0.07)',
         paddingBottom: 'max(env(safe-area-inset-bottom), 8px)',
         paddingTop: '8px',
@@ -45,36 +63,42 @@ export const BottomNav: React.FC<{ unreadCount: number }> = ({ unreadCount }) =>
     >
       {NAV_ITEMS.map((item) => {
         const active = isActive(item.path, item.center);
-        const Icon = item.icon;
+        const { Icon } = item;
+        const weight: PhosphorWeight = active ? 'fill' : 'regular';
 
         if (item.center) {
-          // The elevated center "Challenge" button
           return (
             <motion.button
               key={item.label}
               onClick={() => navigate(player ? '/rankings?challenge=1' : '/login')}
-              whileTap={{ scale: 0.92 }}
-              className="flex flex-col items-center -mt-4 relative"
+              whileTap={{ scale: 0.9 }}
+              className="flex flex-col items-center -mt-5 relative"
               aria-label="Challenge"
             >
               <div className="relative">
-                {/* Pulsing ring */}
+                {/* Expanding rings — double phase */}
                 <div
-                  className="absolute inset-0 rounded-full border border-[#C62828]/60"
+                  className="absolute inset-0 rounded-full border border-[#C62828]/50"
                   style={{ animation: 'ring-pulse 2s ease-out infinite' }}
+                />
+                <div
+                  className="absolute inset-0 rounded-full border border-[#C62828]/30"
+                  style={{ animation: 'ring-pulse 2s ease-out infinite', animationDelay: '1s' }}
                 />
                 {/* Button */}
                 <div
-                  className="w-14 h-14 rounded-full flex items-center justify-center relative z-10"
+                  className="w-[58px] h-[58px] rounded-full flex items-center justify-center relative z-10"
                   style={{
-                    background: 'linear-gradient(145deg, #EF5350 0%, #C62828 55%, #8B0000 100%)',
-                    boxShadow: '0 4px 24px rgba(198,40,40,0.6), inset 0 1px 0 rgba(255,255,255,0.15)',
+                    background: 'linear-gradient(145deg, #EF5350 0%, #C62828 50%, #7F0000 100%)',
+                    boxShadow: '0 0 0 3px rgba(10,8,8,0.94), 0 6px 28px rgba(198,40,40,0.65), inset 0 1px 0 rgba(255,255,255,0.18)',
                   }}
                 >
-                  <Icon size={24} strokeWidth={2.5} />
+                  <Icon size={22} />
                 </div>
               </div>
-              <span className="text-[10px] text-[#9CA3AF] mt-1 font-[Outfit]">{item.label}</span>
+              <span className="text-[10px] text-[#666] mt-1.5 font-[Teko] tracking-widest uppercase">
+                {item.label}
+              </span>
             </motion.button>
           );
         }
@@ -83,27 +107,33 @@ export const BottomNav: React.FC<{ unreadCount: number }> = ({ unreadCount }) =>
           <motion.button
             key={item.label}
             onClick={() => navigate(item.path)}
-            whileTap={{ scale: 0.9 }}
+            whileTap={{ scale: 0.88 }}
             className="flex flex-col items-center gap-0.5 px-3 py-1 min-w-[44px] relative"
             aria-label={item.label}
           >
-            {/* Active spotlight glow */}
+            {/* Active background pill */}
             {active && (
               <motion.div
-                layoutId="nav-glow"
+                layoutId="nav-active-bg"
                 className="absolute inset-0 rounded-xl"
-                style={{ background: 'rgba(198,40,40,0.08)' }}
-                transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+                style={{ background: 'rgba(198,40,40,0.1)' }}
+                transition={{ type: 'spring', stiffness: 380, damping: 30 }}
               />
             )}
 
             <div className="relative">
-              <Icon
-                size={22}
-                strokeWidth={active ? 2.5 : 1.8}
-                style={{ color: active ? '#C62828' : '#6B7280' }}
-              />
-              {/* Notification badge on bell */}
+              <motion.div
+                animate={active ? { scale: [1, 1.18, 1] } : { scale: 1 }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+              >
+                <Icon
+                  size={22}
+                  weight={weight}
+                  style={{ color: active ? '#EF5350' : '#555' }}
+                />
+              </motion.div>
+
+              {/* Notification badge */}
               {item.label === 'Alerts' && unreadCount > 0 && (
                 <AnimatePresence>
                   <motion.span
@@ -112,7 +142,7 @@ export const BottomNav: React.FC<{ unreadCount: number }> = ({ unreadCount }) =>
                     animate={{ scale: 1 }}
                     exit={{ scale: 0 }}
                     transition={{ type: 'spring', stiffness: 500, damping: 20 }}
-                    className="absolute -top-1.5 -right-1.5 bg-[#C62828] text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center font-[JetBrains_Mono]"
+                    className="absolute -top-1.5 -right-2 bg-[#C62828] text-white text-[8px] font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-0.5 font-[Azeret_Mono]"
                   >
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </motion.span>
@@ -121,17 +151,17 @@ export const BottomNav: React.FC<{ unreadCount: number }> = ({ unreadCount }) =>
             </div>
 
             <span
-              className="text-[10px] font-[Outfit] font-medium"
-              style={{ color: active ? '#C62828' : '#6B7280' }}
+              className="font-[Teko] tracking-widest uppercase leading-none"
+              style={{ fontSize: '10px', color: active ? '#EF5350' : '#555' }}
             >
               {item.label}
             </span>
 
-            {/* Active crimson dot */}
+            {/* Active dot */}
             {active && (
               <motion.div
                 layoutId="nav-dot"
-                className="absolute -bottom-1 w-1 h-1 rounded-full bg-[#C62828]"
+                className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-[#C62828]"
                 transition={{ type: 'spring', stiffness: 400, damping: 35 }}
               />
             )}

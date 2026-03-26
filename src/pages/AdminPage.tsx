@@ -38,7 +38,7 @@ export default function AdminPage() {
         <h1 className="font-[Bebas_Neue] text-5xl text-[#E8E2D6]">Admin</h1>
         <Badge variant="info">{profile?.role}</Badge>
       </div>
-      <p className="text-[#9CA3AF] text-sm font-[Outfit] mb-6">League management — handle with care.</p>
+      <p className="text-[#9CA3AF] text-sm font-[Barlow] mb-6">League management — handle with care.</p>
 
       {/* Tabs — horizontal scroll */}
       <div className="flex overflow-x-auto gap-1 mb-5 bg-[#1A1A1A] rounded-xl p-1" style={{ scrollbarWidth: 'none' }}>
@@ -57,7 +57,7 @@ export default function AdminPage() {
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`flex flex-col items-center py-2 px-3 rounded-lg text-xs font-[Outfit] transition-all whitespace-nowrap shrink-0 ${tab === key ? 'bg-[#C62828] text-white' : 'text-[#9CA3AF]'}`}
+            className={`flex flex-col items-center py-2 px-3 rounded-lg text-xs font-[Barlow] transition-all whitespace-nowrap shrink-0 ${tab === key ? 'bg-[#C62828] text-white' : 'text-[#9CA3AF]'}`}
           >
             <Icon size={16} className="mb-0.5" />
             {label}
@@ -125,7 +125,7 @@ function DisputesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
       <div className="text-center py-12">
         <div className="text-4xl mb-3">✅</div>
         <div className="font-[Bebas_Neue] text-2xl text-[#E8E2D6]">No Disputed Matches</div>
-        <div className="text-[#9CA3AF] text-sm font-[Outfit] mt-1">All matches are resolved.</div>
+        <div className="text-[#9CA3AF] text-sm font-[Barlow] mt-1">All matches are resolved.</div>
       </div>
     );
   }
@@ -136,21 +136,21 @@ function DisputesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
         <GlassCard key={m.id} className="p-4">
           <div className="flex items-center justify-between mb-2">
             <Badge variant="loss">DISPUTED</Badge>
-            <span className="text-[#6B7280] text-xs font-[Outfit]">{formatDate(m.created_at)}</span>
+            <span className="text-[#6B7280] text-xs font-[Barlow]">{formatDate(m.created_at)}</span>
           </div>
-          <div className="text-[#E8E2D6] font-[Outfit] text-sm font-semibold mb-0.5">
+          <div className="text-[#E8E2D6] font-[Barlow] text-sm font-semibold mb-0.5">
             {getName(m.player1_id)} vs {getName(m.player2_id)}
           </div>
-          <div className="text-[#E8E2D6] font-[Outfit] text-sm mb-1">Score: {m.player1_score}–{m.player2_score}</div>
-          <div className="text-[#9CA3AF] text-xs font-[Outfit] mb-3">{m.discipline} · Race to {m.race_length} · {m.venue}</div>
+          <div className="text-[#E8E2D6] font-[Barlow] text-sm mb-1">Score: {m.player1_score}–{m.player2_score}</div>
+          <div className="text-[#9CA3AF] text-xs font-[Barlow] mb-3">{m.discipline} · Race to {m.race_length} · {m.venue}</div>
           {resolving === m.id ? (
             <div className="space-y-3">
               <div>
-                <p className="text-[#9CA3AF] text-xs font-[Outfit] mb-2">Select winner:</p>
+                <p className="text-[#9CA3AF] text-xs font-[Barlow] mb-2">Select winner:</p>
                 <div className="grid grid-cols-2 gap-2">
                   {[{ id: m.player1_id, name: getName(m.player1_id) }, { id: m.player2_id, name: getName(m.player2_id) }].map((p) => (
                     <button key={p.id} onClick={() => setWinnerId(p.id)}
-                      className={`py-3 px-2 rounded-xl border text-sm font-[Outfit] font-medium transition-all ${winnerId === p.id ? 'border-[#22C55E] bg-[#22C55E]/10 text-[#22C55E]' : 'border-[#333] bg-[#252525]/50 text-[#E8E2D6]'}`}>
+                      className={`py-3 px-2 rounded-xl border text-sm font-[Barlow] font-medium transition-all ${winnerId === p.id ? 'border-[#22C55E] bg-[#22C55E]/10 text-[#22C55E]' : 'border-[#333] bg-[#252525]/50 text-[#E8E2D6]'}`}>
                       {p.name}
                     </button>
                   ))}
@@ -158,12 +158,12 @@ function DisputesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <input type="number" placeholder="P1 score" value={p1Score} onChange={(e) => setP1Score(e.target.value)}
-                  className="px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Outfit] focus:outline-none focus:border-[#C62828]" />
+                  className="px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[#C62828]" />
                 <input type="number" placeholder="P2 score" value={p2Score} onChange={(e) => setP2Score(e.target.value)}
-                  className="px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Outfit] focus:outline-none focus:border-[#C62828]" />
+                  className="px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[#C62828]" />
               </div>
               <textarea placeholder="Admin notes…" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
-                className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Outfit] focus:outline-none focus:border-[#C62828] resize-none" />
+                className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[#C62828] resize-none" />
               <div className="flex gap-2">
                 <Button variant="ghost" size="sm" onClick={() => setResolving(null)}>Cancel</Button>
                 <Button variant="primary" size="sm" loading={loading} disabled={!winnerId} onClick={() => handleResolve(m.id)}>Resolve</Button>
@@ -253,7 +253,7 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
       <div className="text-center py-12">
         <div className="text-4xl mb-3">✅</div>
         <div className="font-[Bebas_Neue] text-2xl text-[#E8E2D6]">No Active Challenges</div>
-        <div className="text-[#9CA3AF] text-sm font-[Outfit] mt-1">Nothing pending action.</div>
+        <div className="text-[#9CA3AF] text-sm font-[Barlow] mt-1">Nothing pending action.</div>
       </div>
     );
   }
@@ -265,12 +265,12 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
           <div className="flex items-center justify-between mb-2">
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             <Badge variant={STATUS_BADGE[c.status] as any}>{c.status.replace('_', ' ').toUpperCase()}</Badge>
-            <span className="text-[#6B7280] text-xs font-[Outfit]">{formatDate(c.created_at)}</span>
+            <span className="text-[#6B7280] text-xs font-[Barlow]">{formatDate(c.created_at)}</span>
           </div>
-          <div className="font-[Outfit] font-semibold text-sm text-[#E8E2D6] mb-0.5">
+          <div className="font-[Barlow] font-semibold text-sm text-[#E8E2D6] mb-0.5">
             {getName(c.challenger_id)} → {getName(c.challenged_id)}
           </div>
-          <div className="text-[#9CA3AF] text-xs font-[Outfit] mb-3">
+          <div className="text-[#9CA3AF] text-xs font-[Barlow] mb-3">
             {c.discipline} · Race to {c.race_length} · Expires {formatDistanceToNow(c.expires_at)}
           </div>
 
@@ -279,18 +279,18 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
               {actionType === 'forfeit' && (
                 c.match_id ? (
                   <>
-                    <p className="text-[#9CA3AF] text-xs font-[Outfit]">Select winner:</p>
+                    <p className="text-[#9CA3AF] text-xs font-[Barlow]">Select winner:</p>
                     <div className="grid grid-cols-2 gap-2">
                       {[{ id: c.challenger_id, name: getName(c.challenger_id) }, { id: c.challenged_id, name: getName(c.challenged_id) }].map((p) => (
                         <button key={p.id} onClick={() => setWinnerId(p.id)}
-                          className={`py-2 rounded-xl border text-sm font-[Outfit] transition-all ${winnerId === p.id ? 'border-[#22C55E] bg-[#22C55E]/10 text-[#22C55E]' : 'border-[#333] bg-[#252525]/50 text-[#E8E2D6]'}`}>
+                          className={`py-2 rounded-xl border text-sm font-[Barlow] transition-all ${winnerId === p.id ? 'border-[#22C55E] bg-[#22C55E]/10 text-[#22C55E]' : 'border-[#333] bg-[#252525]/50 text-[#E8E2D6]'}`}>
                           {p.name}
                         </button>
                       ))}
                     </div>
                   </>
                 ) : (
-                  <p className="text-[#F59E0B] text-xs font-[Outfit]">No match started — this will cancel the challenge only.</p>
+                  <p className="text-[#F59E0B] text-xs font-[Barlow]">No match started — this will cancel the challenge only.</p>
                 )
               )}
               <div className="flex gap-2">
@@ -371,7 +371,7 @@ function MatchesAdminTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
       <div className="text-center py-12">
         <div className="text-4xl mb-3">✅</div>
         <div className="font-[Bebas_Neue] text-2xl text-[#E8E2D6]">No Active Matches</div>
-        <div className="text-[#9CA3AF] text-sm font-[Outfit] mt-1">Nothing pending action.</div>
+        <div className="text-[#9CA3AF] text-sm font-[Barlow] mt-1">Nothing pending action.</div>
       </div>
     );
   }
@@ -383,24 +383,24 @@ function MatchesAdminTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
           <div className="flex items-center justify-between mb-2">
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             <Badge variant={STATUS_BADGE[m.status] as any}>{m.status.replace('_', ' ').toUpperCase()}</Badge>
-            <span className="text-[#6B7280] text-xs font-[Outfit]">{formatDate(m.created_at)}</span>
+            <span className="text-[#6B7280] text-xs font-[Barlow]">{formatDate(m.created_at)}</span>
           </div>
-          <div className="font-[Outfit] font-semibold text-sm text-[#E8E2D6] mb-0.5">
+          <div className="font-[Barlow] font-semibold text-sm text-[#E8E2D6] mb-0.5">
             {getName(m.player1_id)} vs {getName(m.player2_id)}
           </div>
-          <div className="text-[#9CA3AF] text-xs font-[Outfit] mb-1">Score: {m.player1_score}–{m.player2_score}</div>
-          <div className="text-[#9CA3AF] text-xs font-[Outfit] mb-2">{m.discipline} · Race to {m.race_length} · {m.venue}</div>
-          {m.player1_submitted && <div className="text-[#F59E0B] text-xs font-[Outfit]">⚠ {getName(m.player1_id)} submitted</div>}
-          {m.player2_submitted && <div className="text-[#F59E0B] text-xs font-[Outfit] mb-2">⚠ {getName(m.player2_id)} submitted</div>}
+          <div className="text-[#9CA3AF] text-xs font-[Barlow] mb-1">Score: {m.player1_score}–{m.player2_score}</div>
+          <div className="text-[#9CA3AF] text-xs font-[Barlow] mb-2">{m.discipline} · Race to {m.race_length} · {m.venue}</div>
+          {m.player1_submitted && <div className="text-[#F59E0B] text-xs font-[Barlow]">⚠ {getName(m.player1_id)} submitted</div>}
+          {m.player2_submitted && <div className="text-[#F59E0B] text-xs font-[Barlow] mb-2">⚠ {getName(m.player2_id)} submitted</div>}
 
           {resolving === m.id ? (
             <div className="space-y-3 mt-2">
               <div>
-                <p className="text-[#9CA3AF] text-xs font-[Outfit] mb-2">Select winner:</p>
+                <p className="text-[#9CA3AF] text-xs font-[Barlow] mb-2">Select winner:</p>
                 <div className="grid grid-cols-2 gap-2">
                   {[{ id: m.player1_id, name: getName(m.player1_id) }, { id: m.player2_id, name: getName(m.player2_id) }].map((p) => (
                     <button key={p.id} onClick={() => setWinnerId(p.id)}
-                      className={`py-3 px-2 rounded-xl border text-sm font-[Outfit] font-medium transition-all ${winnerId === p.id ? 'border-[#22C55E] bg-[#22C55E]/10 text-[#22C55E]' : 'border-[#333] bg-[#252525]/50 text-[#E8E2D6]'}`}>
+                      className={`py-3 px-2 rounded-xl border text-sm font-[Barlow] font-medium transition-all ${winnerId === p.id ? 'border-[#22C55E] bg-[#22C55E]/10 text-[#22C55E]' : 'border-[#333] bg-[#252525]/50 text-[#E8E2D6]'}`}>
                       {p.name}
                     </button>
                   ))}
@@ -408,12 +408,12 @@ function MatchesAdminTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <input type="number" placeholder={`${getName(m.player1_id)} score`} value={p1Score} onChange={(e) => setP1Score(e.target.value)}
-                  className="px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Outfit] focus:outline-none focus:border-[#C62828]" />
+                  className="px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[#C62828]" />
                 <input type="number" placeholder={`${getName(m.player2_id)} score`} value={p2Score} onChange={(e) => setP2Score(e.target.value)}
-                  className="px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Outfit] focus:outline-none focus:border-[#C62828]" />
+                  className="px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[#C62828]" />
               </div>
               <textarea placeholder="Admin notes…" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
-                className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Outfit] focus:outline-none focus:border-[#C62828] resize-none" />
+                className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[#C62828] resize-none" />
               <div className="flex gap-2">
                 <Button variant="ghost" size="sm" onClick={() => setResolving(null)}>Cancel</Button>
                 <Button variant="primary" size="sm" loading={loading} disabled={!winnerId} onClick={() => handleForceComplete(m.id)}>
@@ -497,13 +497,13 @@ function RankingsTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   };
 
   if (order.length === 0) {
-    return <div className="text-center py-12 text-[#6B7280] font-[Outfit]">Loading rankings…</div>;
+    return <div className="text-center py-12 text-[#6B7280] font-[Barlow]">Loading rankings…</div>;
   }
 
   return (
     <div className="space-y-3">
       <GlassCard className="p-3">
-        <p className="text-[#9CA3AF] text-xs font-[Outfit]">
+        <p className="text-[#9CA3AF] text-xs font-[Barlow]">
           Use arrows to reorder players. Changes are staged until you tap Save.
         </p>
       </GlassCard>
@@ -514,14 +514,14 @@ function RankingsTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
           const changed = original?.position !== i + 1;
           return (
             <GlassCard key={r.player_id} className={`p-3 flex items-center gap-3 ${changed ? 'border border-[#F59E0B]/30' : ''}`}>
-              <span className="font-[JetBrains_Mono] font-bold text-lg text-[#C62828] w-7 text-center shrink-0">
+              <span className="font-[Azeret_Mono] font-bold text-lg text-[#C62828] w-7 text-center shrink-0">
                 {i + 1}
               </span>
-              <span className="font-[Outfit] font-semibold text-sm text-[#E8E2D6] flex-1 truncate">
+              <span className="font-[Barlow] font-semibold text-sm text-[#E8E2D6] flex-1 truncate">
                 {r.full_name}
               </span>
               {changed && (
-                <span className="text-[#F59E0B] text-xs font-[JetBrains_Mono] shrink-0">
+                <span className="text-[#F59E0B] text-xs font-[Azeret_Mono] shrink-0">
                   was {original?.position}
                 </span>
               )}
@@ -599,8 +599,8 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
           <h3 className="font-[Bebas_Neue] text-lg text-[#E8E2D6] mb-3">Add New Player</h3>
           <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Full name" autoFocus
             onKeyDown={(e) => e.key === 'Enter' && handleAddPlayer()}
-            className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Outfit] text-sm focus:outline-none focus:border-[#C62828] mb-3" />
-          {addError && <p className="text-[#EF4444] text-xs font-[Outfit] mb-2">{addError}</p>}
+            className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] mb-3" />
+          {addError && <p className="text-[#EF4444] text-xs font-[Barlow] mb-2">{addError}</p>}
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={() => { setAdding(false); setNewName(''); setAddError(''); }}>Cancel</Button>
             <Button variant="primary" size="sm" loading={addLoading} disabled={!newName.trim()} onClick={handleAddPlayer}>Add Player</Button>
@@ -612,17 +612,17 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
         </Button>
       )}
 
-      <p className="text-[#9CA3AF] text-xs font-[Outfit]">{players.length} total players</p>
+      <p className="text-[#9CA3AF] text-xs font-[Barlow]">{players.length} total players</p>
       {players.map((p) => (
         <GlassCard key={p.id} className="p-3 flex items-center gap-3">
           <div className="flex-1 min-w-0">
-            <div className={`font-[Outfit] font-semibold text-sm truncate ${p.is_active ? 'text-[#E8E2D6]' : 'text-[#6B7280] line-through'}`}>
+            <div className={`font-[Barlow] font-semibold text-sm truncate ${p.is_active ? 'text-[#E8E2D6]' : 'text-[#6B7280] line-through'}`}>
               {p.full_name}
             </div>
-            <div className="text-[#6B7280] text-xs font-[Outfit]">{p.profile_id ? 'Claimed' : 'Unclaimed'}</div>
+            <div className="text-[#6B7280] text-xs font-[Barlow]">{p.profile_id ? 'Claimed' : 'Unclaimed'}</div>
           </div>
           <button onClick={() => toggleActive(p)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-[Outfit] font-medium transition-colors ${p.is_active ? 'bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/30' : 'bg-[#22C55E]/20 text-[#22C55E] border border-[#22C55E]/30'}`}>
+            className={`px-3 py-1.5 rounded-lg text-xs font-[Barlow] font-medium transition-colors ${p.is_active ? 'bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/30' : 'bg-[#22C55E]/20 text-[#22C55E] border border-[#22C55E]/30'}`}>
             {p.is_active ? 'Deactivate' : 'Activate'}
           </button>
         </GlassCard>
@@ -670,11 +670,11 @@ function TreasuryTab() {
   return (
     <div className="space-y-4">
       <GlassCard className="p-5 text-center">
-        <div className="text-[#9CA3AF] text-sm font-[Outfit] mb-1">Current Balance</div>
-        <div className="font-[JetBrains_Mono] font-bold text-5xl" style={{ color: balance >= 0 ? '#22C55E' : '#EF4444' }}>
+        <div className="text-[#9CA3AF] text-sm font-[Barlow] mb-1">Current Balance</div>
+        <div className="font-[Azeret_Mono] font-bold text-5xl" style={{ color: balance >= 0 ? '#22C55E' : '#EF4444' }}>
           ${(Math.abs(balance) / 100).toFixed(2)}
         </div>
-        {balance < 0 && <div className="text-[#EF4444] text-xs font-[Outfit] mt-1">In deficit</div>}
+        {balance < 0 && <div className="text-[#EF4444] text-xs font-[Barlow] mt-1">In deficit</div>}
       </GlassCard>
 
       <GlassCard className="p-4">
@@ -683,15 +683,15 @@ function TreasuryTab() {
           <div className="flex gap-2">
             {(['credit', 'debit'] as const).map((t) => (
               <button key={t} onClick={() => setEntryType(t)}
-                className={`flex-1 py-2 rounded-lg text-sm font-[Outfit] font-medium transition-all ${entryType === t ? (t === 'credit' ? 'bg-[#22C55E]/20 text-[#22C55E] border border-[#22C55E]/40' : 'bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/40') : 'bg-[#252525] text-[#9CA3AF] border border-[#333]'}`}>
+                className={`flex-1 py-2 rounded-lg text-sm font-[Barlow] font-medium transition-all ${entryType === t ? (t === 'credit' ? 'bg-[#22C55E]/20 text-[#22C55E] border border-[#22C55E]/40' : 'bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/40') : 'bg-[#252525] text-[#9CA3AF] border border-[#333]'}`}>
                 {t === 'credit' ? '+ Credit' : '- Debit'}
               </button>
             ))}
           </div>
           <input type="number" step="0.01" placeholder="Amount ($)" value={amount} onChange={(e) => setAmount(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Outfit] text-sm focus:outline-none focus:border-[#C62828]" />
+            className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]" />
           <input placeholder="Description" value={desc} onChange={(e) => setDesc(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Outfit] text-sm focus:outline-none focus:border-[#C62828]" />
+            className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]" />
           <Button variant="primary" fullWidth loading={loading} onClick={handleAdd} disabled={!amount || !desc}>Add Entry</Button>
         </div>
       </GlassCard>
@@ -700,10 +700,10 @@ function TreasuryTab() {
         {entries.map((e) => (
           <GlassCard key={e.id} className="p-3 flex items-center justify-between">
             <div>
-              <div className="font-[Outfit] text-sm text-[#E8E2D6]">{e.description}</div>
-              <div className="text-[#6B7280] text-xs font-[Outfit]">{formatDate(e.created_at)}</div>
+              <div className="font-[Barlow] text-sm text-[#E8E2D6]">{e.description}</div>
+              <div className="text-[#6B7280] text-xs font-[Barlow]">{formatDate(e.created_at)}</div>
             </div>
-            <div className={`font-[JetBrains_Mono] font-bold ${e.entry_type === 'credit' ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
+            <div className={`font-[Azeret_Mono] font-bold ${e.entry_type === 'credit' ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
               {e.entry_type === 'credit' ? '+' : '-'}${(e.amount_cents / 100).toFixed(2)}
             </div>
           </GlassCard>
@@ -741,7 +741,7 @@ function Rank1Tab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
     <div className="space-y-4">
       <GlassCard className="p-5">
         <h3 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-1">Rank #1 Obligation</h3>
-        <p className="text-[#9CA3AF] text-xs font-[Outfit] mb-4">
+        <p className="text-[#9CA3AF] text-xs font-[Barlow] mb-4">
           The #1 player must play 2 top-5 opponents within 30 days of reaching #1 or be moved to #10.
         </p>
         <div className="flex gap-2">
@@ -755,37 +755,37 @@ function Rank1Tab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
       {status && (
         <GlassCard className="p-5">
           {status.error ? (
-            <p className="text-[#EF4444] text-sm font-[Outfit]">{status.error}</p>
+            <p className="text-[#EF4444] text-sm font-[Barlow]">{status.error}</p>
           ) : status.message ? (
-            <p className="text-[#9CA3AF] text-sm font-[Outfit]">{status.message}</p>
+            <p className="text-[#9CA3AF] text-sm font-[Barlow]">{status.message}</p>
           ) : status.penalized ? (
             <>
               <div className="text-3xl mb-2">📉</div>
               <div className="font-[Bebas_Neue] text-xl text-[#EF4444] mb-1">Penalty Applied</div>
-              <p className="text-[#9CA3AF] text-sm font-[Outfit]">
+              <p className="text-[#9CA3AF] text-sm font-[Barlow]">
                 {status.player} was moved to #10 — only {status.top5_matches}/2 top-5 matches in {status.days_elapsed} days.
               </p>
             </>
           ) : (
             <>
               <div className="flex items-center justify-between mb-4">
-                <span className="font-[Outfit] font-semibold text-[#E8E2D6]">{status.player}</span>
+                <span className="font-[Barlow] font-semibold text-[#E8E2D6]">{status.player}</span>
                 <Badge variant={status.compliant ? 'win' : 'pending'}>{status.compliant ? 'Compliant' : 'At Risk'}</Badge>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="text-center">
-                  <div className="font-[JetBrains_Mono] font-bold text-2xl text-[#E8E2D6]">{status.top5_matches}/2</div>
-                  <div className="text-[#6B7280] text-xs font-[Outfit]">Top-5 matches</div>
+                  <div className="font-[Azeret_Mono] font-bold text-2xl text-[#E8E2D6]">{status.top5_matches}/2</div>
+                  <div className="text-[#6B7280] text-xs font-[Barlow]">Top-5 matches</div>
                 </div>
                 <div className="text-center">
-                  <div className="font-[JetBrains_Mono] font-bold text-2xl text-[#E8E2D6]">{status.days_elapsed}</div>
-                  <div className="text-[#6B7280] text-xs font-[Outfit]">Days elapsed</div>
+                  <div className="font-[Azeret_Mono] font-bold text-2xl text-[#E8E2D6]">{status.days_elapsed}</div>
+                  <div className="text-[#6B7280] text-xs font-[Barlow]">Days elapsed</div>
                 </div>
                 <div className="text-center">
-                  <div className="font-[JetBrains_Mono] font-bold text-2xl" style={{ color: (status.days_remaining ?? 30) <= 7 ? '#EF4444' : '#E8E2D6' }}>
+                  <div className="font-[Azeret_Mono] font-bold text-2xl" style={{ color: (status.days_remaining ?? 30) <= 7 ? '#EF4444' : '#E8E2D6' }}>
                     {status.days_remaining}
                   </div>
-                  <div className="text-[#6B7280] text-xs font-[Outfit]">Days left</div>
+                  <div className="text-[#6B7280] text-xs font-[Barlow]">Days left</div>
                 </div>
               </div>
             </>
@@ -825,16 +825,16 @@ function SettingsTab() {
     setTimeout(() => setSaved(false), 2000);
   };
 
-  if (!settings) return <div className="text-center py-12 text-[#6B7280] font-[Outfit]">Loading settings…</div>;
+  if (!settings) return <div className="text-center py-12 text-[#6B7280] font-[Barlow]">Loading settings…</div>;
 
   const Field = ({ label, fieldKey, unit }: { label: string; fieldKey: keyof LeagueSettings; unit: string }) => (
     <div className="flex items-center justify-between py-3 border-b border-white/5 last:border-0">
       <div>
-        <div className="font-[Outfit] text-sm text-[#E8E2D6]">{label}</div>
-        <div className="text-[#6B7280] text-xs font-[Outfit]">{unit}</div>
+        <div className="font-[Barlow] text-sm text-[#E8E2D6]">{label}</div>
+        <div className="text-[#6B7280] text-xs font-[Barlow]">{unit}</div>
       </div>
       <input type="number" value={get(fieldKey)} onChange={(e) => set(fieldKey, parseInt(e.target.value) || 0)}
-        className="w-20 px-3 py-1.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[JetBrains_Mono] text-sm text-center focus:outline-none focus:border-[#C62828]" />
+        className="w-20 px-3 py-1.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Azeret_Mono] text-sm text-center focus:outline-none focus:border-[#C62828]" />
     </div>
   );
 
@@ -869,18 +869,18 @@ function AuditTab() {
     },
   });
 
-  if (events.length === 0) return <div className="text-center py-12 text-[#6B7280] font-[Outfit]">No audit events yet.</div>;
+  if (events.length === 0) return <div className="text-center py-12 text-[#6B7280] font-[Barlow]">No audit events yet.</div>;
 
   return (
     <div className="space-y-2">
       {events.map((e) => (
         <GlassCard key={e.id} className="p-3">
           <div className="flex items-center justify-between mb-1">
-            <span className="font-[Outfit] font-semibold text-sm text-[#E8E2D6]">{e.action}</span>
-            <span className="text-[#6B7280] text-xs font-[Outfit]">{formatDistanceToNow(e.created_at)}</span>
+            <span className="font-[Barlow] font-semibold text-sm text-[#E8E2D6]">{e.action}</span>
+            <span className="text-[#6B7280] text-xs font-[Barlow]">{formatDistanceToNow(e.created_at)}</span>
           </div>
           {e.target_type && (
-            <div className="text-[#9CA3AF] text-xs font-[Outfit]">{e.target_type}: {e.target_id?.slice(0, 8)}…</div>
+            <div className="text-[#9CA3AF] text-xs font-[Barlow]">{e.target_type}: {e.target_id?.slice(0, 8)}…</div>
           )}
         </GlassCard>
       ))}

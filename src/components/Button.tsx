@@ -41,7 +41,7 @@ export const Button: React.FC<ButtonProps> = ({
       whileTap={isDisabled ? undefined : { scale: 0.97 }}
       whileHover={isDisabled ? undefined : { y: -1 }}
       className={[
-        'rounded-[10px] font-semibold font-[Outfit] tracking-wide transition-all duration-200',
+        'rounded-[10px] font-semibold font-[Barlow] tracking-wide transition-all duration-200',
         'flex items-center justify-center gap-2 select-none',
         VARIANT_STYLES[variant],
         SIZE_STYLES[size],
