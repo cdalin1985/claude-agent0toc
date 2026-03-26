@@ -26,5 +26,6 @@ export function useRankings() {
       })).filter((rp) => rp.player);
     },
     staleTime: 15_000,
+    refetchInterval: 30_000,
   });
 }

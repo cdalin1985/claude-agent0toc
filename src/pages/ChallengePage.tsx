@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, CheckCircle, Swords, Minus, Plus } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { useRankings } from '../hooks/useRankings';
-import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { PoolBall } from '../components/PoolBall';
 import { GlassCard } from '../components/GlassCard';
@@ -18,23 +17,6 @@ const DISCIPLINES: { value: Discipline; emoji: string; desc: string }[] = [
   { value: '10 Ball', emoji: '🟡', desc: 'Strategic — call shot, 10 in the middle' },
 ];
 
-function useWeeklyCount(playerId: string | undefined) {
-  return useQuery({
-    queryKey: ['weekly-challenges', playerId],
-    queryFn: async () => {
-      if (!playerId) return 0;
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-      const { count } = await supabase
-        .from('challenges')
-        .select('id', { count: 'exact', head: true })
-        .eq('challenger_id', playerId)
-        .gte('created_at', sevenDaysAgo);
-      return count ?? 0;
-    },
-    enabled: !!playerId,
-  });
-}
-
 export default function ChallengePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -43,8 +25,6 @@ export default function ChallengePage() {
 
   const target   = rankings.find((r) => r.player.id === id);
   const myRanking = rankings.find((r) => r.player.id === player?.id);
-  const { data: weeklyCount = 0 } = useWeeklyCount(player?.id);
-
   const [step, setStep]             = useState(1);
   const [discipline, setDiscipline] = useState<Discipline | null>(null);
   const [race, setRace]             = useState(7);
@@ -103,7 +83,7 @@ export default function ChallengePage() {
           </motion.div>
           <h1 className="font-[Bebas_Neue] text-5xl text-[#E8E2D6] mb-2">Challenge Sent!</h1>
           <p className="text-[#9CA3AF] font-[Outfit] mb-8">
-            {target.player.full_name} has 48 hours to respond.
+            {target.player.full_name} has 7 days to respond.
           </p>
           <PoolBall position={target.ranking.position} size={80} className="mx-auto mb-8" />
           <Button variant="secondary" onClick={() => navigate('/challenges')}>
@@ -113,8 +93,6 @@ export default function ChallengePage() {
       </div>
     );
   }
-
-  const weeklyRemaining = Math.max(0, 2 - weeklyCount);
 
   return (
     <div className="min-h-screen px-4 pt-4 pb-8">
@@ -128,13 +106,6 @@ export default function ChallengePage() {
           <h1 className="font-[Bebas_Neue] text-3xl text-[#E8E2D6]">
             {step === 1 ? 'Choose Discipline' : step === 2 ? 'Set Race Length' : 'Confirm & Send'}
           </h1>
-        </div>
-        {/* Weekly counter */}
-        <div className="ml-auto text-right">
-          <div className={`text-xs font-[JetBrains_Mono] font-bold ${weeklyRemaining === 0 ? 'text-[#EF4444]' : weeklyRemaining === 1 ? 'text-[#F59E0B]' : 'text-[#22C55E]'}`}>
-            {weeklyRemaining}/2
-          </div>
-          <div className="text-[#6B7280] text-xs font-[Outfit]">this week</div>
         </div>
       </div>
 
@@ -232,7 +203,7 @@ export default function ChallengePage() {
                   { label: 'Their Rank', value: `#${target.ranking.position}` },
                   { label: 'Discipline', value: discipline ?? '' },
                   { label: 'Race',       value: `First to ${race}` },
-                  { label: 'Expires',    value: '48 hours' },
+                  { label: 'Expires',    value: '7 days' },
                 ].map((row) => (
                   <div key={row.label} className="flex justify-between items-center">
                     <span className="text-[#9CA3AF] text-sm font-[Outfit]">{row.label}</span>
@@ -249,12 +220,6 @@ export default function ChallengePage() {
               </div>
             </GlassCard>
 
-            {weeklyRemaining === 0 && (
-              <div className="text-[#EF4444] text-sm font-[Outfit] text-center p-3 bg-[#EF4444]/10 rounded-lg border border-[#EF4444]/20">
-                You have used both challenges this week. This challenge cannot be sent.
-              </div>
-            )}
-
             {error && (
               <div className="text-[#EF4444] text-sm font-[Outfit] text-center p-3 bg-[#EF4444]/10 rounded-lg border border-[#EF4444]/20">
                 {error}
@@ -266,7 +231,6 @@ export default function ChallengePage() {
               fullWidth
               size="lg"
               loading={sending}
-              disabled={weeklyRemaining === 0}
               onClick={handleSend}
             >
               <Swords size={18} /> Send Challenge ⚔️

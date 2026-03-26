@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, List, Swords, Trophy, Bell } from 'lucide-react';
+import { Home, List, Swords, Trophy, Bell, User } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 
 interface NavItem {
@@ -18,6 +18,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Challenge',path: '/rankings',     icon: Swords, center: true },
   { label: 'Matches',  path: '/matches',      icon: Trophy },
   { label: 'Alerts',   path: '/notifications',icon: Bell },
+  { label: 'Settings', path: '/settings',     icon: User },
 ];
 
 export const BottomNav: React.FC<{ unreadCount: number }> = ({ unreadCount }) => {
