@@ -42,29 +42,8 @@ async function checkRank1Compliance(supabase: ReturnType<typeof createClient>) {
     const { data: rank1Player } = await supabase.from('players').select('id, full_name').eq('id', rank1.player_id).single();
 
     if (daysSince >= 30) {
-      // Penalty: move #1 to #10, cascade #2–#9 up
-      const { data: affectedRanks } = await supabase
-        .from('rankings')
-        .select('id, player_id, position')
-        .gte('position', 2)
-        .lte('position', 10)
-        .order('position');
-
-      if (affectedRanks) {
-        for (const r of affectedRanks) {
-          await supabase.from('rankings').update({
-            previous_position: r.position,
-            position: r.position - 1,
-          }).eq('id', r.id);
-        }
-      }
-
-      // Move #1 to #10, reset rank1_since
-      await supabase.from('rankings').update({
-        previous_position: 1,
-        position: 10,
-        rank1_since: null,
-      }).eq('player_id', rank1.player_id);
+      // Atomic cascade via RPC: #1 drops to #10, positions 2–9 each move up one spot.
+      await supabase.rpc('apply_rank1_penalty', { p_player_id: rank1.player_id });
 
       // Notify the penalized player
       if (rank1Player) {
@@ -153,34 +132,17 @@ async function confirmResult(
     const lPos = loserRank.data.position;
 
     if (wPos > lPos) {
-      // Lower-ranked player beat higher-ranked: cascade everyone between down 1
-      const { data: middlePlayers } = await supabase
-        .from('rankings')
-        .select('id, position')
-        .gte('position', lPos)
-        .lt('position', wPos)
-        .neq('player_id', winnerId);
+      // Atomic cascade via RPC: winner takes loser's position, everyone between shifts down 1.
+      // Uses a single SQL UPDATE so Postgres evaluates positions atomically — no unique constraint conflicts.
+      await supabase.rpc('cascade_ranking_after_win', {
+        p_winner_id: winnerId,
+        p_loser_id: loserId,
+      });
 
-      if (middlePlayers) {
-        for (const p of middlePlayers) {
-          await supabase.from('rankings').update({
-            previous_position: p.position,
-            position: p.position + 1,
-          }).eq('id', p.id);
-        }
-      }
-
-      // Move winner to loser's old position
-      const rank1Since = lPos === 1 ? new Date().toISOString() : null;
-      await supabase.from('rankings').update({
-        previous_position: wPos,
-        position: lPos,
-        ...(lPos === 1 ? { rank1_since: rank1Since } : {}),
-      }).eq('player_id', winnerId);
-
-      // If winner is now #1 and didn't have rank1_since, set it
+      // Set rank1_since if winner just became #1 for the first time
       if (lPos === 1 && !winnerRank.data.rank1_since) {
-        await supabase.from('rankings').update({ rank1_since: rank1Since }).eq('player_id', winnerId);
+        await supabase.from('rankings').update({ rank1_since: new Date().toISOString() })
+          .eq('player_id', winnerId);
       }
     }
   }

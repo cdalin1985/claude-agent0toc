@@ -37,19 +37,16 @@ serve(async (req) => {
       await supabase.from('challenges').update({ status: 'resolved' }).eq('id', match.challenge_id);
     }
 
-    // Apply ranking cascade
+    // Apply ranking cascade atomically via RPC
     const [winnerRank, loserRank] = await Promise.all([
       supabase.from('rankings').select('position').eq('player_id', winner_id).single(),
       supabase.from('rankings').select('position').eq('player_id', loser_id).single(),
     ]);
     if (winnerRank.data && loserRank.data && winnerRank.data.position > loserRank.data.position) {
-      const wPos = winnerRank.data.position;
-      const lPos = loserRank.data.position;
-      const { data: middle } = await supabase.from('rankings').select('id, position').gte('position', lPos).lt('position', wPos).neq('player_id', winner_id);
-      if (middle) {
-        for (const p of middle) await supabase.from('rankings').update({ previous_position: p.position, position: p.position + 1 }).eq('id', p.id);
-      }
-      await supabase.from('rankings').update({ previous_position: wPos, position: lPos }).eq('player_id', winner_id);
+      await supabase.rpc('cascade_ranking_after_win', {
+        p_winner_id: winner_id,
+        p_loser_id: loser_id,
+      });
     }
 
     // Update stats
