@@ -87,10 +87,16 @@ $operator = $operator.Replace(
   'const tools = (await mcp.listTools({}, mcpRequestOptions())).tools || [];'
 )
 
-# Increase tool-call timeout.
+# Fix earlier bad timeout patch if already applied.
+$operator = $operator.Replace(
+  'const result = await mcp.callTool({ name: toolName, arguments: toolArgs }, mcpRequestOptions());',
+  'const result = await mcp.callTool({ name: toolName, arguments: toolArgs }, undefined, mcpRequestOptions());'
+)
+
+# Increase tool-call timeout from the original unpatched line too.
 $operator = $operator.Replace(
   'const result = await mcp.callTool({ name: toolName, arguments: toolArgs });',
-  'const result = await mcp.callTool({ name: toolName, arguments: toolArgs }, mcpRequestOptions());'
+  'const result = await mcp.callTool({ name: toolName, arguments: toolArgs }, undefined, mcpRequestOptions());'
 )
 
 Write-TextNoBom $OperatorPath $operator
