@@ -1,0 +1,31 @@
+{
+  "name": "Karpathy Skills Plugin",
+  "version": "1.0.0",
+  "description": "Andrej Karpathy's coding guidelines and best practices for AI/agent development, packaged as Claude Code skills",
+  "author": "Based on forrestchang/andrej-karpathy-skills",
+  "repository": "https://github.com/forrestchang/andrej-karpathy-skills",
+  "license": "MIT",
+  "compatibleVersions": ["2.0.0", "2.1.0"],
+  "skills": [
+    {
+      "id": "karpathy-coding-principles",
+      "name": "Karpathy Coding Principles",
+      "description": "Fundamental coding standards and principles from Andrej Karpathy"
+    },
+    {
+      "id": "code-review-guidelines",
+      "name": "Code Review Guidelines",
+      "description": "Guidelines for effective code review and improvement"
+    },
+    {
+      "id": "agent-development",
+      "name": "Agent Development Practices",
+      "description": "Best practices for developing AI agents and multi-agent systems"
+    },
+    {
+      "id": "prompt-engineering",
+      "name": "Prompt Engineering Guidelines",
+      "description": "Techniques for crafting effective prompts for LLMs"
+    }
+  ]
+}
