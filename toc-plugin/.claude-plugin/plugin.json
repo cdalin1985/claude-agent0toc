@@ -1,0 +1,23 @@
+{
+  "name": "toc",
+  "description": "TOC pool-ranking project skills: canon rules, challenge eligibility, ranking system, Supabase patterns, admin/treasury, and workflow",
+  "version": "1.0.0",
+  "author": {
+    "name": "Chase Dalin",
+    "url": "https://github.com/cdalin1985"
+  },
+  "homepage": "https://github.com/cdalin1985/claude-agent0toc",
+  "repository": "https://github.com/cdalin1985/claude-agent0toc",
+  "license": "Proprietary",
+  "keywords": [
+    "toc",
+    "pool",
+    "ranking",
+    "challenge",
+    "supabase",
+    "helena-montana",
+    "8-ball",
+    "9-ball",
+    "10-ball"
+  ]
+}
