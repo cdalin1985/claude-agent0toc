@@ -614,8 +614,21 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     if (!session) { setAddError('Session expired — please log in again.'); setAddLoading(false); return; }
 
     const payload: { full_name: string; fargo_rating?: number } = { full_name: newName.trim() };
-    const parsed = parseInt(newFargo, 10);
-    if (!isNaN(parsed)) payload.fargo_rating = parsed;
+    const trimmedFargo = newFargo.trim();
+    if (trimmedFargo !== '') {
+      if (!/^\d+$/.test(trimmedFargo)) {
+        setAddError('Fargo rating must be a non-negative whole number.');
+        setAddLoading(false);
+        return;
+      }
+      const numeric = Number(trimmedFargo);
+      if (!Number.isSafeInteger(numeric) || numeric < 0) {
+        setAddError('Fargo rating must be a non-negative whole number.');
+        setAddLoading(false);
+        return;
+      }
+      payload.fargo_rating = numeric;
+    }
 
     const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/add-player`, {
       method: 'POST',
@@ -629,8 +642,10 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     setNewFargo('');
     setAdding(false);
     qc.invalidateQueries({ queryKey: ['admin-players'] });
+    qc.invalidateQueries({ queryKey: ['admin-player-metrics'] });
     qc.invalidateQueries({ queryKey: ['rankings'] });
   };
+
 
   return (
     <div className="space-y-3">
@@ -640,7 +655,7 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
           <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Full name" autoFocus
             onKeyDown={(e) => e.key === 'Enter' && handleAddPlayer()}
             className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] mb-2" />
-          <input type="number" value={newFargo} onChange={(e) => setNewFargo(e.target.value)} placeholder="Fargo rating (optional)"
+          <input type="number" min={0} step={1} inputMode="numeric" value={newFargo} onChange={(e) => setNewFargo(e.target.value)} placeholder="Fargo rating (optional)"
             onKeyDown={(e) => e.key === 'Enter' && handleAddPlayer()}
             className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] mb-3" />
           {addError && <p className="text-[#EF4444] text-xs font-[Barlow] mb-2">{addError}</p>}
