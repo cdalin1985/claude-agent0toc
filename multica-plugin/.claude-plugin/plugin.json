@@ -1,0 +1,21 @@
+{
+  "name": "multica",
+  "description": "Transform agents into functional team members. Assign tasks, track progress, compound skills across agent squads",
+  "version": "1.0.0",
+  "author": {
+    "name": "Multica Contributors",
+    "url": "https://github.com/multica-ai/multica"
+  },
+  "homepage": "https://github.com/multica-ai/multica",
+  "repository": "https://github.com/multica-ai/multica",
+  "license": "Apache-2.0",
+  "keywords": [
+    "agents",
+    "team-management",
+    "task-tracking",
+    "autonomous-workflows",
+    "agent-collaboration",
+    "squads",
+    "skills"
+  ]
+}
