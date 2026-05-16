@@ -31,13 +31,16 @@ function Read-TextNoBom {
 function Write-TextNoBom {
   param(
     [Parameter(Mandatory=$true)][string]$Path,
-    [Parameter(Mandatory=$true)][string]$Text
+    [Parameter(Mandatory=$true)][AllowEmptyString()][string]$Text
   )
   [System.IO.File]::WriteAllText($Path, $Text, $Utf8NoBom)
 }
 
 # 1. Strip BOM from JSON config and add actual Desktop paths.
 $configText = Read-TextNoBom $ConfigPath
+if ([string]::IsNullOrWhiteSpace($configText)) {
+  throw "Config file is empty: $ConfigPath"
+}
 $config = $configText | ConvertFrom-Json
 
 $desktopForward = $Desktop.Replace('\\', '/')
