@@ -11,6 +11,8 @@ import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { Skeleton } from '../components/Skeleton';
+import { CooldownTicker } from '../components/CooldownTicker';
+import { useCooldown } from '../hooks/useCooldown';
 import type { ActivityFeedItem, Match, Notification, Challenge } from '../types/database';
 import { formatDistanceToNow } from '../utils/time';
 
@@ -30,6 +32,7 @@ export default function HomePage() {
   };
 
   const myRanking = rankings.find((r) => r.player.id === player?.id);
+  const { data: cooldown } = useCooldown(player?.id);
 
   // Pending incoming challenges
   const { data: pendingChallenges = [] } = useQuery<Challenge[]>({
@@ -328,7 +331,7 @@ export default function HomePage() {
               <div className="font-[Bebas_Neue] text-3xl text-[#E8E2D6] leading-tight truncate">
                 {profile?.display_name ?? player.full_name}
               </div>
-              <div className="flex items-center gap-3 mt-1">
+              <div className="flex items-center gap-3 mt-1 flex-wrap">
                 <span className="font-[Azeret_Mono] font-bold text-2xl" style={{ color: '#C62828' }}>
                   #{myRanking.ranking.position}
                 </span>
@@ -339,6 +342,9 @@ export default function HomePage() {
                 )}
                 {myStats?.best_rank_achieved && myStats.best_rank_achieved < myRanking.ranking.position && (
                   <Badge variant="default">Best #{myStats.best_rank_achieved}</Badge>
+                )}
+                {cooldown && (
+                  <CooldownTicker expiresAt={cooldown.expiresAt} playerId={player.id} />
                 )}
               </div>
             </div>
