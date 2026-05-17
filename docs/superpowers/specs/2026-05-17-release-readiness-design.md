@@ -13,6 +13,7 @@ This design is split into five deliverable slices:
 3. Activity feed as the public journal of league actions.
 4. Compressed admin rehearsal script for release testing.
 5. Real Open Graph preview image.
+6. Table-side match scoreboard experience.
 
 The visual redesign / curb appeal work remains parked until these release mechanics are reliable.
 
@@ -164,9 +165,9 @@ Events to log:
 - Match fee recorded, including method category.
 - League settings changed.
 
-The feed should not reveal private auth details. Player names, challenge/match context, ranking positions, treasury descriptions, and public league actions are acceptable under the league transparency model.
+The feed should reveal the direct event context in correlation with the event. Player names, emails, challenge/match context, ranking positions, treasury descriptions, public league actions, and relevant before/after values are acceptable under the league transparency model.
 
-Emails are acceptable to the league owner, but the current safer profile policy should remain unless a concrete app feature requires public emails. If emails become publicly visible later, that should be a conscious release decision, not an accidental side effect.
+Emails are acceptable everywhere when they are part of a public app event. Profile visibility can be relaxed if the implementation needs public email access for the journal or admin workflows; if it stays restricted, event-specific emails should still be written into activity/audit details when relevant.
 
 ## Slice 4: Admin Rehearsal Script
 
@@ -225,6 +226,30 @@ Verification:
 - The response is not the app HTML.
 - Shared-link metadata continues to point at `https://toc.monster/og-image.png`.
 
+## Slice 6: Match Scoreboard Experience
+
+Replace the current small-button in-progress scoring surface with a table-side scoreboard that is easy to use during a real match and visually memorable.
+
+Design direction: "Table-Side Scoreboard."
+
+Core behavior:
+
+- The whole player score zone is tappable while the match is in progress.
+- Each side shows player name, rank ball, current score, and race progress.
+- The tap target must be large enough for one-handed phone use.
+- The latest score tap should be reversible with an "Undo last point" action while the match remains in progress.
+- Undo should call the same score-update Edge Function with the previous score state instead of editing locally only.
+- Scoring controls disappear or disable once either player reaches race length or after the viewer has submitted the final result.
+- The final-submit flow stays below the scoreboard.
+
+Interaction and visual requirements:
+
+- Use the current TOC dark/red/gold brand language, but make the scoreboard feel less like a form and more like a live match surface.
+- Prefer lucide icons over emoji for controls.
+- Provide strong pressed/selected feedback within 100ms.
+- Preserve accessibility: buttons need labels, score changes need visible state, and text must fit on mobile.
+- Avoid relying on tiny plus buttons as the primary score input.
+
 ## Release Order
 
 1. Implement payment method enum and treasury source-of-truth.
@@ -233,7 +258,8 @@ Verification:
 4. Expand activity feed events.
 5. Write the admin rehearsal script from the final workflows.
 6. Add and verify `og-image.png`.
-7. Run local tests, lint, build, live Supabase checks, and Vercel preview.
+7. Replace the in-progress scoreboard with the table-side scoreboard and undo-last-point flow.
+8. Run local tests, lint, build, live Supabase checks, and Vercel preview.
 
 ## Testing Strategy
 
@@ -249,5 +275,6 @@ Minimum tests:
 - Decline reversal blocks when later ranking mutation exists.
 - Public pages and admin pages read the same treasury balance.
 - OG image path resolves to a PNG in build output.
+- In-progress match scoring exposes large tappable player score zones and an undo-last-point action.
 
 Manual rehearsal verifies the human workflow layer after code tests pass.
