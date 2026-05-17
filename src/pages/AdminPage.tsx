@@ -11,7 +11,8 @@ import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { formatDistanceToNow, formatDate } from '../utils/time';
-import type { Match, Player, TreasuryEntry, AuditEvent, LeagueSettings, Challenge } from '../types/database';
+import type { Match, Player, AuditEvent, LeagueSettings, Challenge } from '../types/database';
+import { fetchTreasurySnapshot, formatCents, ledgerSignFor } from '../lib/treasury';
 
 type TabKey = 'disputes' | 'challenges' | 'matches' | 'rankings' | 'players' | 'treasury' | 'rank1' | 'settings' | 'audit';
 type ChallengeRow = Challenge & { match_id: string | null };
@@ -737,38 +738,43 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
 // ─── Treasury ────────────────────────────────────────────────────────────────
 
 function TreasuryTab() {
+  const qc = useQueryClient();
   const [entryType, setEntryType] = useState<'credit' | 'debit'>('credit');
   const [amount, setAmount]       = useState('');
   const [desc, setDesc]           = useState('');
   const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState('');
 
-  const { data: entries = [] } = useQuery<TreasuryEntry[]>({
+  const { data } = useQuery({
     queryKey: ['treasury'],
-    queryFn: async () => {
-      const { data } = await supabase.from('treasury_ledger').select('*').order('created_at', { ascending: false }).limit(20);
-      return data ?? [];
-    },
+    queryFn: () => fetchTreasurySnapshot(),
   });
 
-  const balance = entries.reduce((sum, e) => {
-    if (e.entry_type === 'credit') return sum + e.amount_cents;
-    if (e.entry_type === 'debit')  return sum - e.amount_cents;
-    return sum;
-  }, 0);
+  const summary = data?.summary;
+  const entries = data?.entries ?? [];
+  const balance = summary?.balance_cents ?? 0;
 
   const handleAdd = async () => {
     if (!amount || !desc) return;
     setLoading(true);
+    setError('');
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setLoading(false); return; }
-    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-treasury`, {
+    if (!session) { setLoading(false); setError('Session expired — please log in again.'); return; }
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-treasury`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify({ entry_type: entryType, amount_cents: Math.round(parseFloat(amount) * 100), description: desc }),
     });
+    const json = await res.json().catch(() => ({}));
     setLoading(false);
+    if (!res.ok || json.error) {
+      setError(json.error ?? 'Could not save treasury entry.');
+      return;
+    }
     setAmount('');
     setDesc('');
+    qc.invalidateQueries({ queryKey: ['treasury'] });
+    qc.invalidateQueries({ queryKey: ['audit-events'] });
   };
 
   return (
@@ -776,9 +782,12 @@ function TreasuryTab() {
       <GlassCard className="p-5 text-center">
         <div className="text-[#9CA3AF] text-sm font-[Barlow] mb-1">Current Balance</div>
         <div className="font-[Azeret_Mono] font-bold text-5xl" style={{ color: balance >= 0 ? '#22C55E' : '#EF4444' }}>
-          ${(Math.abs(balance) / 100).toFixed(2)}
+          {formatCents(Math.abs(balance))}
         </div>
         {balance < 0 && <div className="text-[#EF4444] text-xs font-[Barlow] mt-1">In deficit</div>}
+        <div className="text-[#6B7280] text-xs font-[Barlow] mt-2">
+          {formatCents(summary?.total_credit_cents ?? 0)} in · {formatCents(summary?.total_debit_cents ?? 0)} out · {summary?.entry_count ?? 0} entries
+        </div>
       </GlassCard>
 
       <GlassCard className="p-4">
@@ -796,22 +805,31 @@ function TreasuryTab() {
             className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]" />
           <input placeholder="Description" value={desc} onChange={(e) => setDesc(e.target.value)}
             className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]" />
+          {error && <p className="text-[#EF4444] text-xs font-[Barlow]">{error}</p>}
           <Button variant="primary" fullWidth loading={loading} onClick={handleAdd} disabled={!amount || !desc}>Add Entry</Button>
         </div>
       </GlassCard>
 
       <div className="space-y-2">
-        {entries.map((e) => (
-          <GlassCard key={e.id} className="p-3 flex items-center justify-between">
-            <div>
-              <div className="font-[Barlow] text-sm text-[#E8E2D6]">{e.description}</div>
-              <div className="text-[#6B7280] text-xs font-[Barlow]">{formatDate(e.created_at)}</div>
-            </div>
-            <div className={`font-[Azeret_Mono] font-bold ${e.entry_type === 'credit' ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
-              {e.entry_type === 'credit' ? '+' : '-'}${(e.amount_cents / 100).toFixed(2)}
-            </div>
-          </GlassCard>
-        ))}
+        {entries.map((entry) => {
+          const sign = ledgerSignFor(entry.effect_cents);
+          const color = entry.effect_cents > 0
+            ? '#22C55E'
+            : entry.effect_cents < 0
+              ? '#EF4444'
+              : '#9CA3AF';
+          return (
+            <GlassCard key={entry.id} className="p-3 flex items-center justify-between">
+              <div className="min-w-0">
+                <div className="font-[Barlow] text-sm text-[#E8E2D6] truncate">{entry.description}</div>
+                <div className="text-[#6B7280] text-xs font-[Barlow]">{formatDate(entry.created_at)}</div>
+              </div>
+              <div className="font-[Azeret_Mono] font-bold shrink-0" style={{ color }}>
+                {sign}{formatCents(Math.abs(entry.effect_cents))}
+              </div>
+            </GlassCard>
+          );
+        })}
       </div>
     </div>
   );
