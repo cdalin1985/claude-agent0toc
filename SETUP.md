@@ -31,8 +31,9 @@ Run every migration in number order:
 11. `supabase/migrations/011_lock_down_security_definer_rpc.sql`
 12. `supabase/migrations/012_serialize_ranking_mutations.sql`
 13. `supabase/migrations/013_release_readiness.sql`
+14. `supabase/migrations/014_release_hardening_guardrails.sql`
 
-If you already ran migrations 001-012 before, run only the missing migrations. The Rank #1 cron migration is safe to run again because it replaces the cron job with the same job name instead of creating duplicates.
+If you already ran migrations 001-013 before, run only the missing migrations. The Rank #1 cron migration is safe to run again because it replaces the cron job with the same job name instead of creating duplicates. Migration 014 adds per-player submission columns and `NOT VALID` `CHECK` constraints, so result submission paths will fail at runtime if the edge functions deploy without it.
 
 ## Step 2: Get Your Service Role Key
 

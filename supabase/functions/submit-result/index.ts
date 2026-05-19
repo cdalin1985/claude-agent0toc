@@ -137,6 +137,66 @@ async function recordMatchFeePayments(
   }
 }
 
+// Records the $5 match fee for each player who attached a payment method to
+// the match, regardless of whether the match is heading to confirmed or
+// disputed. Called from both paths so admin dispute resolution doesn't have
+// to chase down payment methods after the fact.
+async function recordSubmittedMatchFees(
+  supabase: ReturnType<typeof createClient>,
+  match: Record<string, unknown>,
+  actorProfileId: string,
+): Promise<void> {
+  const matchId = match.id as string;
+  const player1Id = match.player1_id as string;
+  const player2Id = match.player2_id as string;
+  const player1PaymentMethod = normalizePayment(match.player1_payment_method);
+  const player2PaymentMethod = normalizePayment(match.player2_payment_method);
+
+  if (!player1PaymentMethod && !player2PaymentMethod) return;
+
+  const [{ data: p1Player }, { data: p2Player }] = await Promise.all([
+    supabase.from('players').select('full_name').eq('id', player1Id).single(),
+    supabase.from('players').select('full_name').eq('id', player2Id).single(),
+  ]);
+
+  const payers: MatchFeePayer[] = [];
+  if (player1PaymentMethod) {
+    payers.push({
+      player_id: player1Id,
+      player_name: p1Player?.full_name ?? 'Player 1',
+      payment_method: player1PaymentMethod,
+    });
+  }
+  if (player2PaymentMethod) {
+    payers.push({
+      player_id: player2Id,
+      player_name: p2Player?.full_name ?? 'Player 2',
+      payment_method: player2PaymentMethod,
+    });
+  }
+
+  if (payers.length === 0) return;
+
+  await recordMatchFeePayments(supabase, matchId, actorProfileId, payers);
+  for (const payer of payers) {
+    const { data: existing } = await supabase
+      .from('activity_feed')
+      .select('id')
+      .eq('event_type', 'match_fee_recorded')
+      .eq('actor_player_id', payer.player_id)
+      .ilike('detail', `%${matchId.slice(0, 8)}%`)
+      .limit(1)
+      .maybeSingle();
+    if (existing) continue;
+    await supabase.from('activity_feed').insert({
+      event_type: 'match_fee_recorded',
+      headline: `${payer.player_name} paid the $5 match fee · ${PAYMENT_METHOD_LABELS[payer.payment_method]}`,
+      detail: `Match ${matchId.slice(0, 8)} · credited to league treasury`,
+      actor_player_id: payer.player_id,
+    });
+  }
+}
+
 async function createPostLossCooldown(supabase: ReturnType<typeof createClient>, loserId: string): Promise<void> {
   const { data: settings } = await supabase.from('league_settings').select('cooldown_hours').single();
   const cooldownHours = settings?.cooldown_hours ?? 24;
@@ -339,6 +399,7 @@ serve(async (req) => {
 
       if (!isCompleteSubmission(player1Submission) || !isCompleteSubmission(player2Submission)) {
         await supabase.from('matches').update({ status: 'disputed' }).eq('id', match_id).eq('status', 'confirming');
+        await recordSubmittedMatchFees(supabase, updated, user.id);
         return new Response(JSON.stringify({ success: true, disputed: true }), { headers: { ...cors, 'Content-Type': 'application/json' } });
       }
 
@@ -360,6 +421,7 @@ serve(async (req) => {
           detail: `${updated.discipline} match ${match_id.slice(0, 8)} needs admin review.`,
         });
 
+        await recordSubmittedMatchFees(supabase, updated, user.id);
         return new Response(JSON.stringify({ success: true, disputed: true }), { headers: { ...cors, 'Content-Type': 'application/json' } });
       }
 
@@ -370,6 +432,7 @@ serve(async (req) => {
       if (finalScoreError) {
         const { error: disputeError } = await supabase.from('matches').update({ status: 'disputed' }).eq('id', match_id).eq('status', 'confirming');
         if (disputeError) throw disputeError;
+        await recordSubmittedMatchFees(supabase, updated, user.id);
         return new Response(JSON.stringify({ success: true, disputed: true, error: finalScoreError }), { headers: { ...cors, 'Content-Type': 'application/json' } });
       }
 
@@ -378,37 +441,7 @@ serve(async (req) => {
 
       const { data: finalMatch } = await supabase.from('matches').select('*').eq('id', match_id).single();
       if (finalMatch) {
-        const [{ data: p1Player }, { data: p2Player }] = await Promise.all([
-          supabase.from('players').select('full_name').eq('id', finalMatch.player1_id).single(),
-          supabase.from('players').select('full_name').eq('id', finalMatch.player2_id).single(),
-        ]);
-
-        const payers: MatchFeePayer[] = [];
-        if (finalMatch.player1_payment_method && PAYMENT_METHODS.includes(finalMatch.player1_payment_method)) {
-          payers.push({
-            player_id: finalMatch.player1_id,
-            player_name: p1Player?.full_name ?? 'Player 1',
-            payment_method: finalMatch.player1_payment_method as PaymentMethod,
-          });
-        }
-        if (finalMatch.player2_payment_method && PAYMENT_METHODS.includes(finalMatch.player2_payment_method)) {
-          payers.push({
-            player_id: finalMatch.player2_id,
-            player_name: p2Player?.full_name ?? 'Player 2',
-            payment_method: finalMatch.player2_payment_method as PaymentMethod,
-          });
-        }
-        if (payers.length > 0) {
-          await recordMatchFeePayments(supabase, match_id, user.id, payers);
-          for (const payer of payers) {
-            await supabase.from('activity_feed').insert({
-              event_type: 'match_fee_recorded',
-              headline: `${payer.player_name} paid the $5 match fee · ${PAYMENT_METHOD_LABELS[payer.payment_method]}`,
-              detail: `Match ${match_id.slice(0, 8)} · credited to league treasury`,
-              actor_player_id: payer.player_id,
-            });
-          }
-        }
+        await recordSubmittedMatchFees(supabase, finalMatch, user.id);
       }
     } else {
       const otherId = isP1 ? match.player2_id : match.player1_id;

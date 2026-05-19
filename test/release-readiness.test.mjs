@@ -58,6 +58,22 @@ test('match confirmation records idempotent match fee credits', () => {
   assert.match(submitResult, /amount_cents: 500/);
 });
 
+test('match fees are recorded even when submissions transition to disputed', () => {
+  // Shared helper is the single source of truth for fee recording.
+  assert.match(submitResult, /async function recordSubmittedMatchFees/);
+  // Helper is invoked from every disputed early-return so admin dispute
+  // resolution doesn't have to recover payment methods after the fact.
+  const disputedCalls = submitResult.match(/await recordSubmittedMatchFees\(supabase, updated, user\.id\)/g) ?? [];
+  assert.ok(disputedCalls.length >= 3, `expected 3+ disputed-path fee recordings, found ${disputedCalls.length}`);
+  // Confirmed path also uses the same helper.
+  assert.match(submitResult, /await recordSubmittedMatchFees\(supabase, finalMatch, user\.id\)/);
+});
+
+test('release setup checklist includes the hardening guardrails migration', () => {
+  const setup = read('SETUP.md');
+  assert.match(setup, /014_release_hardening_guardrails\.sql/);
+});
+
 test('admin rehearsal script and og image exist', () => {
   assert.ok(existsSync(join(root, 'docs', 'release', 'admin-rehearsal-script.md')));
   assert.ok(existsSync(join(root, 'public', 'og-image.png')));
