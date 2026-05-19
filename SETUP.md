@@ -27,8 +27,13 @@ Run every migration in number order:
 7. `supabase/migrations/007_storage_avatars.sql`
 8. `supabase/migrations/008_expire_stale_challenges.sql`
 9. `supabase/migrations/009_rank1_obligation_cron.sql`
+10. `supabase/migrations/010_workflow_connection_fixes.sql`
+11. `supabase/migrations/011_lock_down_security_definer_rpc.sql`
+12. `supabase/migrations/012_serialize_ranking_mutations.sql`
+13. `supabase/migrations/013_release_readiness.sql`
+14. `supabase/migrations/014_add_visual_theme.sql`
 
-If you already ran migrations 001–008 before, run only the missing migrations. The Rank #1 cron migration is safe to run again because it replaces the cron job with the same job name instead of creating duplicates.
+If you already ran migrations 001–013 before, run only the missing migrations. The Rank #1 cron migration is safe to run again because it replaces the cron job with the same job name instead of creating duplicates. Migration 014 adds the `theme_name` column the AdminPage theme switcher depends on; it is idempotent and safe to re-run.
 
 ## Step 2: Get Your Service Role Key
 
