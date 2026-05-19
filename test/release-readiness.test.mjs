@@ -9,7 +9,7 @@ function read(path) {
   return readFileSync(join(root, path), 'utf8');
 }
 
-const migration = read('supabase/migrations/013_release_readiness.sql');
+const migration = read('supabase/migrations/20260517213621_013_release_readiness.sql');
 const submitResult = read('supabase/functions/submit-result/index.ts');
 const respondToChallenge = read('supabase/functions/respond-to-challenge/index.ts');
 const resolveDispute = read('supabase/functions/resolve-dispute/index.ts');
@@ -20,7 +20,7 @@ const setPlayerActive = read('supabase/functions/set-player-active/index.ts');
 const adminPage = read('src/pages/AdminPage.tsx');
 const databaseTypes = read('src/types/database.ts');
 const matchPage = read('src/pages/MatchPage.tsx');
-const hardeningMigrationPath = 'supabase/migrations/014_release_hardening_guardrails.sql';
+const hardeningMigrationPath = 'supabase/migrations/20260519110000_release_hardening_guardrails.sql';
 const hardeningMigration = existsSync(join(root, hardeningMigrationPath)) ? read(hardeningMigrationPath) : '';
 
 test('payment methods are explicit and legacy digital/envelope values are retired', () => {
@@ -71,7 +71,7 @@ test('match fees are recorded even when submissions transition to disputed', () 
 
 test('release setup checklist includes the hardening guardrails migration', () => {
   const setup = read('SETUP.md');
-  assert.match(setup, /014_release_hardening_guardrails\.sql/);
+  assert.match(setup, /20260519110000_release_hardening_guardrails\.sql/);
 });
 
 test('admin rehearsal script and og image exist', () => {
