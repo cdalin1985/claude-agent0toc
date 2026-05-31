@@ -25,6 +25,8 @@ export interface Database {
           preferred_discipline: '8 Ball' | '9 Ball' | '10 Ball' | null;
           avatar_url: string | null;
           is_active: boolean;
+          activated_at: string | null;
+          inactivated_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -310,6 +312,7 @@ export interface Database {
           match_play_days: number;
           challenge_weekly_limit: number;
           first_challenge_range: number;
+          theme_name: 'classic' | 'neon-billiards';
           updated_at: string;
         };
         Insert: Omit<Database['public']['Tables']['league_settings']['Row'], 'id' | 'updated_at'>;
