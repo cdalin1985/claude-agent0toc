@@ -41,7 +41,7 @@ Only super_admin manages treasury.
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **claude-agent0toc** (1094 symbols, 1711 relationships, 24 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **claude-agent0toc** (1268 symbols, 1940 relationships, 26 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -81,3 +81,47 @@ This project is indexed by GitNexus as **claude-agent0toc** (1094 symbols, 1711 
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
+
+<!-- model-delegation-policy -->
+# Model Delegation Policy
+
+Use the cheapest model that can safely complete the task. Escalate only when justified.
+
+## Routing table
+
+| Task | Agent | Model |
+|---|---|---|
+| File discovery, symbol search, reading docs or config | cheap-scout | Haiku |
+| Lint, typecheck, test runs, error log inspection | cheap-tester | Haiku |
+| CSS tweaks, copy edits, label renames, single-file boilerplate | cheap-writer | Haiku |
+| Bug fixes, UI, API wiring, features, refactors up to 6 files | standard-coder | Sonnet |
+| Hard bugs after a Sonnet fix failed; async/auth/DB failures | power-debugger | Opus |
+| Architecture, schema, auth/RLS, payments, large refactors | power-architect | Opus |
+
+## Mandatory sequencing rules
+
+1. If the relevant files are not already known → start with cheap-scout.
+2. If the task is validation or error inspection → start with cheap-tester.
+3. If the task is a trivial write (CSS, copy, config, no logic, max 2 files) → use cheap-writer.
+4. For all other implementation → use standard-coder.
+5. Escalate to power-debugger only after a Sonnet-level fix attempt failed.
+6. Escalate to power-architect only for high-impact decisions, not routine coding.
+
+## Escalation to Opus — only when one of these is true
+
+- The change affects schema, RLS, auth, payment, ranking, or other core business rules.
+- A Sonnet-level fix failed once.
+- The change spans more than 6 meaningful files.
+- A wrong answer could corrupt data, weaken security, or break production behavior.
+- The correct answer depends on hidden coupling or product logic.
+
+## Never use Opus for
+
+Formatting, copy edits, CSS, file discovery, test runs, basic summaries, single-file boilerplate.
+
+## Cost discipline
+
+- Summarize findings; do not paste large file contents between agents.
+- Use exact file paths and line ranges in handoffs.
+- Prefer a targeted lint or single-test command over a full suite.
+- Before escalating to Opus, write one sentence explaining why Haiku or Sonnet cannot safely complete the task.
