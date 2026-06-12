@@ -199,6 +199,7 @@ export default function ChallengesPage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<'incoming' | 'outgoing' | 'history'>('incoming');
   const [responding, setResponding] = useState<Challenge | null>(null);
+  const [actioningId, setActioningId] = useState<string | null>(null);
 
   const { data: challenges = [], isLoading } = usePlayerChallenges(player?.id);
 
@@ -232,6 +233,15 @@ export default function ChallengesPage() {
       body: JSON.stringify(body),
     });
     qc.invalidateQueries({ queryKey: ['challenges'] });
+  };
+
+  const runChallengeAction = async (challengeId: string, action: 'cancel' | 'wash') => {
+    setActioningId(challengeId);
+    try {
+      await callFn({ challenge_id: challengeId, action });
+    } finally {
+      setActioningId(null);
+    }
   };
 
   const currentList = tab === 'incoming' ? incoming : tab === 'outgoing' ? outgoing : history;
@@ -347,7 +357,7 @@ export default function ChallengesPage() {
                         </Button>
                       )}
                       {tab === 'outgoing' && c.status === 'pending' && (
-                        <Button variant="ghost" size="sm" onClick={() => callFn({ challenge_id: c.id, action: 'cancel' })}>
+                        <Button variant="ghost" size="sm" loading={actioningId === c.id} onClick={() => runChallengeAction(c.id, 'cancel')}>
                           Cancel
                         </Button>
                       )}
@@ -359,7 +369,8 @@ export default function ChallengesPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => callFn({ challenge_id: c.id, action: 'wash' })}
+                            loading={actioningId === c.id}
+                            onClick={() => runChallengeAction(c.id, 'wash')}
                           >
                             Couldn't agree
                           </Button>
