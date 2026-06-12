@@ -9,6 +9,7 @@ import { PoolBall } from '../components/PoolBall';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 import { InactivePlayerBanner } from '../components/InactivePlayerBanner';
+import { EmptyState } from '../components/EmptyState';
 
 type Discipline = '8 Ball' | '9 Ball' | '10 Ball';
 
@@ -22,7 +23,7 @@ export default function ChallengePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { player } = useAuthStore();
-  const { data: rankings = [] } = useRankings();
+  const { data: rankings = [], isLoading: rankingsLoading } = useRankings();
 
   const target   = rankings.find((r) => r.player.id === id);
   const myRanking = rankings.find((r) => r.player.id === player?.id);
@@ -35,7 +36,32 @@ export default function ChallengePage() {
   const [sent, setSent]             = useState(false);
   const [error, setError]           = useState('');
 
-  if (!target) return null;
+  if (!target) {
+    // Rankings still loading — show a skeleton instead of a blank screen.
+    if (rankingsLoading) {
+      return (
+        <div className="min-h-screen px-4 pt-4 space-y-4">
+          <div className="skeleton h-8 w-24" />
+          <div className="skeleton h-40 rounded-xl" />
+          <div className="skeleton h-64 rounded-xl" />
+        </div>
+      );
+    }
+    return (
+      <div className="min-h-screen px-4 pt-8">
+        <EmptyState
+          icon="🎱"
+          title="Player Not Found"
+          message="This player isn't on the active ladder. They may be inactive, or the link is out of date."
+          action={
+            <Button variant="primary" onClick={() => navigate('/rankings')}>
+              Back to Rankings
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
 
   const handleRaceChange = (val: string) => {
     setRaceInput(val);
