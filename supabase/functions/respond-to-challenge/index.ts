@@ -66,6 +66,8 @@ serve(async (req) => {
         venue,
         scheduled_at: scheduledAt.toISOString(),
         status: 'scheduled',
+        // The challenger keeps the single scoreboard during play.
+        initiated_by_player_id: challenge.challenger_id,
       }).select().single();
       if (insertError) throw insertError;
 
