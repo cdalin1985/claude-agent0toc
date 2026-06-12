@@ -29,6 +29,12 @@ serve(async (req) => {
     const isP2 = match.player2_id === caller.id;
     if (!isP1 && !isP2) return new Response(JSON.stringify({ error: 'Not a participant in this match.' }), { headers: cors });
 
+    // Single scoreboard: once an initiator is recorded, only they may keep score.
+    // Older matches without an initiator stay open to either participant.
+    if (match.initiated_by_player_id && match.initiated_by_player_id !== caller.id) {
+      return new Response(JSON.stringify({ error: 'Only the match initiator can update the score.' }), { status: 403, headers: cors });
+    }
+
     const newP1Score = isP1 ? my_score : opponent_score;
     const newP2Score = isP1 ? opponent_score : my_score;
 
@@ -62,6 +68,20 @@ serve(async (req) => {
     if (updateError) throw updateError;
     if (!updatedRows?.length) {
       return new Response(JSON.stringify({ error: 'Scores can only be changed before result submission.' }), { status: 409, headers: cors });
+    }
+
+    // Emit a League Journal event the first time a match goes live.
+    if (match.status === 'scheduled') {
+      const [{ data: p1 }, { data: p2 }] = await Promise.all([
+        supabase.from('players').select('full_name').eq('id', match.player1_id).single(),
+        supabase.from('players').select('full_name').eq('id', match.player2_id).single(),
+      ]);
+      await supabase.from('activity_feed').insert({
+        event_type: 'match_started',
+        headline: `${p1?.full_name ?? 'Player 1'} vs ${p2?.full_name ?? 'Player 2'} — ${match.discipline} match started`,
+        detail: `Race to ${match.race_length} at ${match.venue}`,
+        actor_player_id: caller.id,
+      });
     }
 
     return new Response(JSON.stringify({ success: true }), { headers: { ...cors, 'Content-Type': 'application/json' } });
