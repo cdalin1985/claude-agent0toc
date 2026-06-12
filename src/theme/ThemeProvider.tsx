@@ -51,6 +51,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
+    // Loads the league theme from Supabase on mount; the setState calls happen
+    // after the awaited fetch (in async callbacks), not synchronously, so the
+    // cascading-render warning does not apply here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshGlobalTheme()
       .catch((error) => {
         console.error('[TOC theme] Unexpected theme load failure', error);
@@ -100,6 +104,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
+// The useTheme hook is intentionally colocated with its provider.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useTheme() {
   const context = useContext(ThemeContext);
   if (!context) throw new Error('useTheme must be used inside ThemeProvider');
