@@ -259,6 +259,8 @@ async function confirmResult(
     supabase.from('rankings').select('position').eq('player_id', loserId).single(),
   ]);
   const winnerIsChallenger = match.player1_id === winnerId;
+  // Captured when a win causes a ranking swap, so the League Journal can report the move.
+  let rankChange: { winnerOld: number; winnerNew: number; loserOld: number; loserNew: number } | null = null;
 
   if (winnerRank.data && loserRank.data) {
     const wPos = winnerRank.data.position;
@@ -268,13 +270,18 @@ async function confirmResult(
       const { error: cascadeError } = await supabase.rpc('cascade_ranking_after_win', { p_winner_id: winnerId, p_loser_id: loserId });
       if (cascadeError) throw cascadeError;
 
-      const { data: refreshedWinnerRank, error: refreshedWinnerRankError } = await supabase
-        .from('rankings')
-        .select('position')
-        .eq('player_id', winnerId)
-        .single();
+      const [{ data: refreshedWinnerRank, error: refreshedWinnerRankError }, { data: refreshedLoserRank }] = await Promise.all([
+        supabase.from('rankings').select('position').eq('player_id', winnerId).single(),
+        supabase.from('rankings').select('position').eq('player_id', loserId).single(),
+      ]);
       if (refreshedWinnerRankError) throw refreshedWinnerRankError;
       winnerCurrentPosition = refreshedWinnerRank?.position ?? winnerCurrentPosition;
+      rankChange = {
+        winnerOld: wPos,
+        winnerNew: winnerCurrentPosition,
+        loserOld: lPos,
+        loserNew: refreshedLoserRank?.position ?? lPos,
+      };
 
       if (lPos === 1 && !winnerRank.data.rank1_since) {
         const { error: rank1Error } = await supabase.from('rankings').update({ rank1_since: new Date().toISOString() }).eq('player_id', winnerId);
@@ -334,6 +341,32 @@ async function confirmResult(
   ]);
   const { error: activityError } = await supabase.from('activity_feed').insert({ event_type: 'match_confirmed', headline: `${wp.data?.full_name} def. ${lp.data?.full_name} Â· ${p1Score}â€“${p2Score}`, actor_player_id: winnerId });
   if (activityError) throw activityError;
+
+  // Report any ranking movement to the League Journal.
+  if (rankChange && (rankChange.winnerNew !== rankChange.winnerOld || rankChange.loserNew !== rankChange.loserOld)) {
+    const rankEvents = [];
+    if (rankChange.winnerNew !== rankChange.winnerOld) {
+      rankEvents.push({
+        event_type: 'rank_change',
+        headline: `${wp.data?.full_name} climbed to #${rankChange.winnerNew} (from #${rankChange.winnerOld})`,
+        detail: 'Moved up after a match win',
+        actor_player_id: winnerId,
+      });
+    }
+    if (rankChange.loserNew !== rankChange.loserOld) {
+      rankEvents.push({
+        event_type: 'rank_change',
+        headline: `${lp.data?.full_name} moved to #${rankChange.loserNew} (from #${rankChange.loserOld})`,
+        detail: 'Adjusted after a match loss',
+        actor_player_id: loserId,
+      });
+    }
+    if (rankEvents.length > 0) {
+      const { error: rankEventError } = await supabase.from('activity_feed').insert(rankEvents);
+      if (rankEventError) throw rankEventError;
+    }
+  }
+
   await checkRank1Compliance(supabase);
 }
 
