@@ -43,3 +43,12 @@ CREATE TABLE IF NOT EXISTS public.player_discipline_stats (
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE(player_id, discipline)
 );
+
+-- Match production RLS posture: discipline stats are publicly readable, same as
+-- player_season_stats in toc_rls_policies.sql. Without this, a from-scratch DB
+-- leaves the table with RLS disabled and writable by API clients.
+ALTER TABLE public.player_discipline_stats ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can view discipline stats" ON public.player_discipline_stats;
+CREATE POLICY "Anyone can view discipline stats"
+  ON public.player_discipline_stats FOR SELECT
+  USING (true);

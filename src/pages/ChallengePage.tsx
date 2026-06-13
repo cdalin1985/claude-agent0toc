@@ -10,6 +10,7 @@ import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 import { InactivePlayerBanner } from '../components/InactivePlayerBanner';
 import { EmptyState } from '../components/EmptyState';
+import { QueryError } from '../components/QueryError';
 
 type Discipline = '8 Ball' | '9 Ball' | '10 Ball';
 
@@ -23,7 +24,7 @@ export default function ChallengePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { player } = useAuthStore();
-  const { data: rankings = [], isLoading: rankingsLoading } = useRankings();
+  const { data: rankings = [], isLoading: rankingsLoading, isError, refetch, isRefetching } = useRankings();
 
   const target   = rankings.find((r) => r.player.id === id);
   const myRanking = rankings.find((r) => r.player.id === player?.id);
@@ -44,6 +45,15 @@ export default function ChallengePage() {
           <div className="skeleton h-8 w-24" />
           <div className="skeleton h-40 rounded-xl" />
           <div className="skeleton h-64 rounded-xl" />
+        </div>
+      );
+    }
+    // Fetch failed with no cached data — offer a retry instead of a misleading
+    // "Player Not Found" for what may be a perfectly valid challenge link.
+    if (isError && rankings.length === 0) {
+      return (
+        <div className="min-h-screen px-4 pt-8">
+          <QueryError onRetry={() => refetch()} retrying={isRefetching} />
         </div>
       );
     }
