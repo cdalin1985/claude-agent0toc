@@ -22,33 +22,42 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 2. Update RLS Policies
--- Profiles
-DROP POLICY IF EXISTS "Public profiles are viewable by everyone." ON public.profiles;
-CREATE POLICY "Public profiles are viewable by everyone."
-  ON public.profiles FOR SELECT
-  USING ( true );
+-- 2. Update RLS Policies (guarded: tables may not exist on fresh preview branches)
+DO $$
+BEGIN
+  -- Profiles
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'profiles') THEN
+    DROP POLICY IF EXISTS "Public profiles are viewable by everyone." ON public.profiles;
+    CREATE POLICY "Public profiles are viewable by everyone."
+      ON public.profiles FOR SELECT
+      USING ( true );
+  END IF;
 
--- Matches
-DROP POLICY IF EXISTS "Public matches are viewable by everyone." ON public.matches;
-CREATE POLICY "Everyone can see matches"
-  ON public.matches FOR SELECT
-  USING ( true );
+  -- Matches
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'matches') THEN
+    DROP POLICY IF EXISTS "Public matches are viewable by everyone." ON public.matches;
+    CREATE POLICY "Everyone can see matches"
+      ON public.matches FOR SELECT
+      USING ( true );
 
-CREATE POLICY "Challengers can insert matches"
-  ON public.matches FOR INSERT
-  WITH CHECK ( auth.uid() = challenger_id );
+    CREATE POLICY "Challengers can insert matches"
+      ON public.matches FOR INSERT
+      WITH CHECK ( auth.uid() = challenger_id );
 
-CREATE POLICY "Participants can update their matches"
-  ON public.matches FOR UPDATE
-  USING ( auth.uid() = challenger_id OR auth.uid() = opponent_id );
+    CREATE POLICY "Participants can update their matches"
+      ON public.matches FOR UPDATE
+      USING ( auth.uid() = challenger_id OR auth.uid() = opponent_id );
+  END IF;
 
--- Comments
-DROP POLICY IF EXISTS "Everyone can read comments" ON public.comments;
-CREATE POLICY "Everyone can read comments"
-  ON public.comments FOR SELECT
-  USING ( true );
+  -- Comments
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'comments') THEN
+    DROP POLICY IF EXISTS "Everyone can read comments" ON public.comments;
+    CREATE POLICY "Everyone can read comments"
+      ON public.comments FOR SELECT
+      USING ( true );
 
-CREATE POLICY "Authenticated users can post comments"
-  ON public.comments FOR INSERT
-  WITH CHECK ( auth.role() = 'authenticated' );
+    CREATE POLICY "Authenticated users can post comments"
+      ON public.comments FOR INSERT
+      WITH CHECK ( auth.role() = 'authenticated' );
+  END IF;
+END $$;
