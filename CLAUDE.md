@@ -8,6 +8,12 @@ TOC-Agent-Swarm is the automation/swarm folder only.
 
 Never dump random work files into the app repo. Keep scratch files, patch archives, copied prompts, and temporary exports in TOC_WORKSPACE.
 
+## TOC vs TOF — hard boundary
+
+TOC (`cdalin1985/claude-agent0toc`) and TOF (`cdalin1985/TOF`, Top of the Falls) are separate repos, separate Vercel projects (toc-app vs tof-app), and separate Supabase backends. TOF was forked from TOC long ago and has diverged (different ruleset — no Rank #1 obligation, different branding/logo).
+
+Never merge, branch, cherry-pick, or sync code/migrations/PRs between TOC and TOF. Never assume a fix or merge in one applies to the other — always check the other repo independently if asked. Treat them as fully unrelated codebases that happen to share lineage.
+
 ## Canonical paths
 
 - TOC workspace: C:\Users\chase\Desktop\TOC_WORKSPACE
