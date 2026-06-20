@@ -7,6 +7,7 @@ import { useAuthStore } from '../stores/authStore';
 import { PoolBall } from '../components/PoolBall';
 import { Button } from '../components/Button';
 import { GlassCard } from '../components/GlassCard';
+import { QueryError } from '../components/QueryError';
 import type { Player, Ranking, PlayerMetrics } from '../types/database';
 
 
@@ -23,7 +24,7 @@ export default function ClaimPage() {
   const [claiming, setClaiming]       = useState(false);
   const [claimError, setClaimError]   = useState('');
 
-  const { data: players = [], isLoading } = useQuery({
+  const { data: playersData, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['unclaimed-players'],
     queryFn: async () => {
       const [playersRes, rankingsRes, metricsRes] = await Promise.all([
@@ -31,6 +32,9 @@ export default function ClaimPage() {
         supabase.from('rankings').select('*'),
         supabase.from('player_reference_metrics').select('*'),
       ]);
+      // Distinguish "couldn't load the roster" from "everyone is claimed".
+      if (playersRes.error) throw playersRes.error;
+      if (rankingsRes.error) throw rankingsRes.error;
       const rankings = (rankingsRes.data ?? []) as Ranking[];
       const metrics  = (metricsRes.data  ?? []) as PlayerMetrics[];
       return ((playersRes.data ?? []) as Player[]).map((p) => ({
@@ -41,6 +45,7 @@ export default function ClaimPage() {
     },
   });
 
+  const players = playersData ?? [];
   const filtered = players.filter((p) =>
     p.player.full_name.toLowerCase().includes(search.toLowerCase())
   );
@@ -104,7 +109,13 @@ export default function ClaimPage() {
 
         {/* Player list */}
         <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
-          {isLoading
+          {isError && playersData === undefined
+            ? <QueryError
+                message="Couldn't load the league roster. Check your signal and try again."
+                onRetry={() => refetch()}
+                retrying={isRefetching}
+              />
+            : isLoading
             ? Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="glass-card p-4 flex items-center gap-3">
                   <div className="skeleton w-12 h-12 rounded-full" />
@@ -119,7 +130,7 @@ export default function ClaimPage() {
                 <div className="text-center py-12 text-[#6B7280] font-[Barlow]">
                   {players.length === 0
                     ? 'All players have been claimed. Contact the league admin.'
-                    : 'No players match your search.'}
+                    : "No players match your search. Don't see your name? Ask a league admin to add you."}
                 </div>
               )
             : filtered.map((p, i) => (

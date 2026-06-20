@@ -295,12 +295,21 @@ CREATE POLICY "Users can view own profile"
   USING ((select auth.uid()) = id);
 
 -- Replace any previous Rank #1 cron job with the intended twice-daily schedule.
-SELECT cron.unschedule(jobid)
-FROM cron.job
-WHERE jobname IN ('rank1-obligation-check', 'toc_rank1_obligation_enforcement');
-
-SELECT cron.schedule(
-  'rank1-obligation-check',
-  '0 0,12 * * *',
-  $$SELECT public.enforce_rank1_obligations();$$
-);
+-- Guarded: pg_cron is not available on preview branches.
+DO $$
+DECLARE v_job RECORD;
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
+    FOR v_job IN
+      SELECT jobid FROM cron.job
+      WHERE jobname IN ('rank1-obligation-check', 'toc_rank1_obligation_enforcement')
+    LOOP
+      PERFORM cron.unschedule(v_job.jobid);
+    END LOOP;
+    PERFORM cron.schedule(
+      'rank1-obligation-check',
+      '0 0,12 * * *',
+      $cron$SELECT public.enforce_rank1_obligations();$cron$
+    );
+  END IF;
+END $$;

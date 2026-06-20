@@ -333,6 +333,20 @@ export default function SettingsPage() {
         </motion.div>
       )}
 
+      {/* League rules */}
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.14 }}>
+        <GlassCard className="p-5" hover onClick={() => navigate('/rules')}>
+          <div className="flex items-center gap-3">
+            <span className="text-xl">📖</span>
+            <div>
+              <div className="font-[Barlow] font-semibold text-[#E8E2D6]">League Rules</div>
+              <div className="text-[#9CA3AF] text-xs font-[Barlow]">Challenges, cooldowns, forfeits, fees — how the ladder works</div>
+            </div>
+            <div className="ml-auto text-[#6B7280]">→</div>
+          </div>
+        </GlassCard>
+      </motion.div>
+
       {/* App info */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.16 }}>
         <GlassCard className="p-5">
