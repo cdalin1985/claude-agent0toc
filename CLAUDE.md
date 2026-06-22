@@ -2,18 +2,23 @@
 
 ## Workspace policy
 
-TOC_WORKSPACE is the command center.
-claude-agent0toc is the app code repo only.
-TOC-Agent-Swarm is the automation/swarm folder only.
+This repository is the clean local checkout for **TOC.Monster / Top of the Capital**.
 
-Never dump random work files into the app repo. Keep scratch files, patch archives, copied prompts, and temporary exports in TOC_WORKSPACE.
+- Local checkout: `C:/Users/chase/toc-monster-app`
+- GitHub repo: `cdalin1985/claude-agent0toc`
+- Vercel project: `toc-app`
+- Production URL: `https://toc.monster`
+- Supabase project: `toc1`
+- Production branch: `main`
 
-## Canonical paths
+Do not mix TOC.Monster and TOF work:
 
-- TOC workspace: C:\Users\chase\Desktop\TOC_WORKSPACE
-- TOC app repo: C:\Users\chase\Desktop\claude-agent0toc
-- TOC swarm: C:\Users\chase\Desktop\TOC-Agent-Swarm
-- Old incoming folder: D:\documents\Claude\Projects\toc
+- TOC.Monster work belongs in `C:/Users/chase/toc-monster-app`.
+- TOF / Top of the Falls work belongs in `C:/Users/chase/tof-app`.
+- `C:/Users/chase/toc-app` should remain absent/unused; the stale old TOF copy was renamed to `C:/Users/chase/toc-app_OLD_TOF_DO_NOT_USE_20260610`.
+- Never put TOF roster files, Carl notes, TOF migrations, or TOF Supabase config in this TOC.Monster checkout.
+
+Never dump random work files into the app repo. Keep scratch files, patch archives, copied prompts, and temporary exports outside the app repo unless they are intentional project documentation under `docs/`.
 
 ## Work style
 
