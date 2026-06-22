@@ -6,6 +6,8 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useUIStore } from '../stores/uiStore';
 import { AmbientBackground } from './AmbientBackground';
+import { TopHeader } from './TopHeader';
+import { SideMenu } from './SideMenu';
 import { BottomNav } from './BottomNav';
 import { LoadingScreen } from './LoadingScreen';
 import { OfflineBanner } from './OfflineBanner';
@@ -25,6 +27,7 @@ export const Layout: React.FC = () => {
   const { session, player, isLoading, setSession, setProfile, setPlayer, setIsLoading, reset } = useAuthStore();
   const { isOffline, setIsOffline } = useUIStore();
   const [appReady, setAppReady] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Bootstrap auth state
   useEffect(() => {
@@ -152,12 +155,15 @@ export const Layout: React.FC = () => {
       <AmbientBackground />
       <OfflineBanner show={isOffline} />
 
+      {showNav && <TopHeader onMenuToggle={() => setIsMenuOpen(!isMenuOpen)} isMenuOpen={isMenuOpen} />}
+      {showNav && <SideMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />}
+
       {/* Main content area */}
       <main
         className="relative z-10"
         style={{
           paddingBottom: showNav ? '80px' : 0,
-          paddingTop: isOffline ? '36px' : 0,
+          paddingTop: showNav ? '80px' : isOffline ? '36px' : 0,
           minHeight: '100svh',
         }}
       >
@@ -176,7 +182,7 @@ export const Layout: React.FC = () => {
         </AnimatePresence>
       </main>
 
-      {showNav && <BottomNav unreadCount={unreadCount} />}
+      {showNav && <BottomNav unreadCount={unreadCount} onMenuToggle={() => setIsMenuOpen(!isMenuOpen)} />}
     </div>
   );
 };
