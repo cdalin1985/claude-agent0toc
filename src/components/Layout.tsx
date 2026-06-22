@@ -156,7 +156,7 @@ export const Layout: React.FC = () => {
       <OfflineBanner show={isOffline} />
 
       {showNav && <TopHeader onMenuToggle={() => setIsMenuOpen(!isMenuOpen)} isMenuOpen={isMenuOpen} />}
-      {showNav && <SideMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />}
+      {showNav && <SideMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} unreadCount={unreadCount} />}
 
       {/* Main content area */}
       <main
