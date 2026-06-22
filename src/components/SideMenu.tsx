@@ -73,15 +73,24 @@ export function SideMenu({ isOpen, onClose, unreadCount = 0 }: SideMenuProps) {
       <AnimatePresence>
         {isOpen && (
           <motion.nav
-            className="fixed left-0 top-0 h-screen w-64 border-r z-50 flex flex-col"
+            className="fixed left-0 top-0 h-screen border-r z-50 flex flex-col cursor-grab"
             style={{
+              width: 'min(256px, 75vw)',
               backgroundColor: 'var(--color-bg-surface)',
               borderColor: 'var(--color-border-default)',
             }}
-            initial={{ x: -256 }}
+            initial={{ x: 'min(-256px, -75vw)' }}
             animate={{ x: 0 }}
-            exit={{ x: -256 }}
+            exit={{ x: 'min(-256px, -75vw)' }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            drag="x"
+            dragElastic={0.2}
+            dragConstraints={{ left: -100, right: 0 }}
+            onDragEnd={(event, info) => {
+              if (info.velocity.x < -500 || info.offset.x < -50) {
+                onClose();
+              }
+            }}
           >
             {/* Header */}
             <div className="h-16 border-b flex items-center px-6" style={{ borderColor: 'var(--color-border-default)' }}>
@@ -124,7 +133,7 @@ export function SideMenu({ isOpen, onClose, unreadCount = 0 }: SideMenuProps) {
 
             {/* Navigation Items */}
             <div className="flex-1 overflow-y-auto py-4 px-2">
-              {menuItems.map((item) => {
+              {menuItems.map((item, index) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
 
@@ -138,6 +147,9 @@ export function SideMenu({ isOpen, onClose, unreadCount = 0 }: SideMenuProps) {
                       color: isActive ? 'var(--color-accent-primary)' : 'var(--color-text-secondary)',
                       borderLeftColor: isActive ? 'var(--color-accent-primary)' : 'transparent',
                     }}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05, duration: 0.3 }}
                     whileHover={{ x: 4 }}
                     whileTap={{ scale: 0.98 }}
                   >

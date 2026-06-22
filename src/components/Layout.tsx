@@ -8,6 +8,7 @@ import { useUIStore } from '../stores/uiStore';
 import { AmbientBackground } from './AmbientBackground';
 import { TopHeader } from './TopHeader';
 import { SideMenu } from './SideMenu';
+import { FloatingActionButton } from './FloatingActionButton';
 import { BottomNav } from './BottomNav';
 import { LoadingScreen } from './LoadingScreen';
 import { OfflineBanner } from './OfflineBanner';
@@ -147,6 +148,7 @@ export const Layout: React.FC = () => {
   });
 
   const showNav = showsNav(location.pathname) && !!session && !!player;
+  const showFAB = showNav && ['/', '/rankings', '/matches'].some((r) => location.pathname === r || location.pathname.startsWith(r));
 
   return (
     <div className="relative min-h-screen bg-[var(--toc-theme-bg,#0D0D0D)] overflow-hidden">
@@ -183,6 +185,7 @@ export const Layout: React.FC = () => {
       </main>
 
       {showNav && <BottomNav unreadCount={unreadCount} onMenuToggle={() => setIsMenuOpen(!isMenuOpen)} />}
+      <AnimatePresence>{showFAB && <FloatingActionButton show={showFAB} />}</AnimatePresence>
     </div>
   );
 };
