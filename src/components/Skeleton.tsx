@@ -1,33 +1,65 @@
-import React from 'react';
+﻿import React from 'react';
+import { motion } from 'framer-motion';
 
 interface SkeletonProps {
+  width?: string;
+  height?: string;
   className?: string;
   count?: number;
+  circle?: boolean;
 }
 
-export const Skeleton: React.FC<SkeletonProps> = ({ className = '', count = 1 }) => (
-  <>
-    {Array.from({ length: count }).map((_, i) => (
-      <div key={i} className={`skeleton ${className}`} />
-    ))}
-  </>
-);
+export function Skeleton({
+  width = '100%',
+  height = '16px',
+  className = '',
+  count = 1,
+  circle = false,
+}: SkeletonProps) {
+  return (
+    <>
+      {Array.from({ length: count }).map((_, i) => (
+        <motion.div
+          key={i}
+          className={skeleton {className}}
+          style={{
+            width,
+            height,
+            borderRadius: circle ? '50%' : '8px',
+            marginBottom: count > 1 && i < count - 1 ? '12px' : 0,
+          }}
+          animate={{ opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 2, repeat: Infinity }}
+        />
+      ))}
+    </>
+  );
+}
 
-export const RankingRowSkeleton: React.FC = () => (
-  <div className="glass-card p-4 flex items-center gap-3">
-    <Skeleton className="w-12 h-12 rounded-full" />
-    <div className="flex-1 space-y-2">
-      <Skeleton className="h-4 w-32" />
-      <Skeleton className="h-3 w-20" />
+export function SkeletonRankingCard() {
+  return (
+    <div className="glass-card p-4 mb-3 rounded-lg">
+      <div className="flex items-center justify-between mb-3">
+        <Skeleton width="60px" height="20px" />
+        <Skeleton width="100px" height="20px" />
+      </div>
+      <Skeleton width="100%" height="14px" count={2} />
     </div>
-    <Skeleton className="h-8 w-20 rounded-lg" />
-  </div>
-);
+  );
+}
 
-export const CardSkeleton: React.FC<{ lines?: number }> = ({ lines = 3 }) => (
-  <div className="glass-card p-5 space-y-3">
-    {Array.from({ length: lines }).map((_, i) => (
-      <Skeleton key={i} className={`h-4 ${i === 0 ? 'w-2/3' : i % 2 === 0 ? 'w-full' : 'w-4/5'}`} />
-    ))}
-  </div>
-);
+export function SkeletonMatchCard() {
+  return (
+    <div className="glass-card p-4 mb-3 rounded-lg">
+      <div className="flex items-center justify-between mb-2">
+        <Skeleton width="80px" height="18px" />
+        <Skeleton width="40px" height="24px" />
+      </div>
+      <div className="flex justify-between items-center">
+        <Skeleton width="90px" height="16px" />
+        <Skeleton width="30px" height="30px" circle />
+        <Skeleton width="90px" height="16px" />
+      </div>
+    </div>
+  );
+}

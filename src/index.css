@@ -159,3 +159,18 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(198,40,40,0.35); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(198,40,40,0.55); }
+
+/* ── Landscape Orientation ────────────────────────────────────── */
+
+@media (orientation: landscape) and (max-height: 500px) {
+  /* Compress header/nav for landscape mode */
+  header { height: 48px !important; }
+  nav { height: auto; padding-top: 4px; padding-bottom: 4px; }
+  main { padding-top: 56px !important; padding-bottom: 56px !important; }
+
+  /* Reduce spacing in lists */
+  .glass-card { padding: 8px 12px; margin-bottom: 6px; }
+
+  /* Optimize buttons for landscape */
+  button { padding: 6px 12px; }
+}
