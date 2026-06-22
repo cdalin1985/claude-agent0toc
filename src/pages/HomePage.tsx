@@ -11,13 +11,15 @@ import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { Skeleton } from '../components/Skeleton';
+import { QueryError } from '../components/QueryError';
 import type { ActivityFeedItem, Match, Notification, Challenge } from '../types/database';
 import { formatDistanceToNow } from '../utils/time';
 
 export default function HomePage() {
   const navigate   = useNavigate();
   const { player, profile } = useAuthStore();
-  const { data: rankings = [] } = useRankings();
+  const { data: rankingsData, isError: rankingsError, refetch: refetchRankings, isRefetching: rankingsRefetching } = useRankings();
+  const rankings = rankingsData ?? [];
   const [welcomeDismissed, setWelcomeDismissed] = useState(
     () => localStorage.getItem('toc-welcome-dismissed') === '1'
   );
@@ -137,6 +139,16 @@ export default function HomePage() {
 
   const myStats = myRanking?.stats;
 
+  // Without rankings there is nothing to show — surface the failure instead
+  // of leaving the user staring at skeletons forever.
+  if (rankingsError && rankingsData === undefined) {
+    return (
+      <div className="min-h-screen px-4 pt-8">
+        <QueryError onRetry={() => refetchRankings()} retrying={rankingsRefetching} />
+      </div>
+    );
+  }
+
   if (!player || !myRanking) {
     return (
       <div className="min-h-screen px-4 pt-8 space-y-4">
@@ -183,6 +195,9 @@ export default function HomePage() {
                   <p>You can challenge any player ranked within <span className="text-[#E8E2D6]">5 spots</span> above you.</p>
                   <p>Win to move up the ladder. Defend your rank or drop.</p>
                   <p>Head to <span className="text-[#C62828] font-semibold">The List</span> to find your first opponent.</p>
+                  <button onClick={() => navigate('/rules')} className="text-[#C62828] underline underline-offset-2">
+                    Read the full league rules
+                  </button>
                 </div>
               </div>
               <button onClick={dismissWelcome} className="text-[#6B7280] shrink-0 -mt-0.5">

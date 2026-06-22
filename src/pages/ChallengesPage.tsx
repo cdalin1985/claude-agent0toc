@@ -11,6 +11,7 @@ import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { EmptyState } from '../components/EmptyState';
 import { RankingRowSkeleton } from '../components/Skeleton';
+import { QueryError } from '../components/QueryError';
 import { formatDateTime } from '../utils/time';
 import type { Challenge } from '../types/database';
 
@@ -23,11 +24,12 @@ function usePlayerChallenges(playerId: string | undefined) {
     queryKey: ['challenges', playerId],
     queryFn: async () => {
       if (!playerId) return [];
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('challenges')
         .select('*')
         .or(`challenger_id.eq.${playerId},challenged_id.eq.${playerId}`)
         .order('created_at', { ascending: false });
+      if (error) throw error;
       const now = Date.now();
       return (data ?? []).map((challenge) => ({
         ...challenge,
@@ -165,6 +167,9 @@ function RespondModal({
               <li>No match fee is owed.</li>
               <li>An admin can reverse this only if your rankings and stats have not changed yet.</li>
             </ul>
+            <a href="/rules" className="block text-xs font-[Barlow] text-[#C62828] underline underline-offset-2">
+              Read the league rules
+            </a>
             <div className="flex gap-2 pt-1">
               <Button variant="ghost" fullWidth size="sm" onClick={() => setShowDeclineConfirm(false)} disabled={loading}>
                 Keep pending
@@ -199,8 +204,10 @@ export default function ChallengesPage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<'incoming' | 'outgoing' | 'history'>('incoming');
   const [responding, setResponding] = useState<Challenge | null>(null);
+  const [actioningId, setActioningId] = useState<string | null>(null);
 
-  const { data: challenges = [], isLoading } = usePlayerChallenges(player?.id);
+  const { data: challengesData, isLoading, isError, refetch, isRefetching } = usePlayerChallenges(player?.id);
+  const challenges = challengesData ?? [];
 
   const getPlayerName = (id: string) =>
     rankings.find((r) => r.player.id === id)?.player.full_name ?? 'Unknown';
@@ -234,6 +241,15 @@ export default function ChallengesPage() {
     qc.invalidateQueries({ queryKey: ['challenges'] });
   };
 
+  const runChallengeAction = async (challengeId: string, action: 'cancel' | 'wash') => {
+    setActioningId(challengeId);
+    try {
+      await callFn({ challenge_id: challengeId, action });
+    } finally {
+      setActioningId(null);
+    }
+  };
+
   const currentList = tab === 'incoming' ? incoming : tab === 'outgoing' ? outgoing : history;
 
   return (
@@ -262,7 +278,9 @@ export default function ChallengesPage() {
         ))}
       </div>
 
-      {isLoading ? (
+      {isError && challengesData === undefined ? (
+        <QueryError onRetry={() => refetch()} retrying={isRefetching} />
+      ) : isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => <RankingRowSkeleton key={i} />)}
         </div>
@@ -347,7 +365,7 @@ export default function ChallengesPage() {
                         </Button>
                       )}
                       {tab === 'outgoing' && c.status === 'pending' && (
-                        <Button variant="ghost" size="sm" onClick={() => callFn({ challenge_id: c.id, action: 'cancel' })}>
+                        <Button variant="ghost" size="sm" loading={actioningId === c.id} onClick={() => runChallengeAction(c.id, 'cancel')}>
                           Cancel
                         </Button>
                       )}
@@ -359,7 +377,8 @@ export default function ChallengesPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => callFn({ challenge_id: c.id, action: 'wash' })}
+                            loading={actioningId === c.id}
+                            onClick={() => runChallengeAction(c.id, 'wash')}
                           >
                             Couldn't agree
                           </Button>

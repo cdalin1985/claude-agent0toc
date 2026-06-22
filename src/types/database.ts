@@ -104,6 +104,7 @@ export interface Database {
           scheduled_at: string;
           started_at: string | null;
           completed_at: string | null;
+          initiated_by_player_id: string | null;
           created_at: string;
           updated_at: string;
         };

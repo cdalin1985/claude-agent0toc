@@ -138,13 +138,17 @@ COMMENT ON FUNCTION public.check_and_enforce_rank1_obligation() IS
   'Idempotent rank-1 obligation enforcer. On each call: initializes rank1_since if missing, demotes the #1 player if they have <2 top-5 confirmed matches and >=30 days at the top, and starts the new #1''s clock. Returns a jsonb blob describing the action taken. Scheduled via pg_cron daily at 12:00 UTC.';
 
 -- Schedule the cron job: daily at 12:00 UTC (6am Mountain Daylight Time).
--- If a previous job with the same name exists, unschedule it first so we
--- don't end up with duplicate runs.
-SELECT cron.unschedule('rank1-obligation-check')
-WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'rank1-obligation-check');
-
-SELECT cron.schedule(
-  'rank1-obligation-check',
-  '0 12 * * *',
-  $$ SELECT public.check_and_enforce_rank1_obligation(); $$
-);
+-- Guarded: pg_cron is not available on preview branches.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
+    IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'rank1-obligation-check') THEN
+      PERFORM cron.unschedule('rank1-obligation-check');
+    END IF;
+    PERFORM cron.schedule(
+      'rank1-obligation-check',
+      '0 12 * * *',
+      $cron$ SELECT public.check_and_enforce_rank1_obligation(); $cron$
+    );
+  END IF;
+END $$;

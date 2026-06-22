@@ -9,6 +9,7 @@ import { GlassCard } from '../components/GlassCard';
 import { Badge } from '../components/Badge';
 import { EmptyState } from '../components/EmptyState';
 import { RankingRowSkeleton } from '../components/Skeleton';
+import { QueryError } from '../components/QueryError';
 import { Avatar } from '../components/Avatar';
 import { Button } from '../components/Button';
 import { formatDateTime } from '../utils/time';
@@ -23,19 +24,21 @@ export default function MatchesPage() {
   const [tab, setTab]   = useState<'active' | 'history'>('active');
   const [disc, setDisc] = useState<DiscFilter>('All');
 
-  const { data: matches = [], isLoading } = useQuery<Match[]>({
+  const { data: matchesData, isLoading, isError, refetch, isRefetching } = useQuery<Match[]>({
     queryKey: ['matches', player?.id],
     queryFn: async () => {
       if (!player) return [];
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('matches')
         .select('*')
         .or(`player1_id.eq.${player.id},player2_id.eq.${player.id}`)
         .order('scheduled_at', { ascending: false });
+      if (error) throw error;
       return data ?? [];
     },
     enabled: !!player,
   });
+  const matches = matchesData ?? [];
 
   const getPlayerName = (id: string) =>
     rankings.find((r) => r.player.id === id)?.player.full_name ?? 'Unknown';
@@ -91,7 +94,9 @@ export default function MatchesPage() {
         </div>
       )}
 
-      {isLoading ? (
+      {isError && matchesData === undefined ? (
+        <QueryError onRetry={() => refetch()} retrying={isRefetching} />
+      ) : isLoading ? (
         <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <RankingRowSkeleton key={i} />)}</div>
       ) : list.length === 0 ? (
         <EmptyState

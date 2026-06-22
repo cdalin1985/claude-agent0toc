@@ -146,6 +146,7 @@ CREATE TABLE IF NOT EXISTS league_settings (
   challenge_range INTEGER NOT NULL DEFAULT 5,
   cooldown_hours INTEGER NOT NULL DEFAULT 24,
   challenge_expiry_days INTEGER NOT NULL DEFAULT 14,
+  first_challenge_range INTEGER NOT NULL DEFAULT 10,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

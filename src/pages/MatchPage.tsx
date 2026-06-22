@@ -18,6 +18,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useRankings } from '../hooks/useRankings';
 import { PoolBall } from '../components/PoolBall';
 import { GlassCard } from '../components/GlassCard';
+import { QueryError } from '../components/QueryError';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { formatDateTime } from '../utils/time';
@@ -208,20 +209,38 @@ export default function MatchPage() {
   const [lastScoreAction, setLastScoreAction]     = useState<LastScoreAction | null>(null);
   const [undoing, setUndoing]                     = useState(false);
 
-  const { data: match, isLoading } = useQuery<Match>({
+  const { data: match, isLoading, isError, refetch, isRefetching } = useQuery<Match>({
     queryKey: ['match', id],
     queryFn: async () => {
       // id may be either a match UUID (from MatchesPage) or a challenge UUID (from ChallengesPage)
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('matches')
         .select('*')
         .or(`id.eq.${id},challenge_id.eq.${id}`)
         .single();
-      return data!;
+      if (error) throw error;
+      return data;
     },
     enabled: !!id,
     refetchInterval: 5000,
   });
+
+  // Only take over the screen when we have nothing cached — a failed
+  // background refetch mid-match keeps showing the last known scoreboard.
+  if (isError && !match) {
+    return (
+      <div className="min-h-screen px-4 pt-4">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-[#9CA3AF] p-2 -ml-2 mb-4">
+          <ChevronLeft size={18} /> Back
+        </button>
+        <QueryError
+          message="Couldn't load this match. Check your signal and try again."
+          onRetry={() => refetch()}
+          retrying={isRefetching}
+        />
+      </div>
+    );
+  }
 
   if (isLoading || !match) {
     return (
@@ -363,7 +382,12 @@ export default function MatchPage() {
 
   const hasSubmitted = (isPlayer1 && match.player1_submitted) || (isPlayer2 && match.player2_submitted);
   const isWinner    = match.winner_id === player?.id;
-  const canScore    = match.status === 'in_progress' && amInMatch && !hasSubmitted;
+  // Single scoreboard: only the recorded initiator keeps score. Older matches
+  // without an initiator stay open to either participant.
+  const isScorekeeper = !match.initiated_by_player_id || match.initiated_by_player_id === player?.id;
+  const scorekeeperName = match.initiated_by_player_id === match.player1_id ? p1Name
+    : match.initiated_by_player_id === match.player2_id ? p2Name : '';
+  const canScore    = match.status === 'in_progress' && amInMatch && !hasSubmitted && isScorekeeper;
   const showUndo    = canScore && lastScoreAction !== null;
 
   return (
@@ -414,7 +438,12 @@ export default function MatchPage() {
               {submitError}
             </div>
           )}
-          {match.status === 'scheduled' && (
+          {match.status === 'in_progress' && !isScorekeeper && scorekeeperName && (
+            <div className="text-[#F59E0B] text-xs font-[Barlow] p-3 bg-[#F59E0B]/10 rounded-lg border border-[#F59E0B]/20">
+              {scorekeeperName} is keeping the score for this match.
+            </div>
+          )}
+          {match.status === 'scheduled' && isScorekeeper && (
             <Button
               variant="primary" fullWidth size="lg" loading={submitting}
               onClick={async () => {
@@ -432,6 +461,11 @@ export default function MatchPage() {
             >
               🎱 Start Match
             </Button>
+          )}
+          {match.status === 'scheduled' && !isScorekeeper && scorekeeperName && (
+            <div className="text-[#9CA3AF] text-xs font-[Barlow] p-3 bg-[#252525]/50 rounded-lg border border-[#333]">
+              Waiting for {scorekeeperName} to start the match and keep score.
+            </div>
           )}
 
           {/* Opponent submitted — needs confirmation from this player */}

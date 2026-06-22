@@ -11,7 +11,13 @@ This repository is the clean local checkout for **TOC.Monster / Top of the Capit
 - Supabase project: `toc1`
 - Production branch: `main`
 
-Do not mix TOC.Monster and TOF work:
+## TOC vs TOF — hard boundary
+
+TOC (`cdalin1985/claude-agent0toc`) and TOF (`cdalin1985/TOF`, Top of the Falls) are separate repos, separate Vercel projects (toc-app vs tof-app), and separate Supabase backends. TOF was forked from TOC long ago and has diverged (different ruleset — no Rank #1 obligation, different branding/logo).
+
+Never merge, branch, cherry-pick, or sync code/migrations/PRs between TOC and TOF. Never assume a fix or merge in one applies to the other — always check the other repo independently if asked. Treat them as fully unrelated codebases that happen to share lineage.
+
+## Canonical paths
 
 - TOC.Monster work belongs in `C:/Users/chase/toc-monster-app`.
 - TOF / Top of the Falls work belongs in `C:/Users/chase/tof-app`.
