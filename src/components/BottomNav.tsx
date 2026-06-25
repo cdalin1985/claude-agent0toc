@@ -2,7 +2,6 @@ import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { House, Medal, List, Trophy, Bell, UserCircle } from '@phosphor-icons/react';
-import { useAuthStore } from '../stores/authStore';
 
 type PhosphorWeight = 'thin' | 'light' | 'regular' | 'bold' | 'fill' | 'duotone';
 

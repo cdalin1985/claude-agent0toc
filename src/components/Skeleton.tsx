@@ -21,7 +21,7 @@ export function Skeleton({
       {Array.from({ length: count }).map((_, i) => (
         <motion.div
           key={i}
-          className={skeleton {className}}
+          className={`skeleton ${className}`}
           style={{
             width,
             height,
@@ -44,6 +44,31 @@ export function SkeletonRankingCard() {
         <Skeleton width="100px" height="20px" />
       </div>
       <Skeleton width="100%" height="14px" count={2} />
+    </div>
+  );
+}
+
+export function RankingRowSkeleton() {
+  return (
+    <div className="glass-card p-3 mb-2 rounded-lg flex items-center gap-3">
+      <Skeleton width="32px" height="32px" circle />
+      <div className="flex-1">
+        <Skeleton width="60%" height="14px" />
+        <div className="mt-2">
+          <Skeleton width="40%" height="11px" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function CardSkeleton({ lines = 3 }: { lines?: number }) {
+  return (
+    <div className="glass-card p-4 rounded-lg">
+      <Skeleton width="50%" height="18px" />
+      <div className="mt-3">
+        <Skeleton width="100%" height="14px" count={lines} />
+      </div>
     </div>
   );
 }
