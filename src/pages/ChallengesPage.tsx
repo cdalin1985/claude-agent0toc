@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -209,8 +209,11 @@ export default function ChallengesPage() {
   const { data: challengesData, isLoading, isError, refetch, isRefetching } = usePlayerChallenges(player?.id);
   const challenges = challengesData ?? [];
 
-  const getPlayerName = (id: string) =>
-    rankings.find((r) => r.player.id === id)?.player.full_name ?? 'Unknown';
+  const playerNameById = useMemo(
+    () => new Map(rankings.map((r) => [r.player.id, r.player.full_name])),
+    [rankings],
+  );
+  const getPlayerName = (id: string) => playerNameById.get(id) ?? 'Unknown';
 
   const incoming = challenges.filter((c) => c.challenged_id === player?.id && c.status === 'pending');
   const outgoing = challenges.filter((c) => c.challenger_id === player?.id && ['pending', 'accepted', 'scheduled'].includes(c.status));

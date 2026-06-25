@@ -178,22 +178,25 @@ async function recordSubmittedMatchFees(
   if (payers.length === 0) return;
 
   await recordMatchFeePayments(supabase, matchId, actorProfileId, payers);
-  for (const payer of payers) {
-    const { data: existing } = await supabase
-      .from('activity_feed')
-      .select('id')
-      .eq('event_type', 'match_fee_recorded')
-      .eq('actor_player_id', payer.player_id)
-      .ilike('detail', `%${matchId.slice(0, 8)}%`)
-      .limit(1)
-      .maybeSingle();
-    if (existing) continue;
-    await supabase.from('activity_feed').insert({
+
+  const { data: existingEntries } = await supabase
+    .from('activity_feed')
+    .select('actor_player_id')
+    .eq('event_type', 'match_fee_recorded')
+    .in('actor_player_id', payers.map((payer) => payer.player_id))
+    .ilike('detail', `%${matchId.slice(0, 8)}%`);
+  const alreadyRecorded = new Set((existingEntries ?? []).map((row: { actor_player_id: string }) => row.actor_player_id));
+
+  const newEntries = payers
+    .filter((payer) => !alreadyRecorded.has(payer.player_id))
+    .map((payer) => ({
       event_type: 'match_fee_recorded',
       headline: `${payer.player_name} paid the $5 match fee · ${PAYMENT_METHOD_LABELS[payer.payment_method]}`,
       detail: `Match ${matchId.slice(0, 8)} · credited to league treasury`,
       actor_player_id: payer.player_id,
-    });
+    }));
+  if (newEntries.length > 0) {
+    await supabase.from('activity_feed').insert(newEntries);
   }
 }
 
@@ -316,13 +319,22 @@ async function confirmResult(
     if (seed.error) throw seed.error;
   }
 
-  for (const [pid, isWinner, isChallenger] of [[winnerId, true, winnerIsChallenger], [loserId, false, !winnerIsChallenger]] as [string, boolean, boolean][]) {
-    const { data: ds } = await supabase.from('player_discipline_stats').select('*').eq('player_id', pid).eq('discipline', disc).single();
-    if (ds) {
+  const disciplineParticipants = [[winnerId, true, winnerIsChallenger], [loserId, false, !winnerIsChallenger]] as [string, boolean, boolean][];
+  const disciplineStatsRows = await Promise.all(
+    disciplineParticipants.map(([pid]) =>
+      supabase.from('player_discipline_stats').select('*').eq('player_id', pid).eq('discipline', disc).single(),
+    ),
+  );
+  const disciplineUpdates = disciplineParticipants
+    .map(([pid, isWinner, isChallenger], i) => {
+      const ds = disciplineStatsRows[i].data;
+      if (!ds) return null;
       const newStreak = isWinner ? (ds.current_streak >= 0 ? ds.current_streak + 1 : 1) : 0;
-      const { error: disciplineStatsError } = await supabase.from('player_discipline_stats').update({ matches_played: ds.matches_played + 1, wins: isWinner ? ds.wins + 1 : ds.wins, losses: isWinner ? ds.losses : ds.losses + 1, current_streak: newStreak, best_streak: isWinner ? Math.max(ds.best_streak, newStreak) : ds.best_streak, challenger_wins: isWinner && isChallenger ? ds.challenger_wins + 1 : ds.challenger_wins, defender_wins: isWinner && !isChallenger ? ds.defender_wins + 1 : ds.defender_wins, total_race_length: ds.total_race_length + match.race_length, updated_at: new Date().toISOString() }).eq('player_id', pid).eq('discipline', disc);
-      if (disciplineStatsError) throw disciplineStatsError;
-    }
+      return supabase.from('player_discipline_stats').update({ matches_played: ds.matches_played + 1, wins: isWinner ? ds.wins + 1 : ds.wins, losses: isWinner ? ds.losses : ds.losses + 1, current_streak: newStreak, best_streak: isWinner ? Math.max(ds.best_streak, newStreak) : ds.best_streak, challenger_wins: isWinner && isChallenger ? ds.challenger_wins + 1 : ds.challenger_wins, defender_wins: isWinner && !isChallenger ? ds.defender_wins + 1 : ds.defender_wins, total_race_length: ds.total_race_length + match.race_length, updated_at: new Date().toISOString() }).eq('player_id', pid).eq('discipline', disc);
+    })
+    .filter((p): p is NonNullable<typeof p> => p !== null);
+  for (const result of await Promise.all(disciplineUpdates)) {
+    if (result.error) throw result.error;
   }
 
   const [wp, lp] = await Promise.all([
