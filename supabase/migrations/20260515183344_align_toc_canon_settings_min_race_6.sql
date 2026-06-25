@@ -2,6 +2,15 @@
 -- Source: supabase_migrations.schema_migrations
 -- Name: align_toc_canon_settings_min_race_6
 
+-- first_challenge_range and challenge_weekly_limit were added directly to
+-- production via the dashboard and never captured in a migration. Add them
+-- here, idempotently, so fresh preview branches have these columns before
+-- this and later migrations/edge functions read or write to them.
+ALTER TABLE public.league_settings
+  ADD COLUMN IF NOT EXISTS first_challenge_range INTEGER NOT NULL DEFAULT 10;
+ALTER TABLE public.league_settings
+  ADD COLUMN IF NOT EXISTS challenge_weekly_limit INTEGER NOT NULL DEFAULT 2;
+
 update public.league_settings
 set
   min_race = 6,

@@ -7,6 +7,13 @@
 -- ============================================================
 
 -- 1. Replace legacy match payment method values.
+-- player1_payment_method / player2_payment_method were added directly to
+-- production via the dashboard and never captured in a migration. Add them
+-- here, idempotently, so fresh preview branches have these columns before
+-- this migration's UPDATE statements run.
+ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS player1_payment_method TEXT;
+ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS player2_payment_method TEXT;
+
 ALTER TABLE public.matches DROP CONSTRAINT IF EXISTS matches_player1_payment_method_check;
 ALTER TABLE public.matches DROP CONSTRAINT IF EXISTS matches_player2_payment_method_check;
 
@@ -43,6 +50,29 @@ ALTER TABLE public.matches
 -- 2. Track declined-challenge forfeits separately from played losses.
 ALTER TABLE public.player_season_stats
   ADD COLUMN IF NOT EXISTS forfeits integer NOT NULL DEFAULT 0;
+
+-- player_discipline_stats was created directly in production via the
+-- dashboard and never captured in a migration. Create it here, idempotently,
+-- so fresh preview branches have the table before this migration's
+-- ADD COLUMN statement runs.
+CREATE TABLE IF NOT EXISTS public.player_discipline_stats (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  player_id uuid NOT NULL REFERENCES public.players(id),
+  discipline text NOT NULL CHECK (discipline IN ('8 Ball', '9 Ball', '10 Ball')),
+  matches_played integer NOT NULL DEFAULT 0,
+  wins integer NOT NULL DEFAULT 0,
+  losses integer NOT NULL DEFAULT 0,
+  current_streak integer NOT NULL DEFAULT 0,
+  best_streak integer NOT NULL DEFAULT 0,
+  challenger_wins integer NOT NULL DEFAULT 0,
+  defender_wins integer NOT NULL DEFAULT 0,
+  challenges_issued integer NOT NULL DEFAULT 0,
+  challenges_received integer NOT NULL DEFAULT 0,
+  forfeit_wins integer NOT NULL DEFAULT 0,
+  total_race_length integer NOT NULL DEFAULT 0,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (player_id, discipline)
+);
 
 ALTER TABLE public.player_discipline_stats
   ADD COLUMN IF NOT EXISTS forfeits integer NOT NULL DEFAULT 0;
