@@ -13,8 +13,6 @@ name: Migration deploy drift check
 on:
   push:
     branches: [main]
-    paths:
-      - 'supabase/migrations/**'
   schedule:
     - cron: '0 13 * * *'
   workflow_dispatch:
