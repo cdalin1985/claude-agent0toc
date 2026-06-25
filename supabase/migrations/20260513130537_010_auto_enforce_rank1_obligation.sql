@@ -140,11 +140,17 @@ COMMENT ON FUNCTION public.check_and_enforce_rank1_obligation() IS
 -- Schedule the cron job: daily at 12:00 UTC (6am Mountain Daylight Time).
 -- If a previous job with the same name exists, unschedule it first so we
 -- don't end up with duplicate runs.
-SELECT cron.unschedule('rank1-obligation-check')
-WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'rank1-obligation-check');
+-- Guarded: pg_cron's "cron" schema isn't enabled on fresh preview branches.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'cron') THEN
+    PERFORM cron.unschedule('rank1-obligation-check')
+    WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'rank1-obligation-check');
 
-SELECT cron.schedule(
-  'rank1-obligation-check',
-  '0 12 * * *',
-  $$ SELECT public.check_and_enforce_rank1_obligation(); $$
-);
+    PERFORM cron.schedule(
+      'rank1-obligation-check',
+      '0 12 * * *',
+      $cron$ SELECT public.check_and_enforce_rank1_obligation(); $cron$
+    );
+  END IF;
+END $$;
