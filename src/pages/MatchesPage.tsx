@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -40,8 +40,11 @@ export default function MatchesPage() {
   });
   const matches = matchesData ?? [];
 
-  const getPlayerName = (id: string) =>
-    rankings.find((r) => r.player.id === id)?.player.full_name ?? 'Unknown';
+  const playerNameById = useMemo(
+    () => new Map(rankings.map((r) => [r.player.id, r.player.full_name])),
+    [rankings],
+  );
+  const getPlayerName = (id: string) => playerNameById.get(id) ?? 'Unknown';
 
   const active  = matches.filter((m) => ['scheduled', 'in_progress', 'submitted', 'disputed'].includes(m.status));
   const history = matches.filter((m) => ['confirmed', 'resolved'].includes(m.status));

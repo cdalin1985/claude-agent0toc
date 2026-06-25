@@ -124,11 +124,14 @@ serve(async (req) => {
     const { data: challenge, error: insertErr } = await supabase.from('challenges').insert({ challenger_id: challenger.id, challenged_id: challenged_player_id, discipline, race_length, status: 'pending', expires_at: expiresAt }).select().single();
     if (insertErr) throw insertErr;
 
-    const { data: challengerStats } = await supabase.from('player_season_stats').select('challenges_issued').eq('player_id', challenger.id).single();
-    if (challengerStats) await supabase.from('player_season_stats').update({ challenges_issued: challengerStats.challenges_issued + 1 }).eq('player_id', challenger.id);
-
-    const { data: challengedStats } = await supabase.from('player_season_stats').select('challenges_received').eq('player_id', challenged_player_id).single();
-    if (challengedStats) await supabase.from('player_season_stats').update({ challenges_received: challengedStats.challenges_received + 1 }).eq('player_id', challenged_player_id);
+    const [{ data: challengerStats }, { data: challengedStats }] = await Promise.all([
+      supabase.from('player_season_stats').select('challenges_issued').eq('player_id', challenger.id).single(),
+      supabase.from('player_season_stats').select('challenges_received').eq('player_id', challenged_player_id).single(),
+    ]);
+    await Promise.all([
+      challengerStats ? supabase.from('player_season_stats').update({ challenges_issued: challengerStats.challenges_issued + 1 }).eq('player_id', challenger.id) : Promise.resolve(),
+      challengedStats ? supabase.from('player_season_stats').update({ challenges_received: challengedStats.challenges_received + 1 }).eq('player_id', challenged_player_id) : Promise.resolve(),
+    ]);
 
     await Promise.all([
       supabase.from('player_discipline_stats').upsert({ player_id: challenger.id, discipline }, { onConflict: 'player_id,discipline', ignoreDuplicates: true }),
@@ -139,10 +142,15 @@ serve(async (req) => {
       supabase.from('player_discipline_stats').select('challenges_issued').eq('player_id', challenger.id).eq('discipline', discipline).single(),
       supabase.from('player_discipline_stats').select('challenges_received').eq('player_id', challenged_player_id).eq('discipline', discipline).single(),
     ]);
-    if (dStatsC.data) await supabase.from('player_discipline_stats').update({ challenges_issued: dStatsC.data.challenges_issued + 1 }).eq('player_id', challenger.id).eq('discipline', discipline);
-    if (dStatsD.data) await supabase.from('player_discipline_stats').update({ challenges_received: dStatsD.data.challenges_received + 1 }).eq('player_id', challenged_player_id).eq('discipline', discipline);
+    await Promise.all([
+      dStatsC.data ? supabase.from('player_discipline_stats').update({ challenges_issued: dStatsC.data.challenges_issued + 1 }).eq('player_id', challenger.id).eq('discipline', discipline) : Promise.resolve(),
+      dStatsD.data ? supabase.from('player_discipline_stats').update({ challenges_received: dStatsD.data.challenges_received + 1 }).eq('player_id', challenged_player_id).eq('discipline', discipline) : Promise.resolve(),
+    ]);
 
-    const { data: challengerPlayer } = await supabase.from('players').select('full_name').eq('id', challenger.id).single();
+    const [{ data: challengerPlayer }, { data: challengedPlayer }] = await Promise.all([
+      supabase.from('players').select('full_name').eq('id', challenger.id).single(),
+      supabase.from('players').select('full_name').eq('id', challenged_player_id).single(),
+    ]);
     await supabase.from('notifications').insert({
       player_id: challenged_player_id,
       type: 'challenge_received',
@@ -153,7 +161,6 @@ serve(async (req) => {
     });
     await sendPush(supabase, challenged_player_id, `${challengerPlayer?.full_name} challenged you!`, `${discipline} - Race to ${race_length}. Tap to respond.`, '/challenges');
 
-    const { data: challengedPlayer } = await supabase.from('players').select('full_name').eq('id', challenged_player_id).single();
     await supabase.from('activity_feed').insert({
       event_type: 'challenge_issued',
       headline: `${challengerPlayer?.full_name} challenged ${challengedPlayer?.full_name} to ${discipline}!`,
