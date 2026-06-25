@@ -7,6 +7,13 @@
 -- ============================================================
 
 -- 1. Replace legacy match payment method values.
+-- player1_payment_method / player2_payment_method were added directly to
+-- production via the dashboard and never captured in a migration. Add them
+-- here, idempotently, so fresh preview branches have these columns before
+-- this migration's UPDATE statements run.
+ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS player1_payment_method TEXT;
+ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS player2_payment_method TEXT;
+
 ALTER TABLE public.matches DROP CONSTRAINT IF EXISTS matches_player1_payment_method_check;
 ALTER TABLE public.matches DROP CONSTRAINT IF EXISTS matches_player2_payment_method_check;
 
