@@ -1,0 +1,43 @@
+name: RLS escalation guard
+
+# Runtime gate for the privilege-escalation guard. Static tests can only verify
+# the migration's text; this exercises the actual trigger against a real
+# Postgres so a "looks fixed but isn't" change (recursive policy, ineffective
+# REVOKE, broken field reference) fails CI instead of shipping.
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/tests/escalation/**'
+      - '.github/workflows/rls-escalation-check.yml'
+
+jobs:
+  escalation-guard:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the escalation harness
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/escalation/00_harness.sql
+
+      - name: Apply the real guard migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260625030000_guard_privilege_escalation_trigger.sql
+
+      - name: Assert escalation is blocked and legitimate writes still work
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/escalation/02_assert.sql
