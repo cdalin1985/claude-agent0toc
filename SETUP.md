@@ -41,6 +41,10 @@ All current migrations are already applied. New migrations land via PRs and eith
 - merge to `main` and you run `npx supabase db push` once linked, or
 - get applied via the Supabase Branching workflow on PR merge if branching is enabled.
 
+### Deploy-drift CI gate
+
+`.github/workflows/migration-deploy-check.yml` runs on every push to `main` and once daily, and compares migration filenames in this repo against `supabase_migrations.schema_migrations` in production. It catches the exact failure mode from the June 25 incident: a migration merged to `main` but never deployed. It needs a repo secret `PROD_DB_URL` (a Postgres connection string; a read-only role is sufficient) — add it under repo Settings → Secrets → Actions. Without that secret the check no-ops with a warning instead of failing.
+
 ### Why this changed
 
 Earlier setup instructions listed sequence-named files (`001_schema.sql` through `013_*`). Those have been removed — production's migration tracker only knows the timestamp-named versions, and the dual naming caused the `Supabase Preview` GitHub check to fail on every commit to `main`. The timestamp files are the canonical set going forward.

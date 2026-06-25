@@ -1,0 +1,60 @@
+name: Migration deploy drift check
+
+# Catches the exact gap that let three June-25 migrations (including the RLS
+# privilege-escalation fix) sit merged on main but never applied to
+# production: a merged migration file is not a deployed migration. Compares
+# the migration filenames in this repo against the versions production
+# actually has in supabase_migrations.schema_migrations and fails if any
+# repo migration older than SKIP_RECENT_MINUTES is missing in prod.
+#
+# Requires a repo secret PROD_DB_URL: a Postgres connection string for the
+# production database (read-only role is sufficient; it only SELECTs from
+# supabase_migrations.schema_migrations).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+  schedule:
+    - cron: '0 13 * * *'
+  workflow_dispatch:
+
+jobs:
+  drift-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare repo migrations against production schema_migrations
+        env:
+          PROD_DB_URL: ${{ secrets.PROD_DB_URL }}
+        run: |
+          if [ -z "$PROD_DB_URL" ]; then
+            echo "::warning::PROD_DB_URL secret is not set; skipping deploy-drift check. Add it in repo settings to enable this gate."
+            exit 0
+          fi
+
+          local_versions=$(ls supabase/migrations | grep -oE '^[0-9]+' | sort -u)
+          remote_versions=$(psql "$PROD_DB_URL" -v ON_ERROR_STOP=1 -At -c \
+            "SELECT version FROM supabase_migrations.schema_migrations ORDER BY version;")
+
+          # Migrations merged in the last 30 minutes are expected to lag a
+          # manual deploy step; only flag drift older than that.
+          cutoff=$(date -u -d '30 minutes ago' +%Y%m%d%H%M%S)
+
+          missing=""
+          for v in $local_versions; do
+            if ! grep -qx "$v" <<< "$remote_versions"; then
+              if [ "$v" -lt "$cutoff" ]; then
+                missing="$missing $v"
+              fi
+            fi
+          done
+
+          if [ -n "$missing" ]; then
+            echo "::error::Migrations merged to main but NOT applied to production:$missing"
+            echo "Run 'supabase db push' (or apply via the Supabase dashboard/MCP) against production, then re-run this check."
+            exit 1
+          fi
+
+          echo "No deploy drift: all repo migrations are present in production."
