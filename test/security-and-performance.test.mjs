@@ -15,6 +15,7 @@ const createChallenge = read('supabase/functions/create-challenge/index.ts');
 const submitResult = read('supabase/functions/submit-result/index.ts');
 const matchesPage = read('src/pages/MatchesPage.tsx');
 const challengesPage = read('src/pages/ChallengesPage.tsx');
+const deployDriftWorkflow = read('.github/workflows/migration-deploy-check.yml');
 
 // --- Security: RLS self-escalation guards (PR #28) ---
 
@@ -39,6 +40,17 @@ test('a BEFORE UPDATE trigger guards role/is_active against self-escalation (rec
   assert.match(escalationTrigger, /CREATE TRIGGER guard_player_active BEFORE UPDATE ON players/i);
   // The recursive subquery approach must not be reintroduced in the policies.
   assert.doesNotMatch(escalationTrigger, /SELECT is_active FROM players/i);
+});
+
+test('a CI gate diffs production schema_migrations against repo migration filenames', () => {
+  // Catches the exact gap this session found by hand: a migration merged to
+  // main but never deployed to production.
+  assert.match(deployDriftWorkflow, /schedule:\s*\n\s*- cron:/);
+  assert.match(deployDriftWorkflow, /secrets\.PROD_DB_URL/);
+  assert.match(deployDriftWorkflow, /SELECT version FROM supabase_migrations\.schema_migrations/);
+  assert.match(deployDriftWorkflow, /Migrations merged to main but NOT applied to production/);
+  // No PROD_DB_URL secret configured must warn and exit 0, not fail every run.
+  assert.match(deployDriftWorkflow, /skipping deploy-drift check/);
 });
 
 test('send-push rejects unauthenticated callers', () => {
