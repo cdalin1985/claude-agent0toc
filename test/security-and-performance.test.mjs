@@ -7,6 +7,7 @@ const root = process.cwd();
 const read = (path) => readFileSync(join(root, path), 'utf8');
 
 const selfEscalationMigration = read('supabase/migrations/20260625000000_fix_self_escalation_rls.sql');
+const escalationTrigger = read('supabase/migrations/20260625030000_guard_privilege_escalation_trigger.sql');
 const raceCapMigration = read('supabase/migrations/20260625020000_remove_race_length_max_cap.sql');
 const perfIndexes = read('supabase/migrations/20260625010000_add_performance_indexes.sql');
 const sendPush = read('supabase/functions/send-push/index.ts');
@@ -25,6 +26,19 @@ test('profile UPDATE policy pins role to its existing value so users cannot self
 test('player UPDATE policy pins is_active so users cannot reactivate themselves', () => {
   assert.match(selfEscalationMigration, /CREATE POLICY "Players can update own player record" ON players FOR UPDATE/i);
   assert.match(selfEscalationMigration, /is_active = \(SELECT is_active FROM players WHERE profile_id = auth\.uid\(\)\)/i);
+});
+
+test('a BEFORE UPDATE trigger guards role/is_active against self-escalation (recursion-free)', () => {
+  // The effective production guard is a trigger comparing OLD vs NEW, not a
+  // self-referential RLS subquery (which recurses).
+  assert.match(escalationTrigger, /CREATE OR REPLACE FUNCTION public\.guard_privilege_columns\(\)/i);
+  assert.match(escalationTrigger, /jwt_role = 'service_role' OR jwt_role IS NULL/);
+  assert.match(escalationTrigger, /NEW\.role IS DISTINCT FROM OLD\.role/);
+  assert.match(escalationTrigger, /NEW\.is_active IS DISTINCT FROM OLD\.is_active/);
+  assert.match(escalationTrigger, /CREATE TRIGGER guard_profile_role BEFORE UPDATE ON profiles/i);
+  assert.match(escalationTrigger, /CREATE TRIGGER guard_player_active BEFORE UPDATE ON players/i);
+  // The recursive subquery approach must not be reintroduced in the policies.
+  assert.doesNotMatch(escalationTrigger, /SELECT is_active FROM players/i);
 });
 
 test('send-push rejects unauthenticated callers', () => {

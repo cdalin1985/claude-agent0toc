@@ -11,6 +11,14 @@ This project does not yet tag semver releases; entries are grouped by ship date.
   ownership, letting any authenticated user promote their own `role` or
   reactivate their own `players.is_active`. Both policies now pin those columns
   to their existing values in the `WITH CHECK` clause.
+- **Replaced the RLS self-escalation guard with a `BEFORE UPDATE` trigger**
+  (`20260625030000_guard_privilege_escalation_trigger.sql`). Runtime testing
+  against production showed the original `WITH CHECK` subquery approach caused
+  `infinite recursion detected in policy` on `players`, and that column-level
+  `REVOKE` is overridden by the existing table-level `UPDATE` grant — so
+  neither actually blocked escalation. The trigger compares OLD vs NEW and
+  exempts service-role callers; verified at runtime that escalation is blocked
+  while legitimate updates and edge-function writes still succeed.
 - **`send-push` now rejects unauthenticated callers** — it validates the bearer
   token via `auth.getUser` and returns `401` when absent.
 
