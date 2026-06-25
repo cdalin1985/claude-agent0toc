@@ -9,6 +9,7 @@ import { EKGLine } from '../components/EKGLine';
 import { Badge } from '../components/Badge';
 import { RankingRowSkeleton } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
+import { QueryError } from '../components/QueryError';
 import type { RankedPlayer } from '../types/database';
 
 function canChallenge(myPos: number, theirPos: number, isFirstChallenge: boolean): boolean {
@@ -121,7 +122,8 @@ function RankCard({
 }
 
 export default function RankingsPage() {
-  const { data: rankings = [], isLoading } = useRankings();
+  const { data, isLoading, isError, refetch, isRefetching } = useRankings();
+  const rankings = useMemo(() => data ?? [], [data]);
   const { player } = useAuthStore();
   const [search, setSearch]   = useState('');
   const [tab, setTab]         = useState<'all' | 'near'>('all');
@@ -198,7 +200,9 @@ export default function RankingsPage() {
 
       {/* List */}
       <div className="space-y-2">
-        {isLoading
+        {isError && data === undefined
+          ? <QueryError onRetry={() => refetch()} retrying={isRefetching} />
+          : isLoading
           ? Array.from({ length: 10 }).map((_, i) => <RankingRowSkeleton key={i} />)
           : filtered.length === 0
           ? <EmptyState

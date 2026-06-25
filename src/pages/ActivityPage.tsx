@@ -5,6 +5,7 @@ import { ChevronLeft } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { GlassCard } from '../components/GlassCard';
+import { QueryError } from '../components/QueryError';
 import type { ActivityFeedItem } from '../types/database';
 import { formatDistanceToNow } from '../utils/time';
 
@@ -64,7 +65,7 @@ export default function ActivityPage() {
   const [filter, setFilter] = useState<Filter>('all');
   const [limit, setLimit]   = useState(40);
 
-  const { data: feed = [], isLoading } = useQuery<ActivityFeedItem[]>({
+  const { data: feedData, isLoading, isError, refetch, isRefetching } = useQuery<ActivityFeedItem[]>({
     queryKey: ['activity-feed-full', filter, limit],
     queryFn: async () => {
       let query = supabase
@@ -74,10 +75,12 @@ export default function ActivityPage() {
         .limit(limit);
       const events = FILTER_EVENTS[filter];
       if (events) query = query.in('event_type', events);
-      const { data } = await query;
+      const { data, error } = await query;
+      if (error) throw error;
       return data ?? [];
     },
   });
+  const feed = feedData ?? [];
 
   return (
     <div className="min-h-screen px-4 pt-4 pb-8">
@@ -112,7 +115,9 @@ export default function ActivityPage() {
       </div>
 
       <GlassCard className="p-4">
-        {isLoading ? (
+        {isError && feedData === undefined ? (
+          <QueryError onRetry={() => refetch()} retrying={isRefetching} />
+        ) : isLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 10 }).map((_, i) => (
               <div key={i} className="skeleton h-12 rounded-lg" />

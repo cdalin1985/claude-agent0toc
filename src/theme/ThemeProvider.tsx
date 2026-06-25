@@ -1,19 +1,7 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { DEFAULT_THEME, isTocTheme, THEME_STORAGE_KEY, type TocTheme } from './themeTypes';
-
-type ThemeContextValue = {
-  theme: TocTheme;
-  globalTheme: TocTheme;
-  previewTheme: TocTheme | null;
-  loading: boolean;
-  setPreviewTheme: (theme: TocTheme) => void;
-  clearPreviewTheme: () => void;
-  setGlobalThemeLocally: (theme: TocTheme) => void;
-  refreshGlobalTheme: () => Promise<void>;
-};
-
-const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
+import { ThemeContext, type ThemeContextValue } from './useTheme';
 
 function applyTheme(theme: TocTheme) {
   document.documentElement.setAttribute('data-theme', theme);
@@ -51,9 +39,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    // Loads the league theme from Supabase on mount; the setState calls happen
-    // after the awaited fetch (in async callbacks), not synchronously, so the
-    // cascading-render warning does not apply here.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshGlobalTheme()
       .catch((error) => {
@@ -102,12 +87,4 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }), [theme, globalTheme, previewTheme, loading, setPreviewTheme, clearPreviewTheme, setGlobalThemeLocally, refreshGlobalTheme]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
-}
-
-// The useTheme hook is intentionally colocated with its provider.
-// eslint-disable-next-line react-refresh/only-export-components
-export function useTheme() {
-  const context = useContext(ThemeContext);
-  if (!context) throw new Error('useTheme must be used inside ThemeProvider');
-  return context;
 }

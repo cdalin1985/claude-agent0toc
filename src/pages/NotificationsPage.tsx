@@ -9,6 +9,7 @@ import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 import { EmptyState } from '../components/EmptyState';
 import { RankingRowSkeleton } from '../components/Skeleton';
+import { QueryError } from '../components/QueryError';
 import { formatDistanceToNow } from '../utils/time';
 import type { Notification } from '../types/database';
 
@@ -153,20 +154,22 @@ export default function NotificationsPage() {
   const navigate   = useNavigate();
   const qc         = useQueryClient();
 
-  const { data: notifications = [], isLoading } = useQuery<Notification[]>({
+  const { data: notificationsData, isLoading, isError, refetch, isRefetching } = useQuery<Notification[]>({
     queryKey: ['notifications', player?.id],
     queryFn: async () => {
       if (!player) return [];
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('notifications')
         .select('*')
         .eq('player_id', player.id)
         .order('created_at', { ascending: false })
         .limit(50);
+      if (error) throw error;
       return data ?? [];
     },
     enabled: !!player,
   });
+  const notifications = notificationsData ?? [];
 
   const markRead = async (n: Notification) => {
     if (n.is_read) return;
@@ -220,7 +223,9 @@ export default function NotificationsPage() {
         )}
       </div>
 
-      {isLoading ? (
+      {isError && notificationsData === undefined ? (
+        <QueryError onRetry={() => refetch()} retrying={isRefetching} />
+      ) : isLoading ? (
         <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <RankingRowSkeleton key={i} />)}</div>
       ) : notifications.length === 0 ? (
         <EmptyState

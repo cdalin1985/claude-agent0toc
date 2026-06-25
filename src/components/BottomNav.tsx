@@ -1,24 +1,8 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { House, Medal, Trophy, Bell, UserCircle } from '@phosphor-icons/react';
+import { House, Medal, List, Trophy, Bell, UserCircle } from '@phosphor-icons/react';
 import { useAuthStore } from '../stores/authStore';
-
-// Custom crossed pool cues — unique to this app
-const PoolCueCrossIcon = ({ size = 24 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round">
-    {/* Cue 1: top-right to bottom-left */}
-    <line x1="19" y1="5" x2="5" y2="19" strokeWidth="2" />
-    {/* Cue 2: top-left to bottom-right */}
-    <line x1="5" y1="5" x2="19" y2="19" strokeWidth="2" />
-    {/* Tips — wide end of each cue */}
-    <circle cx="5" cy="19" r="2" fill="currentColor" stroke="none" />
-    <circle cx="19" cy="19" r="2" fill="currentColor" stroke="none" />
-    {/* Ferrules — narrow tip end */}
-    <circle cx="19" cy="5" r="1" fill="currentColor" stroke="none" opacity="0.55" />
-    <circle cx="5" cy="5" r="1" fill="currentColor" stroke="none" opacity="0.55" />
-  </svg>
-);
 
 type PhosphorWeight = 'thin' | 'light' | 'regular' | 'bold' | 'fill' | 'duotone';
 
@@ -27,25 +11,27 @@ interface NavItem {
   path: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Icon: React.FC<any>;
-  center?: boolean;
+  menu?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Home',      path: '/',             Icon: House },
   { label: 'Rankings',  path: '/rankings',      Icon: Medal },
-  { label: 'Challenge', path: '/rankings',      Icon: PoolCueCrossIcon, center: true },
+  { label: 'Menu',      path: '#',             Icon: List, menu: true },
   { label: 'Matches',   path: '/matches',       Icon: Trophy },
   { label: 'Alerts',    path: '/notifications', Icon: Bell },
   { label: 'Profile',   path: '/settings',      Icon: UserCircle },
 ];
 
-export const BottomNav: React.FC<{ unreadCount: number }> = ({ unreadCount }) => {
+export const BottomNav: React.FC<{ unreadCount: number; onMenuToggle: () => void }> = ({
+  unreadCount,
+  onMenuToggle,
+}) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { player } = useAuthStore();
 
-  const isActive = (path: string, center?: boolean) => {
-    if (center) return false;
+  const isActive = (path: string, isMenu?: boolean) => {
+    if (isMenu) return false;
     return location.pathname === path || (path !== '/' && location.pathname.startsWith(path));
   };
 
@@ -62,41 +48,30 @@ export const BottomNav: React.FC<{ unreadCount: number }> = ({ unreadCount }) =>
       }}
     >
       {NAV_ITEMS.map((item) => {
-        const active = isActive(item.path, item.center);
+        const active = isActive(item.path, item.menu);
         const { Icon } = item;
         const weight: PhosphorWeight = active ? 'fill' : 'regular';
 
-        if (item.center) {
+        if (item.menu) {
           return (
             <motion.button
               key={item.label}
-              onClick={() => navigate(player ? '/rankings?challenge=1' : '/login')}
-              whileTap={{ scale: 0.9 }}
-              className="flex flex-col items-center -mt-5 relative"
-              aria-label="Challenge"
+              onClick={onMenuToggle}
+              whileTap={{ scale: 0.88 }}
+              className="flex flex-col items-center gap-0.5 px-3 py-1 min-w-[44px] relative"
+              aria-label="Menu"
             >
               <div className="relative">
-                {/* Expanding rings — double phase */}
-                <div
-                  className="absolute inset-0 rounded-full border border-[#C62828]/50"
-                  style={{ animation: 'ring-pulse 2s ease-out infinite' }}
+                <Icon
+                  size={22}
+                  weight="bold"
+                  style={{ color: '#666' }}
                 />
-                <div
-                  className="absolute inset-0 rounded-full border border-[#C62828]/30"
-                  style={{ animation: 'ring-pulse 2s ease-out infinite', animationDelay: '1s' }}
-                />
-                {/* Button */}
-                <div
-                  className="w-[58px] h-[58px] rounded-full flex items-center justify-center relative z-10"
-                  style={{
-                    background: 'linear-gradient(145deg, #EF5350 0%, #C62828 50%, #7F0000 100%)',
-                    boxShadow: '0 0 0 3px rgba(10,8,8,0.94), 0 6px 28px rgba(198,40,40,0.65), inset 0 1px 0 rgba(255,255,255,0.18)',
-                  }}
-                >
-                  <Icon size={22} />
-                </div>
               </div>
-              <span className="text-[10px] text-[#666] mt-1.5 font-[Bebas_Neue] tracking-widest uppercase">
+              <span
+                className="font-[Bebas_Neue] tracking-widest uppercase leading-none"
+                style={{ fontSize: '10px', color: '#666' }}
+              >
                 {item.label}
               </span>
             </motion.button>

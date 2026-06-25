@@ -295,14 +295,17 @@ CREATE POLICY "Users can view own profile"
   USING ((select auth.uid()) = id);
 
 -- Replace any previous Rank #1 cron job with the intended twice-daily schedule.
--- Guarded: pg_cron's "cron" schema isn't enabled on fresh preview branches.
+-- Guarded: pg_cron is not available on preview branches.
 DO $$
+DECLARE v_job RECORD;
 BEGIN
-  IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'cron') THEN
-    PERFORM cron.unschedule(jobid)
-    FROM cron.job
-    WHERE jobname IN ('rank1-obligation-check', 'toc_rank1_obligation_enforcement');
-
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
+    FOR v_job IN
+      SELECT jobid FROM cron.job
+      WHERE jobname IN ('rank1-obligation-check', 'toc_rank1_obligation_enforcement')
+    LOOP
+      PERFORM cron.unschedule(v_job.jobid);
+    END LOOP;
     PERFORM cron.schedule(
       'rank1-obligation-check',
       '0 0,12 * * *',
