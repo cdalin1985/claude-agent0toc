@@ -28,7 +28,12 @@ npx supabase db push
 
 `db push` reads every `.sql` file in `supabase/migrations/`, sorts by filename (timestamp order), and applies any that the project does not already have in its tracker. Safe to re-run.
 
-The latest migration in this release is `20260519110000_release_hardening_guardrails.sql` — it adds per-player submission columns and `NOT VALID` `CHECK` constraints, so result submission paths will fail at runtime if the edge functions deploy without it.
+The latest migrations in this release are, in apply order:
+- `20260519110000_release_hardening_guardrails.sql` — per-player submission columns and `NOT VALID` `CHECK` constraints; result submission paths fail at runtime if the edge functions deploy without it.
+- `20260612000000_add_match_initiator.sql` and `20260612150000_lock_down_process_inactive_demotions.sql`.
+- `20260625000000_fix_self_escalation_rls.sql` — **security:** stops authenticated users from self-promoting `profiles.role` or self-reactivating `players.is_active`. Deploy this with the edge-function release.
+- `20260625010000_add_performance_indexes.sql` — additive indexes on `matches(player_id, status)` and `challenges(challenger_id, created_at)`.
+- `20260625020000_remove_race_length_max_cap.sql` — relaxes the `challenges` race-length `CHECK` to the canon `>= 6` with no maximum.
 
 ### For the existing `toc1` production project (`ankvjywsnydpkepdvuvm`)
 
