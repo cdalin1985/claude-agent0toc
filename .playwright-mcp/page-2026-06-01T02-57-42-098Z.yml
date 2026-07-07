@@ -1,0 +1,40 @@
+- generic [ref=e3]:
+  - generic [ref=e5]:
+    - generic [ref=e6]: 🎱
+    - generic [ref=e7]:
+      - generic [ref=e8]: Add to Home Screen
+      - generic [ref=e9]: Install for the best experience
+    - button "Install" [ref=e10]:
+      - img [ref=e11]
+      - text: Install
+    - button [ref=e14]:
+      - img [ref=e15]
+  - main [ref=e18]:
+    - generic [ref=e21]:
+      - generic [ref=e22]:
+        - img "Top of the Capital" [ref=e24]
+        - heading "TOP OF THE CAPITAL" [level=1] [ref=e25]:
+          - text: TOP OF THE
+          - text: CAPITAL
+        - paragraph [ref=e26]: Helena Pool League
+        - img [ref=e27]
+        - paragraph [ref=e29]: Track your matches. Climb the ladder. Defend your spot.
+      - generic [ref=e48]:
+        - generic [ref=e49]:
+          - button "Back to email step" [ref=e50]:
+            - img [ref=e51]
+          - generic [ref=e53]:
+            - generic [ref=e54]: Check your email
+            - generic [ref=e55]: Code sent to chase.dalin@gmail.com
+        - generic [ref=e56]:
+          - generic [ref=e57]:
+            - img [ref=e58]
+            - text: 8-Digit Code
+          - textbox "8-Digit Code" [ref=e61]:
+            - /placeholder: "00000000"
+        - button "Sign In" [disabled] [ref=e62]
+        - button "Resend code" [ref=e64]
+      - link "Trouble signing in?" [ref=e44] [cursor=pointer]:
+        - /url: mailto:help@toc.monster?subject=TOC%20sign-in%20help
+        - img [ref=e45]
+        - text: Trouble signing in?

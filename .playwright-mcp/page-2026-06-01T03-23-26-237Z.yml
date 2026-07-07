@@ -1,0 +1,33 @@
+- main [ref=e12]:
+  - generic [ref=e30]:
+    - generic [ref=e31]:
+      - img "Top of the Capital" [ref=e33]
+      - heading "TOP OF THE CAPITAL" [level=1] [ref=e34]:
+        - text: TOP OF THE
+        - text: CAPITAL
+      - paragraph [ref=e35]: Helena Pool League
+      - img [ref=e36]
+      - paragraph [ref=e38]: Track your matches. Climb the ladder. Defend your spot.
+    - generic [ref=e57]:
+      - generic [ref=e58]:
+        - button "Back to email step" [ref=e59]:
+          - img [ref=e60]
+        - generic [ref=e62]:
+          - generic [ref=e63]: Check your email
+          - generic [ref=e64]: Code sent to chase.dalin@gmail.com
+      - generic [ref=e65]:
+        - generic [ref=e66]:
+          - img [ref=e67]
+          - text: 8-Digit Code
+        - textbox "8-Digit Code" [ref=e70]:
+          - /placeholder: "00000000"
+          - text: "04950752"
+        - paragraph [ref=e77]:
+          - img [ref=e78]
+          - text: Invalid or expired code. Try again.
+      - button "Sign In" [ref=e71] [cursor=pointer]
+      - button "Resend code" [ref=e73]
+    - link "Trouble signing in?" [ref=e53] [cursor=pointer]:
+      - /url: mailto:help@toc.monster?subject=TOC%20sign-in%20help
+      - img [ref=e54]
+      - text: Trouble signing in?

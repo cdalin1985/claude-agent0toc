@@ -1,0 +1,27 @@
+- main [ref=e12]:
+  - generic [ref=e30]:
+    - generic [ref=e31]:
+      - img "Top of the Capital" [ref=e33]
+      - heading "TOP OF THE CAPITAL" [level=1] [ref=e34]:
+        - text: TOP OF THE
+        - text: CAPITAL
+      - paragraph [ref=e35]: Helena Pool League
+      - img [ref=e36]
+      - paragraph [ref=e38]: Track your matches. Climb the ladder. Defend your spot.
+    - generic [ref=e80]:
+      - generic [ref=e81]:
+        - generic [ref=e82]: Email Address
+        - generic [ref=e83]:
+          - img [ref=e84]
+          - textbox "Email Address" [ref=e87]:
+            - /placeholder: your@email.com
+            - text: chase.dalin@gmail.com
+      - button "Loading…" [disabled] [ref=e93]:
+        - generic [ref=e94]:
+          - img [ref=e95]
+          - text: Loading…
+      - paragraph [ref=e92]: We'll email you an 8-digit code. No password needed.
+    - link "Trouble signing in?" [ref=e53] [cursor=pointer]:
+      - /url: mailto:help@toc.monster?subject=TOC%20sign-in%20help
+      - img [ref=e54]
+      - text: Trouble signing in?
