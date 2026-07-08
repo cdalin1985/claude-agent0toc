@@ -74,7 +74,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden">
+    <div className="min-h-screen flex flex-col items-center justify-start pt-32 px-6 relative overflow-hidden">
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -91,14 +91,15 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <motion.div
-            animate={{ y: [0, -6, 0] }}
+            animate={{ y: [0, -18, 0], scale: [1, 1.30, 1] }}
             transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
             className="mb-4 flex justify-center"
           >
             <img
               src="/toclogo.png"
               alt="Top of the Capital"
-              className="h-28 w-auto object-contain"
+              className="object-fill"
+              style={{ height: '149px', width: '250px' }}
             />
           </motion.div>
           <h1

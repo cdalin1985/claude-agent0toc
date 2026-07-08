@@ -125,3 +125,40 @@ Formatting, copy edits, CSS, file discovery, test runs, basic summaries, single-
 - Use exact file paths and line ranges in handoffs.
 - Prefer a targeted lint or single-test command over a full suite.
 - Before escalating to Opus, write one sentence explaining why Haiku or Sonnet cannot safely complete the task.
+
+<!-- OPENROUTER_COST_ROUTING_START -->
+
+# Claude Code OpenRouter Cost Routing
+
+Use OpenRouter through Claude Code.
+
+## Model routing
+
+| Task type | Agent | Claude Code role | OpenRouter model |
+|---|---|---|---|
+| File discovery, repo scouting, config/docs inspection | flash-scout | haiku | deepseek/deepseek-v4-flash |
+| Test/lint/typecheck/build validation | flash-tester | haiku | deepseek/deepseek-v4-flash |
+| Very small obvious edits | flash-simple-editor | haiku | deepseek/deepseek-v4-flash |
+| Normal coding and feature work | v4-pro-coder | sonnet | deepseek/deepseek-v4-pro |
+| Hard architecture/debugging/security/business logic | opus-hard | opus | anthropic/claude-opus-4.8 |
+
+## Escalation rules
+
+1. Start with lash-scout when files or root cause are unknown.
+2. Use lash-tester for validation and error summaries.
+3. Use lash-simple-editor only for tiny safe edits.
+4. Use 4-pro-coder for normal implementation.
+5. Use opus-hard only for:
+   - auth
+   - RLS/security
+   - database migrations
+   - payment logic
+   - ranking/business rules
+   - repeated bugs
+   - architecture decisions
+   - refactors touching more than 5 meaningful files
+6. Before using Opus, state why DeepSeek V4 Flash or DeepSeek V4 Pro is not enough.
+7. Keep context small. Prefer targeted file reads and targeted validation commands.
+8. Do not use Opus for file search, log reading, simple UI edits, CSS tweaks, small copy changes, or routine test runs.
+
+<!-- OPENROUTER_COST_ROUTING_END -->
