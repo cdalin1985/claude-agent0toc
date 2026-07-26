@@ -17,7 +17,7 @@ import { AdminThemeSwitcher } from './admin/AdminThemeSwitcher';
 import { useQuery } from '@tanstack/react-query';
 
 // Screens that show bottom nav
-const NAV_ROUTES = ['/', '/rankings', '/matches', '/notifications', '/settings', '/challenges'];
+const NAV_ROUTES = ['/', '/rankings', '/matches', '/notifications', '/settings', '/challenges', '/usage-dashboard'];
 const showsNav = (path: string) =>
   NAV_ROUTES.some((r) => (r === '/' ? path === '/' : path.startsWith(r)));
 

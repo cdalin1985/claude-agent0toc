@@ -9,6 +9,7 @@ import {
   Bell,
   User,
   Gear,
+  ChartLine,
   DoorOpen,
   ArrowRight,
 } from '@phosphor-icons/react';
@@ -27,6 +28,7 @@ interface MenuItem {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   icon: React.FC<any>;
   badge?: boolean;
+  adminOnly?: boolean;
 }
 
 const menuItems: MenuItem[] = [
@@ -35,6 +37,7 @@ const menuItems: MenuItem[] = [
   { path: '/challenges', label: 'Challenges', icon: Sword },
   { path: '/matches', label: 'Matches', icon: Flame },
   { path: '/notifications', label: 'Alerts', icon: Bell, badge: true },
+  { path: '/usage-dashboard', label: 'Vercel Usage', icon: ChartLine, adminOnly: true },
   { path: '/profile', label: 'Profile', icon: User },
 ];
 
@@ -133,7 +136,9 @@ export function SideMenu({ isOpen, onClose, unreadCount = 0 }: SideMenuProps) {
 
             {/* Navigation Items */}
             <div className="flex-1 overflow-y-auto py-4 px-2">
-              {menuItems.map((item, index) => {
+              {menuItems
+                .filter((item) => !item.adminOnly || ['admin', 'super_admin'].includes(profile?.role ?? ''))
+                .map((item, index) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
 

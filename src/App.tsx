@@ -21,6 +21,7 @@ const AuthCallbackPage = React.lazy(() => import('./pages/AuthCallbackPage'));
 const TreasuryPage     = React.lazy(() => import('./pages/TreasuryPage'));
 const ActivityPage     = React.lazy(() => import('./pages/ActivityPage'));
 const RulesPage        = React.lazy(() => import('./pages/RulesPage'));
+const VercelUsageDashboardPage = React.lazy(() => import('./pages/VercelUsageDashboardPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -64,6 +65,7 @@ export default function App() {
               <Route path="/treasury"      element={<Suspense><TreasuryPage /></Suspense>} />
               <Route path="/activity"      element={<Suspense><ActivityPage /></Suspense>} />
               <Route path="/rules"         element={<Suspense><RulesPage /></Suspense>} />
+              <Route path="/usage-dashboard" element={<Suspense><VercelUsageDashboardPage /></Suspense>} />
               <Route path="*"              element={<Navigate to="/" replace />} />
             </Route>
           </Routes>
