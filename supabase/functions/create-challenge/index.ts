@@ -171,8 +171,16 @@ serve(async (req) => {
     if (existingIn) return new Response(JSON.stringify({ error: 'That player already has an active challenge they must resolve first.' }), { headers: corsHeaders });
 
     const now = new Date().toISOString();
-    const { data: myCooldown } = await supabase.from('cooldowns').select('expires_at').eq('player_id', challenger.id).eq('type', 'post_match').gt('expires_at', now).maybeSingle();
-    if (myCooldown) return new Response(JSON.stringify({ error: `You are in a post-match cooldown period until ${new Date(myCooldown.expires_at).toLocaleString()}.` }), { headers: corsHeaders });
+    const { data: myCooldown, error: cooldownError } = await supabase.from('cooldowns').select('expires_at').eq('player_id', challenger.id).eq('type', 'post_match').gt('expires_at', now).maybeSingle();
+    if (cooldownError) {
+      console.error(`[create-challenge] cooldown check failed for player ${challenger.id}: ${cooldownError.message}`);
+      return new Response(JSON.stringify({ error: 'Could not check your cooldown status. Please try again.' }), { status: 500, headers: corsHeaders });
+    }
+    // README scopes the post-match cooldown to challenging UP — "wait 24 hours
+    // before challenging up again" — and separately grants top-10 players the
+    // right to challenge down 5 spots. Blocking a downward challenge would take
+    // away a challenge the rulebook gives you.
+    if (myCooldown && theirPos < myPos) return new Response(JSON.stringify({ error: `You are in a post-match cooldown and cannot challenge up until ${new Date(myCooldown.expires_at).toLocaleString()}. You can still challenge down.` }), { headers: corsHeaders });
 
     const expiresAt = new Date(Date.now() + challengeExpiryDays * 24 * 3600 * 1000).toISOString();
     const { data: challenge, error: insertErr } = await supabase.from('challenges').insert({ challenger_id: challenger.id, challenged_id: challenged_player_id, discipline, race_length, status: 'pending', expires_at: expiresAt }).select().single();

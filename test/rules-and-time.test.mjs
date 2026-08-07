@@ -11,6 +11,8 @@ const submitResult = read('supabase', 'functions', 'submit-result', 'index.ts');
 const createChallenge = read('supabase', 'functions', 'create-challenge', 'index.ts');
 const respondToChallenge = read('supabase', 'functions', 'respond-to-challenge', 'index.ts');
 const databaseTypes = read('src', 'types', 'database.ts');
+const rulesPage = read('src', 'pages', 'RulesPage.tsx');
+const adminPage = read('src', 'pages', 'AdminPage.tsx');
 
 // --- README rule: a winner who climbs also cools down -----------------------
 
@@ -26,9 +28,35 @@ test('a win that moves the winner up the list creates a cooldown for them too', 
 
 test('the climber cooldown is keyed off an actual ranking change, not merely winning', () => {
   // README: "If you defend your spot (higher seed wins): You can challenge up
-  // immediately". rankChange is non-null only when the cascade ran, so a
-  // successful defence passes null and gets no cooldown.
+  // immediately". rankChange is set only on the climb branch, so a successful
+  // defence passes null and gets no cooldown.
   assert.match(submitResult, /createPostMatchCooldowns\(supabase, loserId, rankChange \? winnerId : null\)/);
+});
+
+test('the climb branch is entered on a lower seed winning, and rankChange is set only there', () => {
+  // This is the line the whole rule turns on. Flip it to `wPos < lPos` and the
+  // cooldown inverts -- defenders punished, climbers free -- with every other
+  // assertion in this file still passing. Positions are 1-based, so the winner
+  // having the HIGHER number means they were the lower seed and climbed.
+  const climbBranch = submitResult.match(/if \(wPos > lPos\) \{[\s\S]*?\n {4}\}/);
+  assert.ok(climbBranch, 'expected a `if (wPos > lPos) {` climb branch in confirmResult');
+  assert.match(climbBranch[0], /rankChange = \{/);
+  assert.match(climbBranch[0], /cascade_ranking_after_win/);
+  // rankChange must not be assigned anywhere outside that branch.
+  const assignments = submitResult.match(/rankChange = /g) ?? [];
+  assert.equal(assignments.length, 1, 'rankChange should be assigned exactly once, inside the climb branch');
+});
+
+test('a post-match cooldown blocks challenging up but not challenging down', () => {
+  // README:17 grants top-10 players a challenge DOWN 5 spots, and README:32/:38
+  // put the cooldown specifically on challenging up.
+  assert.match(createChallenge, /if \(myCooldown && theirPos < myPos\) return/);
+  assert.match(createChallenge, /You can still challenge down/);
+});
+
+test('the ranking reads that gate the cascade, stats and cooldowns are not swallowed', () => {
+  assert.match(submitResult, /if \(winnerRank\.error\) throw winnerRank\.error;/);
+  assert.match(submitResult, /if \(loserRank\.error\) throw loserRank\.error;/);
 });
 
 test('cooldown length still comes from league_settings rather than a literal', () => {
@@ -78,9 +106,44 @@ test('respond-to-challenge records why a challenge was cancelled', () => {
   assert.match(respondToChallenge, /\.update\(\{ status: 'cancelled', cancel_reason: 'withdrawn' \}\)/);
 });
 
-test('the wash and withdraw writes are guarded by their prior status', () => {
-  assert.match(respondToChallenge, /\.in\('status', \['pending', 'accepted', 'scheduled'\]\);/);
-  assert.match(respondToChallenge, /\.update\(\{ status: 'cancelled', cancel_reason: 'withdrawn' \}\)\s*\n\s*\.eq\('id', challenge_id\)\s*\n\s*\.eq\('status', 'pending'\)/);
+test('the wash and withdraw writes are guarded by their prior status AND act on the rowcount', () => {
+  // A prior-status filter that nobody inspects is decoration: the handler would
+  // still announce a wash it did not perform.
+  assert.match(respondToChallenge, /\.in\('status', \['pending', 'accepted', 'scheduled'\]\)\s*\n\s*\.select\('id'\);/);
+  assert.match(respondToChallenge, /if \(!washed\?\.length\) \{/);
+  assert.match(respondToChallenge, /\.eq\('status', 'pending'\)\s*\n\s*\.select\('id'\);/);
+  assert.match(respondToChallenge, /if \(!withdrawn\?\.length\) \{/);
+});
+
+test('a wash cannot void a match that is already under way', () => {
+  // challenges.status stays 'scheduled' for the whole life of a match -- only
+  // matches.status advances -- so without this a player losing 4-1 could tap
+  // "Couldn't agree" and erase the loss at no cost.
+  assert.match(respondToChallenge, /if \(existingMatch && existingMatch\.status !== 'scheduled'\) \{/);
+  assert.match(respondToChallenge, /This match is already under way/);
+  // And the match close is scoped, so one that starts mid-request survives.
+  assert.match(respondToChallenge, /\.update\(\{ status: 'resolved' \}\)\.eq\('challenge_id', challenge_id\)\.eq\('status', 'scheduled'\)/);
+});
+
+test('the wash guard returns a conflict status rather than a bare 200', () => {
+  const washBranch = respondToChallenge.match(/action === 'wash'[\s\S]*?action === 'cancel'/);
+  assert.ok(washBranch, 'expected a wash branch');
+  assert.equal((washBranch[0].match(/status: 409/g) ?? []).length, 2);
+});
+
+test('an admin cancelling a challenge does not charge the challenger for it', () => {
+  assert.match(adminPage, /\.update\(\{ status: 'cancelled', cancel_reason: 'wash' \}\)/);
+  assert.match(adminPage, /Could not cancel that challenge/);
+});
+
+test('the in-app rulebook matches the shipped cooldown and play-window behaviour', () => {
+  // RulesPage is the only rulebook most players will read. If it still says the
+  // cooldown is loss-only, a blocked climber concludes the app is broken.
+  assert.match(rulesPage, /you climbed, or you got passed/);
+  assert.match(rulesPage, /You can still challenge down/);
+  assert.match(rulesPage, /Successfully defending your spot costs you nothing/);
+  assert.match(rulesPage, /automatically ruled a wash/);
+  assert.doesNotMatch(rulesPage, /After losing a match, you must wait/);
 });
 
 test('washing a challenge tells the other player', () => {
@@ -118,12 +181,28 @@ test('an overdue match is ruled a wash only when it never got under way', () => 
   // A match that reached in_progress/submitted/confirming was played; cancelling
   // it would destroy a real result.
   assert.match(migration, /AND NOT EXISTS \(\s*SELECT 1 FROM public\.matches m\s*WHERE m\.challenge_id = c\.id AND m\.status <> 'scheduled'/i);
+  // Phrased as NOT EXISTS(beyond scheduled) rather than EXISTS(scheduled) so a
+  // challenge stranded at 'scheduled' with no match row at all is also cleared —
+  // accept writes the challenge and the match non-atomically.
+  assert.doesNotMatch(migration, /AND EXISTS \(\s*SELECT 1 FROM public\.matches m\s*WHERE m\.challenge_id = c\.id AND m\.status = 'scheduled'/i);
 });
 
-test('overdue enforcement notifies both players and is idempotent', () => {
-  assert.match(migration, /CROSS JOIN LATERAL \(VALUES \(o\.challenger_id\), \(o\.challenged_id\)\)/i);
-  // Re-running cannot re-match: the WHERE clause requires status='scheduled'.
-  assert.match(migration, /WHERE c\.status\s*=\s*'scheduled'/i);
+test('re-running overdue enforcement cannot act on the same challenge twice', () => {
+  // The claim is idempotence, so assert the mechanism: the qualifier requires
+  // status='scheduled' and the same statement writes status='cancelled', so a
+  // second run has nothing to match.
+  const fn = migration.match(/CREATE OR REPLACE FUNCTION public\.expire_overdue_matches[\s\S]*?\n\$\$;/);
+  assert.ok(fn, 'expected expire_overdue_matches body');
+  assert.match(fn[0], /SET status\s*=\s*'cancelled'/i);
+  assert.match(fn[0], /WHERE c\.status\s*=\s*'scheduled'/i);
+});
+
+test('overdue notifications name the opponent so a player knows which match', () => {
+  assert.match(
+    migration,
+    /CROSS JOIN LATERAL \(VALUES \(n\.challenger_id, n\.challenged_name\),\s*\n?\s*\(n\.challenged_id, n\.challenger_name\)\) AS p\(player_id, opponent_name\)/i,
+  );
+  assert.match(migration, /' match with ' \|\| p\.opponent_name/);
 });
 
 // --- Pre-match reminders ----------------------------------------------------
@@ -133,13 +212,20 @@ test('reminders claim the match in the same statement that sends them', () => {
   assert.match(migration, /SET reminder_sent_at = NOW\(\)/i);
   assert.match(migration, /AND m\.reminder_sent_at IS NULL/i);
   assert.match(migration, /'match_reminder'/);
-  assert.match(migration, /CROSS JOIN LATERAL \(VALUES \(d\.player1_id\), \(d\.player2_id\)\)/i);
+  assert.match(
+    migration,
+    /CROSS JOIN LATERAL \(VALUES \(n\.player1_id, n\.player2_name\),\s*\n?\s*\(n\.player2_id, n\.player1_name\)\) AS p\(player_id, opponent_name\)/i,
+  );
 });
 
-test('the reminder lead time is configurable and a non-positive value disables it', () => {
-  assert.match(migration, /SELECT match_reminder_hours INTO v_lead_hours FROM public\.league_settings/i);
+test('the reminder lead time and display timezone are configurable, not literals', () => {
+  assert.match(migration, /SELECT match_reminder_hours, display_timezone\s*\n\s*INTO v_lead_hours, v_timezone/i);
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS display_timezone TEXT NOT NULL DEFAULT 'America\/Denver'/i);
+  assert.match(migration, /AT TIME ZONE v_timezone/i);
   assert.match(migration, /IF v_lead_hours <= 0 THEN\s*\n\s*RETURN 0;/i);
   assert.match(migration, /make_interval\(hours => v_lead_hours\)/i);
+  // The settings read must be deterministic if a second row ever appears.
+  assert.match(migration, /ORDER BY updated_at DESC, id\s*\n\s*LIMIT 1;/i);
 });
 
 // --- Privilege and scheduling hygiene ---------------------------------------

@@ -169,6 +169,21 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Challenge cannot be washed at this stage.' }), { headers: cors });
       }
 
+      // The challenge row stays at 'scheduled' for the entire life of the match —
+      // only matches.status advances — so the check above does not on its own
+      // prove the match has not been played. Without this, a player losing 4-1
+      // could tap "Couldn't agree" and erase the match: no loss, no rank change,
+      // no cooldown, and since a wash is now refunded, no cost at all.
+      const { data: existingMatch, error: matchLookupError } = await supabase
+        .from('matches')
+        .select('id, status')
+        .eq('challenge_id', challenge_id)
+        .maybeSingle();
+      if (matchLookupError) throw matchLookupError;
+      if (existingMatch && existingMatch.status !== 'scheduled') {
+        return new Response(JSON.stringify({ error: 'This match is already under way. Submit the result, or ask an admin if something went wrong.' }), { status: 409, headers: cors });
+      }
+
       // A wash is a failure to agree on a time, so it only exists once there was
       // a time to agree on. Washing a still-pending challenge is really the
       // challenger walking away, and is recorded as such — only a true wash is
@@ -176,15 +191,23 @@ serve(async (req) => {
       const cancelReason = challenge.status === 'pending' ? 'withdrawn' : 'wash';
 
       // Cancel with no penalties — no cooldowns, no rank changes
-      const { error: cancelError } = await supabase
+      const { data: washed, error: cancelError } = await supabase
         .from('challenges')
         .update({ status: 'cancelled', cancel_reason: cancelReason })
         .eq('id', challenge_id)
-        .in('status', ['pending', 'accepted', 'scheduled']);
+        .in('status', ['pending', 'accepted', 'scheduled'])
+        .select('id');
       if (cancelError) throw cancelError;
+      // Someone else moved the challenge on between the read and this write.
+      // Stop here rather than announcing a wash that did not happen.
+      if (!washed?.length) {
+        return new Response(JSON.stringify({ error: 'This challenge has already moved on. Refresh and take another look.' }), { status: 409, headers: cors });
+      }
 
-      // Also cancel the associated match if one was created
-      const { error: matchCancelError } = await supabase.from('matches').update({ status: 'resolved' }).eq('challenge_id', challenge_id);
+      // Close the unplayed match, if one was created. Scoped to 'scheduled' so a
+      // match that started in the moment between the check above and this write
+      // survives.
+      const { error: matchCancelError } = await supabase.from('matches').update({ status: 'resolved' }).eq('challenge_id', challenge_id).eq('status', 'scheduled');
       if (matchCancelError) throw matchCancelError;
 
       const { data: challengerPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenger_id).single();
@@ -215,12 +238,16 @@ serve(async (req) => {
       if (challenge.status !== 'pending') return new Response(JSON.stringify({ error: 'Can only cancel pending challenges.' }), { headers: cors });
       // Withdrawing your own challenge still spends it — see countsAgainstWeeklyLimit
       // in create-challenge.
-      const { error: withdrawError } = await supabase
+      const { data: withdrawn, error: withdrawError } = await supabase
         .from('challenges')
         .update({ status: 'cancelled', cancel_reason: 'withdrawn' })
         .eq('id', challenge_id)
-        .eq('status', 'pending');
+        .eq('status', 'pending')
+        .select('id');
       if (withdrawError) throw withdrawError;
+      if (!withdrawn?.length) {
+        return new Response(JSON.stringify({ error: 'This challenge has already been answered. Refresh and take another look.' }), { status: 409, headers: cors });
+      }
 
       const { data: challengedPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenged_id).single();
       const { error: cancelActivityError } = await supabase.from('activity_feed').insert({

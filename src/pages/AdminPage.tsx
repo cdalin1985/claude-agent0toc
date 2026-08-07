@@ -235,15 +235,15 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const [actionType, setActionType] = useState<'cancel' | 'forfeit' | 'reverse_decline' | null>(null);
   const [winnerId, setWinnerId]     = useState('');
   const [loading, setLoading]       = useState(false);
-  const [reverseError, setReverseError] = useState('');
+  const [actionError, setActionError] = useState('');
 
-  const resetAction = () => { setActioning(null); setActionType(null); setWinnerId(''); setReverseError(''); };
+  const resetAction = () => { setActioning(null); setActionType(null); setWinnerId(''); setActionError(''); };
 
   const handleReverseDecline = async (c: ChallengeRow) => {
     setLoading(true);
-    setReverseError('');
+    setActionError('');
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setLoading(false); setReverseError('Session expired — please log in again.'); return; }
+    if (!session) { setLoading(false); setActionError('Session expired — please log in again.'); return; }
     const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/respond-to-challenge`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
@@ -252,7 +252,7 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     const json = await res.json().catch(() => ({}));
     setLoading(false);
     if (!res.ok || json.error) {
-      setReverseError(json.error ?? 'Could not reverse this decline.');
+      setActionError(json.error ?? 'Could not reverse this decline.');
       return;
     }
     qc.invalidateQueries({ queryKey: ['admin-active-challenges'] });
@@ -265,7 +265,15 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
 
   const handleCancel = async (c: ChallengeRow) => {
     setLoading(true);
-    await supabase.from('challenges').update({ status: 'cancelled' }).eq('id', c.id);
+    // An admin cancelling on the players' behalf must not cost the challenger
+    // one of their two weekly challenges, so this records a wash rather than a
+    // withdrawal — see countsAgainstWeeklyLimit in the create-challenge function.
+    const { error } = await supabase.from('challenges').update({ status: 'cancelled', cancel_reason: 'wash' }).eq('id', c.id);
+    if (error) {
+      setActionError(`Could not cancel that challenge: ${error.message}`);
+      setLoading(false);
+      return;
+    }
     qc.invalidateQueries({ queryKey: ['admin-active-challenges'] });
     setLoading(false);
     resetAction();
@@ -337,7 +345,7 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
                       Reverse the decline. The challenge returns to pending only if the rankings, stats,
                       cooldown, and challenge row have not been touched since the forfeit.
                     </p>
-                    {reverseError && <p className="text-[#EF4444] text-xs font-[Barlow]">{reverseError}</p>}
+                    {actionError && <p className="text-[#EF4444] text-xs font-[Barlow]">{actionError}</p>}
                     <div className="flex gap-2">
                       <Button variant="ghost" size="sm" onClick={resetAction}>Back</Button>
                       <Button variant="primary" size="sm" loading={loading} onClick={() => handleReverseDecline(c)}>
@@ -366,6 +374,7 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
                       <p className="text-[#F59E0B] text-xs font-[Barlow]">No match started — this will cancel the challenge only.</p>
                     )
                   )}
+                  {actionError && <p className="text-[#EF4444] text-xs font-[Barlow]">{actionError}</p>}
                   <div className="flex gap-2">
                     <Button variant="ghost" size="sm" onClick={resetAction}>Back</Button>
                     <Button
@@ -385,7 +394,7 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
                 <div className="flex gap-2">
                   <Button
                     variant="secondary" size="sm"
-                    onClick={() => { setActioning(c.id); setActionType('reverse_decline'); setReverseError(''); }}
+                    onClick={() => { setActioning(c.id); setActionType('reverse_decline'); setActionError(''); }}
                   >
                     Reverse Decline
                   </Button>

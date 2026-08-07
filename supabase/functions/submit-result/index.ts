@@ -307,6 +307,11 @@ async function confirmResult(
     supabase.from('rankings').select('position, rank1_since').eq('player_id', winnerId).single(),
     supabase.from('rankings').select('position').eq('player_id', loserId).single(),
   ]);
+  // The match is already marked confirmed by this point. Swallowing a read
+  // failure here would silently skip the ranking cascade, both players' stats
+  // AND the cooldowns — leaving a confirmed match that changed nothing.
+  if (winnerRank.error) throw winnerRank.error;
+  if (loserRank.error) throw loserRank.error;
   const winnerIsChallenger = match.player1_id === winnerId;
   // Captured when a win causes a ranking swap, so the League Journal can report the move.
   let rankChange: { winnerOld: number; winnerNew: number; loserOld: number; loserNew: number } | null = null;

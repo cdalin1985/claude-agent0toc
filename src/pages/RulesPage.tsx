@@ -88,8 +88,10 @@ export default function RulesPage() {
 
         <Section icon="🕐" title="Timing">
           <Rule>A challenge expires if not answered within <strong>{expiryDays} days</strong>.</Rule>
-          <Rule>Once accepted, the match must be played within <strong>{playDays} days</strong>.</Rule>
-          <Rule>After losing a match, you must wait <strong>{cooldownHours} hours</strong> before challenging up again.</Rule>
+          <Rule>Once accepted, the match must be played within <strong>{playDays} days</strong>. If it isn't, it's automatically ruled a wash — no penalty for either player, and it doesn't use up a challenge.</Rule>
+          <Rule>After a match that <strong>moves you on the list</strong> — you climbed, or you got passed — you must wait <strong>{cooldownHours} hours</strong> before challenging up again. You can still challenge down.</Rule>
+          <Rule>Successfully defending your spot costs you nothing — you can challenge up immediately.</Rule>
+          <Rule>You'll get a reminder before your match starts.</Rule>
         </Section>
 
         <GlassCard className="p-5 border border-[#EF4444]/40 bg-[#EF4444]/5">

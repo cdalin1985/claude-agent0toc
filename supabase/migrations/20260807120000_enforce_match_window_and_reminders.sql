@@ -25,9 +25,15 @@
 ALTER TABLE public.league_settings
   ADD COLUMN IF NOT EXISTS match_play_days INTEGER NOT NULL DEFAULT 10;
 
--- How far ahead of a match to send the reminder.
+-- How far ahead of a match to send the reminder. Zero or less disables them.
 ALTER TABLE public.league_settings
   ADD COLUMN IF NOT EXISTS match_reminder_hours INTEGER NOT NULL DEFAULT 24;
+
+-- Times in notifications are rendered in the league's local time, not UTC.
+-- Helena is Mountain; kept a setting rather than a literal so it travels with
+-- the rest of the league configuration.
+ALTER TABLE public.league_settings
+  ADD COLUMN IF NOT EXISTS display_timezone TEXT NOT NULL DEFAULT 'America/Denver';
 
 -- ---------------------------------------------------------------------------
 -- Columns
@@ -80,6 +86,12 @@ BEGIN
   -- in_progress/submitted/confirming/disputed the players did meet, and the
   -- deadline stops being relevant -- confirmation or dispute resolution owns
   -- it from there. Cancelling those would destroy a played result.
+  --
+  -- The guard is NOT EXISTS(match beyond 'scheduled') rather than
+  -- EXISTS(match = 'scheduled'), so it also catches a challenge left at
+  -- 'scheduled' with NO match row at all. That happens if the accept path dies
+  -- between writing the challenge and inserting the match, and it is exactly
+  -- the stuck state this function exists to clear.
   WITH overdue AS (
     UPDATE public.challenges c
        SET status        = 'cancelled',
@@ -88,15 +100,19 @@ BEGIN
      WHERE c.status         = 'scheduled'
        AND c.match_deadline IS NOT NULL
        AND c.match_deadline < NOW()
-       AND EXISTS (
-             SELECT 1 FROM public.matches m
-              WHERE m.challenge_id = c.id AND m.status = 'scheduled'
-           )
        AND NOT EXISTS (
              SELECT 1 FROM public.matches m
               WHERE m.challenge_id = c.id AND m.status <> 'scheduled'
            )
     RETURNING c.id, c.challenger_id, c.challenged_id, c.discipline
+  ),
+  named AS (
+    SELECT o.id, o.challenger_id, o.challenged_id, o.discipline,
+           cr.full_name AS challenger_name,
+           cd.full_name AS challenged_name
+      FROM overdue o
+      JOIN public.players cr ON cr.id = o.challenger_id
+      JOIN public.players cd ON cd.id = o.challenged_id
   ),
   closed_matches AS (
     UPDATE public.matches m
@@ -111,12 +127,10 @@ BEGIN
     INSERT INTO public.activity_feed (event_type, headline, detail, actor_player_id)
     SELECT
       'challenge_cancelled',
-      cr.full_name || ' vs ' || cd.full_name || ' was not played in time -- ruled a wash.',
-      o.discipline || ' - no ranking change, no cooldown, no challenge used',
+      n.challenger_name || ' vs ' || n.challenged_name || ' was not played in time -- ruled a wash.',
+      n.discipline || ' - no ranking change, no cooldown, no challenge used',
       NULL
-    FROM overdue o
-    JOIN public.players cr ON cr.id = o.challenger_id
-    JOIN public.players cd ON cd.id = o.challenged_id
+    FROM named n
     RETURNING id
   ),
   notified AS (
@@ -125,11 +139,13 @@ BEGIN
       p.player_id,
       'challenge_expired',
       'Match window closed',
-      'Your ' || o.discipline || ' match was not played within the allowed window, so it is a wash. No penalty, and it did not use up a challenge.',
-      o.id,
+      'Your ' || n.discipline || ' match with ' || p.opponent_name
+        || ' was not played in time, so it is a wash. No penalty for either of you, and it did not use up a challenge.',
+      n.id,
       'challenge'
-    FROM overdue o
-    CROSS JOIN LATERAL (VALUES (o.challenger_id), (o.challenged_id)) AS p(player_id)
+    FROM named n
+    CROSS JOIN LATERAL (VALUES (n.challenger_id, n.challenged_name),
+                               (n.challenged_id, n.challenger_name)) AS p(player_id, opponent_name)
     RETURNING id
   )
   SELECT COUNT(*) INTO v_expired FROM overdue;
@@ -157,10 +173,18 @@ SET search_path = public
 AS $$
 DECLARE
   v_lead_hours INTEGER;
+  v_timezone   TEXT;
   v_sent       INTEGER := 0;
 BEGIN
-  SELECT match_reminder_hours INTO v_lead_hours FROM public.league_settings LIMIT 1;
+  -- There is one settings row; the ORDER BY only makes the read deterministic
+  -- if that ever stops being true.
+  SELECT match_reminder_hours, display_timezone
+    INTO v_lead_hours, v_timezone
+    FROM public.league_settings
+   ORDER BY updated_at DESC, id
+   LIMIT 1;
   v_lead_hours := COALESCE(v_lead_hours, 24);
+  v_timezone   := COALESCE(v_timezone, 'America/Denver');
   IF v_lead_hours <= 0 THEN
     RETURN 0;
   END IF;
@@ -178,18 +202,28 @@ BEGIN
        AND m.scheduled_at <= NOW() + make_interval(hours => v_lead_hours)
     RETURNING m.id, m.player1_id, m.player2_id, m.scheduled_at, m.venue, m.discipline
   ),
+  named AS (
+    SELECT d.id, d.player1_id, d.player2_id, d.scheduled_at, d.venue, d.discipline,
+           p1.full_name AS player1_name,
+           p2.full_name AS player2_name
+      FROM due d
+      JOIN public.players p1 ON p1.id = d.player1_id
+      JOIN public.players p2 ON p2.id = d.player2_id
+  ),
   notified AS (
     INSERT INTO public.notifications (player_id, type, title, body, reference_id, reference_type)
     SELECT
       p.player_id,
       'match_reminder',
       'Match coming up',
-      'Your ' || d.discipline || ' match at ' || COALESCE(d.venue, 'your agreed venue')
-        || ' is on ' || to_char(d.scheduled_at AT TIME ZONE 'America/Denver', 'Dy Mon FMDD at FMHH12:MI AM') || '.',
-      d.id,
+      'Your ' || n.discipline || ' match with ' || p.opponent_name
+        || ' at ' || COALESCE(n.venue, 'your agreed venue')
+        || ' is on ' || to_char(n.scheduled_at AT TIME ZONE v_timezone, 'Dy Mon FMDD at FMHH12:MI AM') || '.',
+      n.id,
       'match'
-    FROM due d
-    CROSS JOIN LATERAL (VALUES (d.player1_id), (d.player2_id)) AS p(player_id)
+    FROM named n
+    CROSS JOIN LATERAL (VALUES (n.player1_id, n.player2_name),
+                               (n.player2_id, n.player1_name)) AS p(player_id, opponent_name)
     RETURNING id
   )
   SELECT COUNT(*) INTO v_sent FROM due;
