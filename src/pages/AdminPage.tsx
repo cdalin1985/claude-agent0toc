@@ -417,7 +417,10 @@ function MatchesAdminTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
       const { data } = await supabase
         .from('matches')
         .select('*')
-        .in('status', ['scheduled', 'in_progress', 'submitted'])
+        // 'confirming' is included so a match stranded mid-confirmation is visible
+        // here and can be force-completed. Without it the row is invisible to every
+        // admin surface and only recoverable with direct SQL.
+        .in('status', ['scheduled', 'in_progress', 'submitted', 'confirming'])
         .order('created_at', { ascending: false });
       return data ?? [];
     },
@@ -439,24 +442,35 @@ function MatchesAdminTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const [p2Score, setP2Score]     = useState('');
   const [notes, setNotes]         = useState('');
   const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState('');
 
   const handleForceComplete = async (matchId: string) => {
     if (!winnerId) return;
     setLoading(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setLoading(false); return; }
-    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-dispute`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({ match_id: matchId, winner_id: winnerId, final_score_player1: parseInt(p1Score) || 0, final_score_player2: parseInt(p2Score) || 0, notes, force_complete: true }),
-    });
-    setLoading(false);
-    setResolving(null);
-    qc.invalidateQueries({ queryKey: ['admin-active-matches'] });
-    qc.invalidateQueries({ queryKey: ['rankings'] });
+    setError('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setError('Session expired — please log in again.'); return; }
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-dispute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ match_id: matchId, winner_id: winnerId, final_score_player1: parseInt(p1Score, 10), final_score_player2: parseInt(p2Score, 10), notes, force_complete: true }),
+      });
+      const json = await res.json().catch(() => ({}));
+      // The server rejects incomplete scores, so surface that instead of closing
+      // the dialog on a resolution that never happened.
+      if (!res.ok || json.error) { setError(json.error ?? `Could not force complete (HTTP ${res.status}).`); return; }
+      setResolving(null);
+      qc.invalidateQueries({ queryKey: ['admin-active-matches'] });
+      qc.invalidateQueries({ queryKey: ['rankings'] });
+    } catch {
+      setError('Network error — the match was not resolved. Try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const STATUS_BADGE: Record<string, string> = { scheduled: 'info', in_progress: 'loss', submitted: 'pending' };
+  const STATUS_BADGE: Record<string, string> = { scheduled: 'info', in_progress: 'loss', submitted: 'pending', confirming: 'loss' };
 
   if (matches.length === 0) {
     return (
@@ -506,6 +520,7 @@ function MatchesAdminTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
               </div>
               <textarea placeholder="Admin notes…" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
                 className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[#C62828] resize-none" />
+              {error && <p className="text-[#EF4444] text-xs font-[Barlow]">{error}</p>}
               <div className="flex gap-2">
                 <Button variant="ghost" size="sm" onClick={() => setResolving(null)}>Cancel</Button>
                 <Button variant="primary" size="sm" loading={loading} disabled={!winnerId} onClick={() => handleForceComplete(m.id)}>
@@ -514,7 +529,7 @@ function MatchesAdminTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
               </div>
             </div>
           ) : (
-            <Button variant="danger" size="sm" onClick={() => { setResolving(m.id); setWinnerId(''); setP1Score(''); setP2Score(''); setNotes(''); }}>
+            <Button variant="danger" size="sm" onClick={() => { setResolving(m.id); setWinnerId(''); setP1Score(''); setP2Score(''); setNotes(''); setError(''); }}>
               Force Complete
             </Button>
           )}

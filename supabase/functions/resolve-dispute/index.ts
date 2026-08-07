@@ -12,7 +12,13 @@ const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   venmo: 'Venmo',
 };
 const ALLOWED_RESOLUTION_STATUSES = ['disputed'];
-const FORCE_COMPLETE_STATUSES = ['scheduled', 'in_progress', 'submitted'];
+// 'confirming' is the short-lived status submit-result claims a match with before
+// running confirmResult. If that run dies part-way, the row is stranded there:
+// submit-result rejects it ("not in progress"), it never reaches 'disputed', and
+// without this entry no admin action could reach it either. Recovering it is safe
+// because a match only stays in 'confirming' when confirmResult's *first* write
+// failed, so no ranking cascade or stats were applied.
+const FORCE_COMPLETE_STATUSES = ['scheduled', 'in_progress', 'submitted', 'confirming'];
 
 function validateFinalScore(
   winnerId: string,
