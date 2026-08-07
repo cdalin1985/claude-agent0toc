@@ -1,4 +1,4 @@
-﻿/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import webpush from 'npm:web-push';
@@ -79,6 +79,24 @@ function canChallenge(
   return null;
 }
 
+/**
+ * Whether a challenge consumes one of the challenger's weekly slots.
+ *
+ * README: "If you can't agree on a time: The challenge is a wash. No penalties
+ * for either player." Losing a weekly challenge to a wash is a penalty, so a
+ * wash — and a match ruled overdue, which is the same outcome reached by the
+ * clock rather than by agreement — does not count. Neither does a challenge that
+ * expired unanswered: the challenger did nothing wrong and got no match.
+ *
+ * A challenge the challenger withdrew before it was accepted DOES count.
+ * Otherwise the limit is unenforceable — you could create and withdraw all day.
+ */
+function countsAgainstWeeklyLimit(row: { status: string; cancel_reason: string | null }): boolean {
+  if (row.status === 'expired') return false;
+  if (row.status === 'cancelled' && (row.cancel_reason === 'wash' || row.cancel_reason === 'overdue')) return false;
+  return true;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -134,8 +152,17 @@ serve(async (req) => {
     if (eligibilityError) return new Response(JSON.stringify({ error: eligibilityError }), { headers: corsHeaders });
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-    const { count: weeklyCount } = await supabase.from('challenges').select('id', { count: 'exact', head: true }).eq('challenger_id', challenger.id).gte('created_at', sevenDaysAgo);
-    if ((weeklyCount ?? 0) >= weeklyLimit) return new Response(JSON.stringify({ error: `You have reached the weekly challenge limit (${weeklyLimit} per 7 days).` }), { headers: corsHeaders });
+    const { data: recentChallenges, error: weeklyError } = await supabase
+      .from('challenges')
+      .select('status, cancel_reason')
+      .eq('challenger_id', challenger.id)
+      .gte('created_at', sevenDaysAgo);
+    if (weeklyError) {
+      console.error(`[create-challenge] weekly limit check failed for player ${challenger.id}: ${weeklyError.message}`);
+      return new Response(JSON.stringify({ error: 'Could not check your weekly challenge count. Please try again.' }), { status: 500, headers: corsHeaders });
+    }
+    const weeklyCount = (recentChallenges ?? []).filter(countsAgainstWeeklyLimit).length;
+    if (weeklyCount >= weeklyLimit) return new Response(JSON.stringify({ error: `You have reached the weekly challenge limit (${weeklyLimit} per 7 days).` }), { headers: corsHeaders });
 
     const { data: existingOut } = await supabase.from('challenges').select('id').eq('challenger_id', challenger.id).in('status', ['pending', 'accepted', 'scheduled', 'in_progress']).maybeSingle();
     if (existingOut) return new Response(JSON.stringify({ error: 'You already have an active outgoing challenge.' }), { headers: corsHeaders });

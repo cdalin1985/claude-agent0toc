@@ -32,14 +32,16 @@ serve(async (req) => {
       if (Number.isNaN(scheduledAt.getTime())) return new Response(JSON.stringify({ error: 'scheduled_at must be a valid date.' }), { status: 400, headers: cors });
       if (scheduledAt.getTime() < Date.now() - 5 * 60 * 1000) return new Response(JSON.stringify({ error: 'Match cannot be scheduled in the past.' }), { status: 400, headers: cors });
 
-      const { data: settings } = await supabase.from('league_settings').select('venues').single();
+      const { data: settings } = await supabase.from('league_settings').select('venues, match_play_days').single();
       const validVenues = Array.isArray(settings?.venues) && settings.venues.length > 0 ? settings.venues : VALID_VENUES;
       if (typeof venue !== 'string' || !validVenues.includes(venue)) {
         return new Response(JSON.stringify({ error: 'Venue is not in league settings.' }), { status: 400, headers: cors });
       }
 
-      // Match must be played within 10 days of acceptance
-      const matchDeadline = new Date(Date.now() + 10 * 24 * 3600 * 1000).toISOString();
+      // README: "Once accepted, the match must be played within 10 days."
+      // expire_overdue_matches() reads this deadline and rules anything past it a wash.
+      const matchPlayDays = settings?.match_play_days ?? 10;
+      const matchDeadline = new Date(Date.now() + matchPlayDays * 24 * 3600 * 1000).toISOString();
 
       const { data: scheduledChallenge, error: updateError } = await supabase
         .from('challenges')
@@ -167,33 +169,66 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Challenge cannot be washed at this stage.' }), { headers: cors });
       }
 
+      // A wash is a failure to agree on a time, so it only exists once there was
+      // a time to agree on. Washing a still-pending challenge is really the
+      // challenger walking away, and is recorded as such — only a true wash is
+      // refunded against the weekly challenge limit.
+      const cancelReason = challenge.status === 'pending' ? 'withdrawn' : 'wash';
+
       // Cancel with no penalties — no cooldowns, no rank changes
-      await supabase.from('challenges').update({ status: 'cancelled' }).eq('id', challenge_id);
+      const { error: cancelError } = await supabase
+        .from('challenges')
+        .update({ status: 'cancelled', cancel_reason: cancelReason })
+        .eq('id', challenge_id)
+        .in('status', ['pending', 'accepted', 'scheduled']);
+      if (cancelError) throw cancelError;
 
       // Also cancel the associated match if one was created
-      await supabase.from('matches').update({ status: 'resolved' }).eq('challenge_id', challenge_id);
+      const { error: matchCancelError } = await supabase.from('matches').update({ status: 'resolved' }).eq('challenge_id', challenge_id);
+      if (matchCancelError) throw matchCancelError;
 
       const { data: challengerPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenger_id).single();
       const { data: challengedPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenged_id).single();
-      await supabase.from('activity_feed').insert({
+      const { error: washActivityError } = await supabase.from('activity_feed').insert({
         event_type: 'challenge_cancelled',
         headline: `${callerPlayer.full_name} declared a scheduling wash on ${challengerPlayer?.full_name ?? '?'} vs ${challengedPlayer?.full_name ?? '?'}.`,
         detail: `${challenge.discipline} · race to ${challenge.race_length} · no ranking change, no cooldown`,
         actor_player_id: callerPlayer.id,
       });
+      if (washActivityError) throw washActivityError;
+
+      const otherPlayerId = isChallenger ? challenge.challenged_id : challenge.challenger_id;
+      const { error: washNotifyError } = await supabase.from('notifications').insert({
+        player_id: otherPlayerId,
+        type: 'challenge_expired',
+        title: '🤝 Challenge washed',
+        body: `${callerPlayer.full_name} called your ${challenge.discipline} challenge a wash. No penalty for either of you.`,
+        reference_id: challenge_id,
+        reference_type: 'challenge',
+      });
+      if (washNotifyError) throw washNotifyError;
+      await sendPush(supabase, otherPlayerId, '🤝 Challenge washed', `${callerPlayer.full_name} called your ${challenge.discipline} challenge a wash.`, '/challenges');
 
     } else if (action === 'cancel') {
       // Challenger cancels their own pending challenge
       if (challenge.challenger_id !== callerPlayer.id) return new Response(JSON.stringify({ error: 'Not authorized.' }), { headers: cors });
       if (challenge.status !== 'pending') return new Response(JSON.stringify({ error: 'Can only cancel pending challenges.' }), { headers: cors });
-      await supabase.from('challenges').update({ status: 'cancelled' }).eq('id', challenge_id);
+      // Withdrawing your own challenge still spends it — see countsAgainstWeeklyLimit
+      // in create-challenge.
+      const { error: withdrawError } = await supabase
+        .from('challenges')
+        .update({ status: 'cancelled', cancel_reason: 'withdrawn' })
+        .eq('id', challenge_id)
+        .eq('status', 'pending');
+      if (withdrawError) throw withdrawError;
 
       const { data: challengedPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenged_id).single();
-      await supabase.from('activity_feed').insert({
+      const { error: cancelActivityError } = await supabase.from('activity_feed').insert({
         event_type: 'challenge_cancelled',
         headline: `${callerPlayer.full_name} cancelled their pending ${challenge.discipline} challenge to ${challengedPlayer?.full_name ?? '?'}.`,
         actor_player_id: callerPlayer.id,
       });
+      if (cancelActivityError) throw cancelActivityError;
 
     } else {
       return new Response(JSON.stringify({ error: 'Invalid action.' }), { headers: cors });

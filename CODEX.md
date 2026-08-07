@@ -1,4 +1,4 @@
-﻿# AGENTS.md — TOC Agent Instructions
+# AGENTS.md — TOC Agent Instructions
 
 ## Workspace policy
 

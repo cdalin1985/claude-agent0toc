@@ -65,6 +65,10 @@ export interface Database {
           venue: 'Eagles 4040' | 'Valley Hub' | null;
           scheduled_at: string | null;
           match_deadline: string | null;
+          // Set when status is 'cancelled'. Only 'wash' and 'overdue' are
+          // refunded against the weekly challenge limit — see
+          // countsAgainstWeeklyLimit in the create-challenge function.
+          cancel_reason: 'wash' | 'withdrawn' | 'overdue' | null;
           expires_at: string;
           response_message: string | null;
           created_at: string;
@@ -105,6 +109,9 @@ export interface Database {
           started_at: string | null;
           completed_at: string | null;
           initiated_by_player_id: string | null;
+          // Stamped by send_match_reminders(); its presence is what stops a
+          // pre-match reminder firing twice for the same match.
+          reminder_sent_at: string | null;
           created_at: string;
           updated_at: string;
         };
