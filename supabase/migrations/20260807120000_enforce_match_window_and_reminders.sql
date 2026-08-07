@@ -184,7 +184,12 @@ BEGIN
    ORDER BY updated_at DESC, id
    LIMIT 1;
   v_lead_hours := COALESCE(v_lead_hours, 24);
-  v_timezone   := COALESCE(v_timezone, 'America/Denver');
+  -- An unrecognised zone name makes AT TIME ZONE raise, which would abort the
+  -- statement, roll back the reminder_sent_at claim, and silently kill reminders
+  -- league-wide on every run. Fall back rather than fail.
+  IF v_timezone IS NULL OR NOT EXISTS (SELECT 1 FROM pg_timezone_names WHERE name = v_timezone) THEN
+    v_timezone := 'America/Denver';
+  END IF;
   IF v_lead_hours <= 0 THEN
     RETURN 0;
   END IF;

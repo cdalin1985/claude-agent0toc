@@ -316,6 +316,8 @@ export interface Database {
           challenge_expiry_days: number;
           challenge_response_hours: number;
           match_play_days: number;
+          match_reminder_hours: number;
+          display_timezone: string;
           challenge_weekly_limit: number;
           first_challenge_range: number;
           updated_at: string;

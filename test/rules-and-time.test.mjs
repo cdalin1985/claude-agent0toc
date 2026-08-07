@@ -136,14 +136,57 @@ test('an admin cancelling a challenge does not charge the challenger for it', ()
   assert.match(adminPage, /Could not cancel that challenge/);
 });
 
+test('an admin action error is cleared when a different action is opened', () => {
+  // Otherwise a failed cancel on one challenge renders its red error inside the
+  // next challenge's fresh panel.
+  assert.match(adminPage, /setActionType\('cancel'\); setActionError\(''\);/);
+  assert.match(adminPage, /setActionType\('forfeit'\); setWinnerId\(''\); setActionError\(''\);/);
+  assert.match(adminPage, /setActionType\('reverse_decline'\); setActionError\(''\);/);
+});
+
+test('a failed forfeit is reported rather than closing the panel as if it worked', () => {
+  // A forfeit moves ladder positions; silently failing is a standings problem.
+  assert.match(adminPage, /Could not record that forfeit\. Nothing was changed\./);
+  assert.match(adminPage, /The result was recorded but the challenge did not close/);
+  assert.match(adminPage, /Connection problem — the forfeit was not recorded/);
+});
+
+test('a failed league-settings save is reported rather than showing Saved', () => {
+  assert.match(adminPage, /setSaveError\(`Could not save: \$\{error\.message\}`\)/);
+  assert.match(adminPage, /\{saveError && \(/);
+});
+
+test('the reminder lead time is reachable from the admin settings form', () => {
+  assert.match(adminPage, /key: 'match_reminder_hours', label: 'Pre-match reminder'/);
+  // 0 turns reminders off, so this one field must not inherit the min-of-1 floor.
+  assert.match(adminPage, /unit: 'hours before the match \(0 = off\)', min: 0/);
+  assert.match(adminPage, /function SettingsField\(\{ label, unit, value, onChange, min = 1 \}/);
+  assert.match(adminPage, /match_reminder_hours: edits\.match_reminder_hours \?\? settings\.match_reminder_hours,/);
+  // The cooldown label used to say "hours after a win", which was never the
+  // whole rule and is now plainly wrong.
+  assert.doesNotMatch(adminPage, /unit: 'hours after a win'/);
+});
+
+test('an unusable display_timezone falls back instead of killing reminders league-wide', () => {
+  // AT TIME ZONE raises on an unknown zone, which would abort the statement,
+  // roll back the reminder_sent_at claim, and silently stop every reminder.
+  assert.match(migration, /NOT EXISTS \(SELECT 1 FROM pg_timezone_names WHERE name = v_timezone\)/i);
+  assert.match(migration, /v_timezone := 'America\/Denver';/);
+});
+
 test('the in-app rulebook matches the shipped cooldown and play-window behaviour', () => {
   // RulesPage is the only rulebook most players will read. If it still says the
   // cooldown is loss-only, a blocked climber concludes the app is broken.
-  assert.match(rulesPage, /you climbed, or you got passed/);
+  // The loser's cooldown is unconditional (submit-result builds the loser row
+  // before any rankChange test), so the copy must cover a challenger who loses
+  // and does not move — the single most common outcome on the ladder — as well
+  // as the climber. Only the successful defender is exempt.
+  assert.match(rulesPage, /After you <strong>lose<\/strong> a match, or after a win that <strong>moves you up<\/strong> the list/);
   assert.match(rulesPage, /You can still challenge down/);
   assert.match(rulesPage, /Successfully defending your spot costs you nothing/);
   assert.match(rulesPage, /automatically ruled a wash/);
   assert.doesNotMatch(rulesPage, /After losing a match, you must wait/);
+  assert.doesNotMatch(rulesPage, /you climbed, or you got passed/);
 });
 
 test('washing a challenge tells the other player', () => {

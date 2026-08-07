@@ -285,22 +285,42 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setLoading(false); resetAction(); return; }
     const challengerWon = winnerId === c.challenger_id;
-    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-dispute`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({
-        match_id: c.match_id,
-        winner_id: winnerId,
-        final_score_player1: challengerWon ? c.race_length : 0,
-        final_score_player2: challengerWon ? 0 : c.race_length,
-        notes: 'Admin forfeit',
-        force_complete: true,
-      }),
-    });
-    await supabase.from('challenges').update({ status: 'forfeited' }).eq('id', c.id);
+    // A forfeit moves ladder positions. Failing silently and then closing the
+    // panel as if it worked leaves the admin believing a rank change happened
+    // that did not.
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-dispute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({
+          match_id: c.match_id,
+          winner_id: winnerId,
+          final_score_player1: challengerWon ? c.race_length : 0,
+          final_score_player2: challengerWon ? 0 : c.race_length,
+          notes: 'Admin forfeit',
+          force_complete: true,
+        }),
+      });
+      const json = await res.json().catch(() => ({})) as { error?: string };
+      if (!res.ok || json.error) {
+        setActionError(json.error ?? 'Could not record that forfeit. Nothing was changed.');
+        return;
+      }
+
+      const { error } = await supabase.from('challenges').update({ status: 'forfeited' }).eq('id', c.id);
+      if (error) {
+        // The match result landed; only the challenge row is out of step.
+        setActionError(`The result was recorded but the challenge did not close: ${error.message}`);
+        return;
+      }
+    } catch {
+      setActionError('Connection problem — the forfeit was not recorded. Try again.');
+      return;
+    } finally {
+      setLoading(false);
+    }
     qc.invalidateQueries({ queryKey: ['admin-active-challenges'] });
     qc.invalidateQueries({ queryKey: ['rankings'] });
-    setLoading(false);
     resetAction();
   };
 
@@ -404,8 +424,8 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
 
             return (
               <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={() => { setActioning(c.id); setActionType('cancel'); }}>Cancel</Button>
-                <Button variant="danger" size="sm" onClick={() => { setActioning(c.id); setActionType('forfeit'); setWinnerId(''); }}>
+                <Button variant="ghost" size="sm" onClick={() => { setActioning(c.id); setActionType('cancel'); setActionError(''); }}>Cancel</Button>
+                <Button variant="danger" size="sm" onClick={() => { setActioning(c.id); setActionType('forfeit'); setWinnerId(''); setActionError(''); }}>
                   {c.match_id ? 'Force Forfeit' : 'Force Cancel'}
                 </Button>
               </div>
@@ -1143,18 +1163,20 @@ type SettingsFormState = {
   challenge_expiry_days: number | '';
   challenge_response_hours: number | '';
   match_play_days: number | '';
+  match_reminder_hours: number | '';
   challenge_weekly_limit: number | '';
   first_challenge_range: number | '';
 };
 
-const RULE_FIELDS: Array<{ key: keyof SettingsFormState; label: string; unit: string }> = [
+const RULE_FIELDS: Array<{ key: keyof SettingsFormState; label: string; unit: string; min?: number }> = [
   { key: 'min_race', label: 'Min race length', unit: 'games' },
   { key: 'challenge_range', label: 'Challenge range', unit: 'spots (normal)' },
   { key: 'first_challenge_range', label: 'First challenge range', unit: 'spots (first ever)' },
   { key: 'challenge_weekly_limit', label: 'Weekly challenge limit', unit: 'challenges per 7 days' },
   { key: 'challenge_response_hours', label: 'Challenge response window', unit: 'hours to accept/decline' },
   { key: 'match_play_days', label: 'Match play window', unit: 'days after acceptance' },
-  { key: 'cooldown_hours', label: 'Post-match cooldown', unit: 'hours after a win' },
+  { key: 'match_reminder_hours', label: 'Pre-match reminder', unit: 'hours before the match (0 = off)', min: 0 },
+  { key: 'cooldown_hours', label: 'Post-match cooldown', unit: 'hours before challenging up' },
   { key: 'challenge_expiry_days', label: 'Challenge expiry', unit: 'days until auto-expire' },
 ];
 
@@ -1163,9 +1185,12 @@ type SettingsFieldProps = {
   unit: string;
   value: number | '';
   onChange: (value: number | '') => void;
+  // Every rule setting has a sensible floor of 1 except the reminder lead,
+  // where 0 is how an admin turns reminders off.
+  min?: number;
 };
 
-function SettingsField({ label, unit, value, onChange }: SettingsFieldProps) {
+function SettingsField({ label, unit, value, onChange, min = 1 }: SettingsFieldProps) {
   return (
     <div className="flex items-center justify-between py-3 border-b border-white/5 last:border-0">
       <div>
@@ -1174,7 +1199,7 @@ function SettingsField({ label, unit, value, onChange }: SettingsFieldProps) {
       </div>
       <input
         type="number"
-        min={1}
+        min={min}
         value={value}
         onChange={(event) => {
           const raw = event.target.value;
@@ -1199,6 +1224,7 @@ function SettingsTab() {
   const [edits, setEdits] = useState<Partial<SettingsFormState>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   if (!settings) return <div className="text-center py-12 text-[#6B7280] font-[Barlow]">Loading settings…</div>;
 
@@ -1209,6 +1235,7 @@ function SettingsTab() {
     challenge_expiry_days: edits.challenge_expiry_days ?? settings.challenge_expiry_days,
     challenge_response_hours: edits.challenge_response_hours ?? settings.challenge_response_hours,
     match_play_days: edits.match_play_days ?? settings.match_play_days,
+    match_reminder_hours: edits.match_reminder_hours ?? settings.match_reminder_hours,
     challenge_weekly_limit: edits.challenge_weekly_limit ?? settings.challenge_weekly_limit,
     first_challenge_range: edits.first_challenge_range ?? settings.first_challenge_range,
   };
@@ -1227,8 +1254,16 @@ function SettingsTab() {
     if (!isDirty || hasBlankField) return;
     if (!window.confirm('Save these league rule changes?')) return;
     setSaving(true);
-    await supabase.from('league_settings').update(form).eq('id', settings.id);
+    setSaveError('');
+    const { error } = await supabase.from('league_settings').update(form).eq('id', settings.id);
     setSaving(false);
+    if (error) {
+      // These values drive every rule check in the app. Reporting success on a
+      // failed write would leave the admin believing the league runs on numbers
+      // it does not.
+      setSaveError(`Could not save: ${error.message}`);
+      return;
+    }
     setEdits({});
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -1247,11 +1282,15 @@ function SettingsTab() {
             value={form[field.key]}
             onChange={(value) => set(field.key, value)}
             unit={field.unit}
+            min={field.min}
           />
         ))}
       </GlassCard>
       {hasBlankField && (
         <p className="text-[#EF4444] text-xs font-[Barlow] px-1">Fill in every setting before saving.</p>
+      )}
+      {saveError && (
+        <p className="text-[#EF4444] text-xs font-[Barlow] px-1">{saveError}</p>
       )}
       <Button variant="primary" fullWidth loading={saving} disabled={!isDirty || hasBlankField} onClick={handleSave}>
         {saved ? '✓ Saved' : 'Save Settings'}
