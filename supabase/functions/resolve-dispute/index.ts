@@ -131,7 +131,10 @@ serve(async (req) => {
       supabase.from('rankings').select('position').eq('player_id', loser_id).single(),
     ]);
     let winnerCurrentPosition = winnerRank.data?.position ?? null;
-    if (winnerRank.data && loserRank.data && winnerRank.data.position > loserRank.data.position) {
+    // Same test the cascade uses: the winner held the worse (higher-numbered)
+    // position, so resolving this match moves them up.
+    const winnerClimbed = Boolean(winnerRank.data && loserRank.data && winnerRank.data.position > loserRank.data.position);
+    if (winnerClimbed) {
       const { error: cascadeError } = await supabase.rpc('cascade_ranking_after_win', {
         p_winner_id: winner_id,
         p_loser_id: loser_id,
@@ -145,6 +148,18 @@ serve(async (req) => {
         .single();
       winnerCurrentPosition = refreshedWinnerRank?.position ?? winnerCurrentPosition;
     }
+
+    // A resolved dispute is a real result, so it carries the same cooldown as a
+    // cleanly confirmed one. This path wrote none at all, which meant a loser
+    // whose match went to dispute — and the admin Force Forfeit button, which
+    // comes through here — escaped a cooldown an identically placed loser
+    // received. The match update above is a compare-and-swap, so this cannot run
+    // twice for the same match.
+    const { error: cooldownError } = await supabase.rpc('apply_post_match_cooldowns', {
+      p_loser_id: loser_id,
+      p_climber_id: winnerClimbed ? winner_id : null,
+    });
+    if (cooldownError) throw cooldownError;
 
     // Update stats
     const [ws, ls] = await Promise.all([

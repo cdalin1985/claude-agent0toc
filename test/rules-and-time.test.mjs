@@ -7,6 +7,8 @@ const root = process.cwd();
 const read = (...parts) => readFileSync(join(root, ...parts), 'utf8');
 
 const migration = read('supabase', 'migrations', '20260807120000_enforce_match_window_and_reminders.sql');
+const cooldownMigration = read('supabase', 'migrations', '20260807130000_unify_post_match_cooldowns.sql');
+const resolveDispute = read('supabase', 'functions', 'resolve-dispute', 'index.ts');
 const submitResult = read('supabase', 'functions', 'submit-result', 'index.ts');
 const createChallenge = read('supabase', 'functions', 'create-challenge', 'index.ts');
 const respondToChallenge = read('supabase', 'functions', 'respond-to-challenge', 'index.ts');
@@ -21,7 +23,7 @@ test('a win that moves the winner up the list creates a cooldown for them too', 
   // hours before challenging up again."
   assert.match(submitResult, /async function createPostMatchCooldowns\(/);
   assert.match(submitResult, /climberId: string \| null/);
-  assert.match(submitResult, /if \(climberId\) rows\.push\(\{ player_id: climberId, type: 'post_match', expires_at: expiresAt \}\)/);
+  assert.match(submitResult, /p_climber_id: climberId,/);
   // The old loser-only helper must be gone, not merely unused.
   assert.doesNotMatch(submitResult, /createPostLossCooldown/);
 });
@@ -60,13 +62,73 @@ test('the ranking reads that gate the cascade, stats and cooldowns are not swall
 });
 
 test('cooldown length still comes from league_settings rather than a literal', () => {
-  assert.match(submitResult, /\.from\('league_settings'\)\.select\('cooldown_hours'\)/);
-  assert.match(submitResult, /const cooldownHours = settings\?\.cooldown_hours \?\? 24;/);
-  assert.match(submitResult, /if \(cooldownHours <= 0\) return;/);
+  assert.match(cooldownMigration, /SELECT cooldown_hours INTO v_hours/i);
+  assert.match(cooldownMigration, /v_hours := COALESCE\(v_hours, 24\);/i);
+  assert.match(cooldownMigration, /IF v_hours <= 0 THEN\s*\n\s*RETURN ARRAY\[NULL, NULL\]::uuid\[\];/i);
+  assert.doesNotMatch(cooldownMigration, /make_interval\(hours => 24\)/i);
 });
 
-test('the cooldown settings read reports failure instead of silently defaulting', () => {
-  assert.match(submitResult, /if \(settingsError\) console\.error\(/);
+test('the cooldown rule has exactly one implementation, called by all three paths', () => {
+  // It was previously written three times with three different answers.
+  assert.match(cooldownMigration, /CREATE OR REPLACE FUNCTION public\.apply_post_match_cooldowns\(/i);
+  assert.match(submitResult, /\.rpc\('apply_post_match_cooldowns', \{/);
+  assert.match(resolveDispute, /\.rpc\('apply_post_match_cooldowns', \{/);
+  assert.match(cooldownMigration, /v_cooldown_ids := public\.apply_post_match_cooldowns\(/i);
+  // No path may keep its own inline cooldown INSERT.
+  assert.doesNotMatch(submitResult, /from\('cooldowns'\)\.insert/);
+  assert.doesNotMatch(resolveDispute, /from\('cooldowns'\)\.insert/);
+});
+
+test('a challenger who climbs by decline-forfeit gets the cooldown too', () => {
+  // The loophole this series exists to close, reached by a different door:
+  // challenge up, opponent declines, you climb, challenge up again immediately.
+  assert.match(cooldownMigration, /v_challenger_climbed := v_challenger_previous_position IS NOT NULL/i);
+  assert.match(cooldownMigration, /CASE WHEN v_challenger_climbed THEN v_challenge\.challenger_id END/i);
+  // The same flag gates the cascade, so the cooldown cannot drift from the
+  // condition that decides whether anyone actually moved.
+  assert.match(cooldownMigration, /IF v_challenger_climbed THEN\s*\n\s*PERFORM public\.cascade_ranking_after_win/i);
+});
+
+test('a resolved dispute applies the same cooldown as a cleanly confirmed match', () => {
+  // Includes the admin Force Forfeit button, which comes through this path.
+  assert.match(resolveDispute, /const winnerClimbed = Boolean\(winnerRank\.data && loserRank\.data && winnerRank\.data\.position > loserRank\.data\.position\);/);
+  assert.match(resolveDispute, /p_climber_id: winnerClimbed \? winner_id : null,/);
+  assert.match(resolveDispute, /if \(cooldownError\) throw cooldownError;/);
+});
+
+test('reversing a decline unwinds both cooldowns, not just the decliner s', () => {
+  // challenge_forfeiture_events.cooldown_id is a single uuid; without a second
+  // column the challenger is left blocked by a cooldown for a forfeit that no
+  // longer exists.
+  assert.match(cooldownMigration, /ADD COLUMN IF NOT EXISTS challenger_cooldown_id uuid REFERENCES public\.cooldowns\(id\) ON DELETE SET NULL/i);
+  assert.match(cooldownMigration, /IF v_event\.challenger_cooldown_id IS NOT NULL THEN\s*\n\s*DELETE FROM public\.cooldowns WHERE id = v_event\.challenger_cooldown_id;/i);
+  assert.match(cooldownMigration, /v_cooldown_id, v_challenger_cooldown_id, v_activity_event_id, v_notification_ids,/);
+});
+
+test('the shared cooldown helper is locked to service_role like every other definer', () => {
+  assert.match(cooldownMigration, /REVOKE ALL ON FUNCTION public\.apply_post_match_cooldowns\(uuid, uuid\) FROM anon, authenticated/i);
+  assert.match(cooldownMigration, /GRANT EXECUTE ON FUNCTION public\.apply_post_match_cooldowns\(uuid, uuid\) TO service_role/i);
+  assert.doesNotMatch(cooldownMigration, /GRANT EXECUTE ON FUNCTION public\.[a-z_]+\(uuid, uuid\) TO (anon|authenticated)/i);
+  // Redefining the two forfeit functions must not silently re-open their grants.
+  for (const fn of ['apply_challenge_decline_forfeit', 'reverse_challenge_decline_forfeit']) {
+    assert.match(cooldownMigration, new RegExp(`REVOKE ALL ON FUNCTION public\\.${fn}\\(uuid, uuid\\) FROM anon, authenticated`, 'i'));
+    assert.match(cooldownMigration, new RegExp(`GRANT EXECUTE ON FUNCTION public\\.${fn}\\(uuid, uuid\\) TO service_role`, 'i'));
+  }
+});
+
+test('the helper never writes two cooldowns for the same player', () => {
+  // create-challenge reads one active cooldown; two rows for one person would
+  // be a self-inflicted data problem.
+  assert.match(cooldownMigration, /IF p_climber_id IS NOT NULL AND p_climber_id IS DISTINCT FROM p_loser_id THEN/i);
+});
+
+test('the cooldown read tolerates a player holding two overlapping cooldowns', () => {
+  // Reachable: lose a match, then decline a challenge inside the window.
+  // maybeSingle() errors on more than one row, which the new error check would
+  // turn into a 500 that blocks a legitimate challenge.
+  assert.match(createChallenge, /\.order\('expires_at', \{ ascending: false \}\)\s*\n\s*\.limit\(1\);/);
+  assert.match(createChallenge, /const myCooldown = activeCooldowns\?\.\[0\];/);
+  assert.doesNotMatch(createChallenge, /\.gt\('expires_at', now\)\.maybeSingle\(\)/);
 });
 
 // --- README rule: a wash costs nothing --------------------------------------
@@ -314,7 +376,7 @@ test('the generated types carry the new columns', () => {
 // --- Encoding ---------------------------------------------------------------
 
 test('nothing added in this package reintroduces mojibake or a BOM', () => {
-  for (const [name, source] of Object.entries({ migration, submitResult, createChallenge, respondToChallenge })) {
+  for (const [name, source] of Object.entries({ migration, cooldownMigration, submitResult, createChallenge, respondToChallenge, resolveDispute })) {
     assert.doesNotMatch(source, /Ã.|â€|ðŸ/, `${name} contains mojibake`);
     assert.ok(!source.startsWith('﻿'), `${name} starts with a BOM`);
   }

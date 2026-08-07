@@ -171,7 +171,19 @@ serve(async (req) => {
     if (existingIn) return new Response(JSON.stringify({ error: 'That player already has an active challenge they must resolve first.' }), { headers: corsHeaders });
 
     const now = new Date().toISOString();
-    const { data: myCooldown, error: cooldownError } = await supabase.from('cooldowns').select('expires_at').eq('player_id', challenger.id).eq('type', 'post_match').gt('expires_at', now).maybeSingle();
+    // Ordered limit rather than maybeSingle: a player can hold two overlapping
+    // post_match cooldowns (lose a match, then decline a challenge inside the
+    // window), and maybeSingle errors on more than one row. The latest expiry is
+    // the one that actually gates them.
+    const { data: activeCooldowns, error: cooldownError } = await supabase
+      .from('cooldowns')
+      .select('expires_at')
+      .eq('player_id', challenger.id)
+      .eq('type', 'post_match')
+      .gt('expires_at', now)
+      .order('expires_at', { ascending: false })
+      .limit(1);
+    const myCooldown = activeCooldowns?.[0];
     if (cooldownError) {
       console.error(`[create-challenge] cooldown check failed for player ${challenger.id}: ${cooldownError.message}`);
       return new Response(JSON.stringify({ error: 'Could not check your cooldown status. Please try again.' }), { status: 500, headers: corsHeaders });

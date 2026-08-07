@@ -236,22 +236,21 @@ async function recordSubmittedMatchFees(
  * So the loser always cools down, and the winner only when the win moved them up
  * the list. Previously only the loser ever got one, which let a challenger climb
  * and immediately challenge again. `climberId` is null on a successful defence.
+ *
+ * The rule has exactly one implementation — the apply_post_match_cooldowns SQL
+ * function — because it was previously written three times in three languages
+ * with three different answers, and the decline-forfeit path had drifted into
+ * leaving a climbing challenger free to challenge up again immediately.
  */
 async function createPostMatchCooldowns(
   supabase: ReturnType<typeof createClient>,
   loserId: string,
   climberId: string | null,
 ): Promise<void> {
-  const { data: settings, error: settingsError } = await supabase.from('league_settings').select('cooldown_hours').single();
-  // Fall back rather than fail the whole confirmation over a settings read, but
-  // say so — silently applying a default is how a misconfiguration hides.
-  if (settingsError) console.error(`[cooldown] could not read cooldown_hours, using 24: ${settingsError.message}`);
-  const cooldownHours = settings?.cooldown_hours ?? 24;
-  if (cooldownHours <= 0) return;
-  const expiresAt = new Date(Date.now() + cooldownHours * 3600 * 1000).toISOString();
-  const rows = [{ player_id: loserId, type: 'post_match', expires_at: expiresAt }];
-  if (climberId) rows.push({ player_id: climberId, type: 'post_match', expires_at: expiresAt });
-  const { error } = await supabase.from('cooldowns').insert(rows);
+  const { error } = await supabase.rpc('apply_post_match_cooldowns', {
+    p_loser_id: loserId,
+    p_climber_id: climberId,
+  });
   if (error) throw error;
 }
 
