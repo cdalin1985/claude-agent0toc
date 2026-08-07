@@ -51,22 +51,57 @@ serve(async (req) => {
     const updates: Record<string, unknown> = {};
 
     // Transition to in_progress if needed
+    const isStartingMatch = match.status === 'scheduled' && !match.initiated_by_player_id;
     if (match.status === 'scheduled') {
       updates.status = 'in_progress';
       updates.started_at = new Date().toISOString();
     }
 
+    // First caller claims the single-scoreboard by setting initiated_by_player_id.
+    // Subsequent calls from the other player are rejected by the line above.
+    if (isStartingMatch) {
+      updates.initiated_by_player_id = caller.id;
+    }
+
     updates.player1_score = newP1Score;
     updates.player2_score = newP2Score;
 
-    const { data: updatedRows, error: updateError } = await supabase
+    // Atomic claim: when the match is being started for the first time, only
+    // succeed if initiated_by_player_id is still NULL. This makes the
+    // "whoever taps Start Match first becomes scorekeeper" race safe.
+    let updateQuery = supabase
       .from('matches')
       .update(updates)
       .eq('id', match_id)
-      .in('status', MATCH_SCORE_STATUSES)
-      .select('id');
+      .in('status', MATCH_SCORE_STATUSES);
+    if (isStartingMatch) {
+      updateQuery = updateQuery.is('initiated_by_player_id', null);
+    }
+
+    const { data: updatedRows, error: updateError } = await updateQuery.select('id');
     if (updateError) throw updateError;
     if (!updatedRows?.length) {
+      // If we were trying to start the match and 0 rows updated, the other
+      // player beat us to it — they claimed the single-scoreboard.
+      if (isStartingMatch) {
+        const { data: refreshed } = await supabase
+          .from('matches')
+          .select('initiated_by_player_id')
+          .eq('id', match_id)
+          .single();
+        const otherId = refreshed?.initiated_by_player_id;
+        if (otherId && otherId !== caller.id) {
+          const { data: otherPlayer } = await supabase
+            .from('players')
+            .select('full_name')
+            .eq('id', otherId)
+            .single();
+          return new Response(
+            JSON.stringify({ error: `${otherPlayer?.full_name ?? 'Your opponent'} already started the match and is keeping score.` }),
+            { status: 409, headers: cors },
+          );
+        }
+      }
       return new Response(JSON.stringify({ error: 'Scores can only be changed before result submission.' }), { status: 409, headers: cors });
     }
 

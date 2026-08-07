@@ -24,6 +24,8 @@ export interface Database {
           bio: string | null;
           preferred_discipline: '8 Ball' | '9 Ball' | '10 Ball' | null;
           avatar_url: string | null;
+          banner_url: string | null;
+          accent_color: string | null;
           is_active: boolean;
           created_at: string;
           updated_at: string;

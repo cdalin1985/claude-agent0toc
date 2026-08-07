@@ -66,8 +66,8 @@ serve(async (req) => {
         venue,
         scheduled_at: scheduledAt.toISOString(),
         status: 'scheduled',
-        // The challenger keeps the single scoreboard during play.
-        initiated_by_player_id: challenge.challenger_id,
+        // Single-scoreboard is claimed by whoever taps "Start Match" first during play.
+        // Leaving this NULL at accept time lets either player start the match.
       }).select().single();
       if (insertError) throw insertError;
 

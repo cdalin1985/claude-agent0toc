@@ -20,12 +20,31 @@ const DISCIPLINES: Discipline[] = ['8 Ball', '9 Ball', '10 Ball'];
 const DISC_EMOJI: Record<Discipline, string> = { '8 Ball': '🎱', '9 Ball': '🔵', '10 Ball': '🟡' };
 type HistoryFilter = 'All' | 'Wins' | 'Losses' | '8 Ball' | '9 Ball' | '10 Ball';
 
+const VENUES = ['Eagles 4040', 'Valley Hub'] as const;
+type Venue = (typeof VENUES)[number];
+
 function canChallenge(myPos: number, theirPos: number, isFirstChallenge: boolean): boolean {
   if (myPos === theirPos) return false;
   if (myPos === 1) return true; // #1 can challenge anyone (top-5 obligation)
   if (myPos <= 10) return Math.abs(myPos - theirPos) <= 5; // top-10: ±5 in either direction
   if (isFirstChallenge) return theirPos < myPos && (myPos - theirPos) <= 10;
   return theirPos < myPos && (myPos - theirPos) <= 5;
+}
+
+function computeVenueStreaks(matchList: Match[], playerId: string): { current: number; best: number } {
+  if (matchList.length === 0) return { current: 0, best: 0 };
+  let current = 0;
+  for (const m of matchList) {
+    if (m.winner_id === playerId) current++;
+    else break;
+  }
+  let best = 0;
+  let run = 0;
+  for (const m of [...matchList].reverse()) {
+    if (m.winner_id === playerId) { run++; best = Math.max(best, run); }
+    else run = 0;
+  }
+  return { current, best };
 }
 
 export default function PlayerPage() {
@@ -35,6 +54,7 @@ export default function PlayerPage() {
   const { data: rankings = [] } = useRankings();
   const [discTab, setDiscTab]         = useState<Discipline>('8 Ball');
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('All');
+  const [venueTab, setVenueTab]       = useState<Venue>('Eagles 4040');
 
   const targetRanking = rankings.find((r) => r.player.id === id);
   const myRanking     = rankings.find((r) => r.player.id === myPlayer?.id);
@@ -83,6 +103,7 @@ export default function PlayerPage() {
   const { player, ranking, metrics, stats } = targetRanking;
   const totalMatches = stats?.matches_played ?? 0;
   const overallWinPct = totalMatches > 0 ? Math.round(((stats?.wins ?? 0) / totalMatches) * 100) : 0;
+  const accent = player.accent_color ?? '#C62828';
 
   // Head-to-head vs viewer
   const h2h = matches.filter((m) =>
@@ -97,6 +118,13 @@ export default function PlayerPage() {
   const dsWinPct = ds && ds.matches_played > 0 ? Math.round((ds.wins / ds.matches_played) * 100) : 0;
   const dsAvgRace = ds && ds.matches_played > 0 ? (ds.total_race_length / ds.matches_played).toFixed(1) : '—';
 
+  const venueMatches = matches.filter((m) => m.venue === venueTab);
+  const vWins = venueMatches.filter((m) => m.winner_id === id).length;
+  const vLosses = venueMatches.filter((m) => m.loser_id === id).length;
+  const vPlayed = vWins + vLosses;
+  const vWinPct = vPlayed > 0 ? Math.round((vWins / vPlayed) * 100) : 0;
+  const { current: vCurrentStreak, best: vBestStreak } = computeVenueStreaks(venueMatches, id ?? '');
+
   return (
     <div className="min-h-screen px-4 pt-4 pb-4">
       <button
@@ -109,14 +137,20 @@ export default function PlayerPage() {
       {/* Hero card */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
         <GlassCard className="p-6 text-center relative overflow-hidden mb-4">
+          {player.banner_url && (
+            <div
+              className="absolute inset-0 opacity-25 pointer-events-none bg-cover bg-center"
+              style={{ backgroundImage: `url(${player.banner_url})` }}
+            />
+          )}
           <div className="absolute inset-0 bg-gradient-to-br from-[#C62828]/5 to-transparent pointer-events-none" />
-          <Avatar player={player} size={80} className="mx-auto mb-4" />
+          <Avatar player={player} size={80} className="mx-auto mb-4 relative" />
           {player && !player.is_active && (
             <InactivePlayerBanner playerName={player.full_name} />
           )}
-          <h1 className="font-[Bebas_Neue] text-4xl text-[#E8E2D6]">{player.full_name}</h1>
-          <div className="flex items-center justify-center flex-wrap gap-2 mt-2">
-            <span className="font-[Azeret_Mono] text-2xl font-bold text-[#C62828]">
+          <h1 className="font-[Bebas_Neue] text-4xl text-[#E8E2D6] relative">{player.full_name}</h1>
+          <div className="flex items-center justify-center flex-wrap gap-2 mt-2 relative">
+            <span className="font-[Azeret_Mono] text-2xl font-bold" style={{ color: accent }}>
               #{ranking.position}
             </span>
             {metrics?.fargo_rating && <Badge variant="default">FR {metrics.fargo_rating}</Badge>}
@@ -228,6 +262,48 @@ export default function PlayerPage() {
           ) : (
             <p className="text-[#6B7280] text-sm font-[Barlow] text-center py-4">
               No {discTab} matches played yet.
+            </p>
+          )}
+        </GlassCard>
+      </motion.div>
+
+      {/* By Venue */}
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.13, duration: 0.35 }}>
+        <GlassCard className="p-4 mb-4">
+          <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-3">By Venue</h2>
+          <div className="flex gap-1 mb-4 bg-[#1A1A1A] rounded-xl p-1">
+            {VENUES.map((v) => (
+              <button
+                key={v}
+                onClick={() => setVenueTab(v)}
+                className={[
+                  'flex-1 py-2 rounded-lg text-xs font-[Barlow] font-medium transition-all duration-200',
+                  venueTab === v ? 'bg-[#C62828] text-white' : 'text-[#9CA3AF]',
+                ].join(' ')}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+          {vPlayed > 0 ? (
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: 'Wins',        value: vWins,           color: '#22C55E' },
+                { label: 'Losses',      value: vLosses,         color: '#EF4444' },
+                { label: 'Win %',       value: `${vWinPct}%`,   color: '#E8E2D6' },
+                { label: 'Played',      value: vPlayed,         color: '#9CA3AF' },
+                { label: 'Streak',      value: vCurrentStreak,  color: vCurrentStreak > 0 ? '#22C55E' : '#9CA3AF' },
+                { label: 'Best Streak', value: vBestStreak,     color: '#9CA3AF' },
+              ].map((s) => (
+                <div key={s.label} className="text-center bg-[#252525]/60 rounded-xl p-3">
+                  <div className="font-[Azeret_Mono] font-bold text-2xl" style={{ color: s.color }}>{s.value}</div>
+                  <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">{s.label}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[#6B7280] text-sm font-[Barlow] text-center py-4">
+              No matches played at {venueTab} yet.
             </p>
           )}
         </GlassCard>

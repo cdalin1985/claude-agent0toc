@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Swords, Trophy, TrendingUp, AlertTriangle, DollarSign, X } from 'lucide-react';
+import { Swords, Trophy, TrendingUp, AlertTriangle, DollarSign, X, Target } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { useRankings } from '../hooks/useRankings';
@@ -12,6 +12,7 @@ import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { Skeleton } from '../components/Skeleton';
 import { QueryError } from '../components/QueryError';
+import { OnboardingTour } from '../components/OnboardingTour';
 import type { ActivityFeedItem, Match, Notification, Challenge } from '../types/database';
 import { formatDistanceToNow } from '../utils/time';
 
@@ -93,6 +94,22 @@ export default function HomePage() {
     },
   });
 
+  const { data: busyPlayerIds = [] } = useQuery<string[]>({
+    queryKey: ['active-challenge-player-ids'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('challenges')
+        .select('challenger_id, challenged_id')
+        .in('status', ['pending', 'accepted', 'scheduled', 'in_progress']);
+      const ids = new Set<string>();
+      for (const c of data ?? []) {
+        ids.add(c.challenger_id);
+        ids.add(c.challenged_id);
+      }
+      return [...ids];
+    },
+  });
+
   // #1 compliance
   const isRank1 = myRanking?.ranking.position === 1;
   const { data: rank1Compliance } = useQuery({
@@ -139,6 +156,25 @@ export default function HomePage() {
 
   const myStats = myRanking?.stats;
 
+  const myPos = myRanking?.ranking.position ?? 99;
+  const isFirstChallenge = (myRanking?.stats?.challenges_issued ?? 0) === 0;
+  const busySet = new Set(busyPlayerIds);
+  const suggestedOpponent = myRanking && player
+    ? rankings
+        .filter((r) => {
+          if (!r.player.is_active) return false;
+          if (r.player.id === player.id) return false;
+          if (busySet.has(r.player.id)) return false;
+          const theirPos = r.ranking.position;
+          if (myPos === theirPos) return false;
+          if (myPos === 1) return true;
+          if (myPos <= 10) return Math.abs(myPos - theirPos) <= 5;
+          if (isFirstChallenge) return theirPos < myPos && (myPos - theirPos) <= 10;
+          return theirPos < myPos && (myPos - theirPos) <= 5;
+        })
+        .sort((a, b) => a.ranking.position - b.ranking.position)[0]
+    : undefined;
+
   // Without rankings there is nothing to show — surface the failure instead
   // of leaving the user staring at skeletons forever.
   if (rankingsError && rankingsData === undefined) {
@@ -180,6 +216,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen px-4 pt-8 pb-4 space-y-4">
+      <OnboardingTour />
 
       {/* Welcome card for new users */}
       {showWelcome && (
@@ -377,6 +414,32 @@ export default function HomePage() {
           </div>
         </GlassCard>
       </motion.div>
+
+      {/* Suggested opponent */}
+      {suggestedOpponent && (
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08, duration: 0.4 }}>
+          <GlassCard
+            className="p-4 border border-[#C62828]/30"
+            hover
+            onClick={() => navigate(`/challenge/${suggestedOpponent.player.id}`)}
+          >
+            <div className="flex items-center gap-3">
+              <Target size={20} className="text-[#C62828] shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">
+                  Your best move: challenge {suggestedOpponent.player.full_name}
+                </div>
+                <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-0.5">
+                  #{suggestedOpponent.ranking.position}
+                  {suggestedOpponent.metrics?.fargo_rating ? ` · FR ${suggestedOpponent.metrics.fargo_rating}` : ''}
+                  {suggestedOpponent.player.preferred_discipline ? ` · ${suggestedOpponent.player.preferred_discipline}` : ''}
+                </div>
+              </div>
+              <div className="text-[#C62828] text-xs font-[Barlow] font-semibold shrink-0">Challenge →</div>
+            </div>
+          </GlassCard>
+        </motion.div>
+      )}
 
       {/* Quick actions */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.4 }}>
