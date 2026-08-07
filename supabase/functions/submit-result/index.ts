@@ -6,14 +6,41 @@ import webpush from 'npm:web-push';
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' };
 
 // deno-lint-ignore-file no-explicit-any
+// Kept in sync with supabase/functions/_shared/sendPush.ts. This function is
+// deployed as a standalone bundle, so it carries its own copy rather than
+// importing across directories.
+function vapidDetails(): { subject: string; publicKey: string; privateKey: string } | null {
+  const rawSubject = Deno.env.get('VAPID_SUBJECT') ?? '';
+  const publicKey = Deno.env.get('VAPID_PUBLIC_KEY') ?? '';
+  const privateKey = Deno.env.get('VAPID_PRIVATE_KEY') ?? '';
+  const missing = [rawSubject ? null : 'VAPID_SUBJECT', publicKey ? null : 'VAPID_PUBLIC_KEY', privateKey ? null : 'VAPID_PRIVATE_KEY'].filter((n): n is string => n !== null);
+  if (missing.length > 0) {
+    console.error(`[push] NOT CONFIGURED — missing ${missing.join(', ')}. No notification was sent.`);
+    return null;
+  }
+  const subject = /^(mailto:|https?:)/i.test(rawSubject) ? rawSubject : `mailto:${rawSubject}`;
+  return { subject, publicKey, privateKey };
+}
+
+// Never throws — push must not break match submission. But every exit path
+// logs, because a swallowed failure is indistinguishable from a delivery.
 async function sendPush(supabase: any, playerId: string, title: string, body: string, url: string): Promise<void> {
   try {
-    const { data: row } = await supabase.from('push_subscriptions').select('subscription').eq('player_id', playerId).single();
-    if (!row?.subscription) return;
-    webpush.setVapidDetails(`mailto:${Deno.env.get('VAPID_SUBJECT')}`, Deno.env.get('VAPID_PUBLIC_KEY') ?? '', Deno.env.get('VAPID_PRIVATE_KEY') ?? '');
+    const { data: row, error } = await supabase.from('push_subscriptions').select('subscription').eq('player_id', playerId).maybeSingle();
+    if (error) { console.error(`[push] could not read subscription for player ${playerId}: ${error.message}`); return; }
+    if (!row?.subscription) { console.info(`[push] player ${playerId} has no push subscription — skipped.`); return; }
+    const vapid = vapidDetails();
+    if (!vapid) return;
+    webpush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);
     await webpush.sendNotification(row.subscription, JSON.stringify({ title, body, url }));
-  } catch {
-    // Push delivery should never break match submission.
+    console.info(`[push] delivered to player ${playerId}: ${title}`);
+  } catch (e: any) {
+    if (e?.statusCode === 404 || e?.statusCode === 410) {
+      console.warn(`[push] subscription for player ${playerId} is gone (${e.statusCode}) — removing it.`);
+      await supabase.from('push_subscriptions').delete().eq('player_id', playerId);
+      return;
+    }
+    console.error(`[push] delivery failed for player ${playerId} (status ${e?.statusCode ?? 'none'}): ${e?.body ?? e?.message ?? String(e)}`);
   }
 }
 

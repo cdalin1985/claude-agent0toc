@@ -29,29 +29,51 @@ serve(async (req) => {
       .from('players')
       .select('id')
       .eq('profile_id', user.id)
-      .single();
+      .maybeSingle();
     if (existingPlayer) return new Response(JSON.stringify({ error: 'You have already claimed a player profile.' }), { headers: corsHeaders });
 
-    // Check target player is unclaimed
+    // Check target player is unclaimed. This is only for a friendly up-front
+    // message — the claim below re-checks atomically and is the real gate.
     const { data: targetPlayer } = await supabase
       .from('players')
       .select('id, profile_id, full_name')
       .eq('id', player_id)
-      .single();
+      .maybeSingle();
     if (!targetPlayer) return new Response(JSON.stringify({ error: 'Player not found.' }), { headers: corsHeaders });
     if (targetPlayer.profile_id) return new Response(JSON.stringify({ error: 'This player has already been claimed.' }), { headers: corsHeaders });
 
-    // Claim it
-    await supabase.from('players').update({ profile_id: user.id }).eq('id', player_id);
+    // Claim it. `.is('profile_id', null)` makes the check and the write a single
+    // statement, so two people tapping the same name cannot both pass. Previously
+    // this write's result was discarded and success was reported unconditionally,
+    // so any failure — a lost connection included — told the player they had
+    // claimed a profile they were not actually linked to.
+    const { data: claimed, error: claimError } = await supabase
+      .from('players')
+      .update({ profile_id: user.id })
+      .eq('id', player_id)
+      .is('profile_id', null)
+      .select('id')
+      .maybeSingle();
 
-    // Log audit event
-    await supabase.from('audit_events').insert({
+    if (claimError) {
+      console.error(`[claim] write failed for player ${player_id}: ${claimError.message}`);
+      return new Response(JSON.stringify({ error: 'Could not claim that profile. Please try again.' }), { status: 500, headers: corsHeaders });
+    }
+    // No error but nothing updated: the row stopped being unclaimed between the
+    // check above and this write.
+    if (!claimed) {
+      return new Response(JSON.stringify({ error: 'This player was just claimed by someone else. Please pick another name.' }), { status: 409, headers: corsHeaders });
+    }
+
+    // Log audit event. Never fail the claim over the audit trail.
+    const { error: auditError } = await supabase.from('audit_events').insert({
       actor_profile_id: user.id,
       action: 'claim_player',
       target_type: 'player',
       target_id: player_id,
       detail: { player_name: targetPlayer.full_name },
     });
+    if (auditError) console.error(`[claim] audit insert failed for player ${player_id}: ${auditError.message}`);
 
     return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
