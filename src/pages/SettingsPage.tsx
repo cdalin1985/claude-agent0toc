@@ -15,6 +15,17 @@ const DISCIPLINES = ['8 Ball', '9 Ball', '10 Ball'] as const;
 
 const PRESET_ICONS = ['🎱','🔵','🟡','🦁','🐺','🦅','🐉','⚡','🔥','🎯','💀','🌙'];
 
+const ACCENT_COLORS = [
+  { hex: '#C62828', name: 'TOC Red' },
+  { hex: '#E53935', name: 'Bright Red' },
+  { hex: '#D4AF37', name: 'Gold' },
+  { hex: '#22C55E', name: 'Green' },
+  { hex: '#3B82F6', name: 'Blue' },
+  { hex: '#A855F7', name: 'Purple' },
+  { hex: '#F59E0B', name: 'Amber' },
+  { hex: '#06B6D4', name: 'Cyan' },
+];
+
 export default function SettingsPage() {
   const navigate  = useNavigate();
   const { profile, player, setPlayer, reset } = useAuthStore();
@@ -22,14 +33,18 @@ export default function SettingsPage() {
   const { supported: pushSupported, subscribed: pushSubscribed, permission: pushPermission, loading: pushLoading, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications();
   const { data: rankings = [] } = useRankings();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
 
   const [displayName,   setDisplayName]   = useState(profile?.display_name ?? '');
   const [bio,           setBio]           = useState('');
   const [preferredDisc, setPreferredDisc] = useState<typeof DISCIPLINES[number] | ''>('');
+  const [accentColor,   setAccentColor]   = useState<string | null>(null);
   const [saving,        setSaving]        = useState(false);
   const [signingOut,    setSigningOut]    = useState(false);
   const [avatarSaving,  setAvatarSaving]  = useState(false);
   const [avatarError,   setAvatarError]   = useState('');
+  const [bannerSaving,  setBannerSaving]  = useState(false);
+  const [bannerError,   setBannerError]   = useState('');
   const [showIconPicker, setShowIconPicker] = useState(false);
 
   const myRanking = rankings.find((r) => r.player.id === player?.id);
@@ -37,11 +52,12 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!playerId) return;
-    supabase.from('players').select('bio, preferred_discipline').eq('id', playerId).single()
+    supabase.from('players').select('bio, preferred_discipline, accent_color').eq('id', playerId).single()
       .then(({ data }) => {
         if (data) {
           setBio(data.bio ?? '');
           setPreferredDisc((data.preferred_discipline as typeof DISCIPLINES[number] | null) ?? '');
+          setAccentColor(data.accent_color ?? null);
         }
       });
   }, [playerId]);
@@ -99,6 +115,44 @@ export default function SettingsPage() {
     const { data } = await supabase.from('players').select('*').eq('id', player.id).single();
     if (data) setPlayer(data);
     setAvatarSaving(false);
+  };
+
+  const handleBannerUpload = async (file: File) => {
+    if (!player || !profile) return;
+    if (file.size > 5 * 1024 * 1024) { setBannerError('Banner must be under 5 MB.'); return; }
+    setBannerSaving(true);
+    setBannerError('');
+    const ext  = file.name.split('.').pop() ?? 'jpg';
+    const path = `${profile.id}/banner.${ext}`;
+    const { error: uploadErr } = await supabase.storage.from('banners').upload(path, file, { upsert: true });
+    if (uploadErr) { setBannerError(uploadErr.message); setBannerSaving(false); return; }
+    const { data: { publicUrl } } = supabase.storage.from('banners').getPublicUrl(path);
+    await supabase.from('players').update({ banner_url: publicUrl }).eq('id', player.id);
+    const { data } = await supabase.from('players').select('*').eq('id', player.id).single();
+    if (data) setPlayer(data);
+    setBannerSaving(false);
+  };
+
+  const handleRemoveBanner = async () => {
+    if (!player) return;
+    setBannerSaving(true);
+    setBannerError('');
+    await supabase.from('players').update({ banner_url: null }).eq('id', player.id);
+    const { data } = await supabase.from('players').select('*').eq('id', player.id).single();
+    if (data) setPlayer(data);
+    setBannerSaving(false);
+  };
+
+  const handleSelectAccent = async (hex: string) => {
+    if (!player) return;
+    setAccentColor(hex);
+    await supabase.from('players').update({ accent_color: hex }).eq('id', player.id);
+  };
+
+  const handleClearAccent = async () => {
+    if (!player) return;
+    setAccentColor(null);
+    await supabase.from('players').update({ accent_color: null }).eq('id', player.id);
   };
 
   const handleSignOut = async () => {
@@ -195,11 +249,72 @@ export default function SettingsPage() {
                     </Button>
                   )}
                 </div>
-                {avatarError && <p className="text-[#EF4444] text-xs font-[Barlow] mt-2">{avatarError}</p>}
-              </motion.div>
-            )}
+{avatarError && <p className="text-[#EF4444] text-xs font-[Barlow] mt-2">{avatarError}</p>}
+            </motion.div>
+          )}
 
-            {/* Display name */}
+          {/* Banner & Accent */}
+          <div className="mb-5">
+            <label className="block text-[#9CA3AF] text-sm font-[Barlow] mb-2">Profile Banner</label>
+            <div className="flex items-center gap-3">
+              <div className="relative w-full h-16 rounded-lg overflow-hidden bg-[#252525] border border-[#333] flex items-center justify-center">
+                {player.banner_url ? (
+                  <>
+                    <img src={player.banner_url} alt="Banner" className="w-full h-full object-cover" />
+                    <button
+                      onClick={handleRemoveBanner}
+                      disabled={bannerSaving}
+                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center text-xs"
+                    >
+                      ×
+                    </button>
+                  </>
+                ) : (
+                  <span className="text-[#6B7280] text-xs font-[Barlow]">No banner yet</span>
+                )}
+              </div>
+              <input
+                ref={bannerInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleBannerUpload(file);
+                }}
+              />
+              <Button variant="secondary" size="sm" loading={bannerSaving} onClick={() => bannerInputRef.current?.click()}>
+                {player.banner_url ? 'Change' : 'Upload'}
+              </Button>
+            </div>
+            {bannerError && <p className="text-[#EF4444] text-xs font-[Barlow] mt-2">{bannerError}</p>}
+
+            <label className="block text-[#9CA3AF] text-sm font-[Barlow] mt-4 mb-2">Accent Color</label>
+            <div className="flex flex-wrap gap-2 items-center">
+              {ACCENT_COLORS.map((c) => (
+                <button
+                  key={c.hex}
+                  onClick={() => handleSelectAccent(c.hex)}
+                  aria-label={c.name}
+                  className={[
+                    'w-7 h-7 rounded-full border transition-all active:scale-95',
+                    accentColor === c.hex ? 'border-white ring-2 ring-white/40' : 'border-[#333]',
+                  ].join(' ')}
+                  style={{ background: c.hex }}
+                />
+              ))}
+              {accentColor && (
+                <button
+                  onClick={handleClearAccent}
+                  className="text-[#6B7280] text-xs font-[Barlow] underline ml-2"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Display name */}
             <div className="mb-4">
               <label className="block text-[#9CA3AF] text-sm font-[Barlow] mb-2 flex items-center gap-1">
                 <User size={14} /> Display Name

@@ -21,6 +21,7 @@ import { GlassCard } from '../components/GlassCard';
 import { QueryError } from '../components/QueryError';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
+import { CoachTip } from '../components/CoachTip';
 import { formatDateTime } from '../utils/time';
 import type { Match } from '../types/database';
 import {
@@ -382,8 +383,10 @@ export default function MatchPage() {
 
   const hasSubmitted = (isPlayer1 && match.player1_submitted) || (isPlayer2 && match.player2_submitted);
   const isWinner    = match.winner_id === player?.id;
-  // Single scoreboard: only the recorded initiator keeps score. Older matches
-  // without an initiator stay open to either participant.
+  // Single scoreboard: whoever taps "Start Match" first becomes the scorekeeper.
+  // Before that, either participant may start; once claimed, only the
+  // recorded initiator keeps score. Older matches without an initiator stay
+  // open to either participant.
   const isScorekeeper = !match.initiated_by_player_id || match.initiated_by_player_id === player?.id;
   const scorekeeperName = match.initiated_by_player_id === match.player1_id ? p1Name
     : match.initiated_by_player_id === match.player2_id ? p2Name : '';
@@ -439,8 +442,9 @@ export default function MatchPage() {
             </div>
           )}
           {match.status === 'in_progress' && !isScorekeeper && scorekeeperName && (
-            <div className="text-[#F59E0B] text-xs font-[Barlow] p-3 bg-[#F59E0B]/10 rounded-lg border border-[#F59E0B]/20">
+            <div className="text-[#F59E0B] text-xs font-[Barlow] p-3 bg-[#F59E0B]/10 rounded-lg border border-[#F59E0B]/20 flex items-center gap-1">
               {scorekeeperName} is keeping the score for this match.
+              <CoachTip id="scorekeeper" size={12} />
             </div>
           )}
           {match.status === 'scheduled' && isScorekeeper && (
@@ -474,8 +478,9 @@ export default function MatchPage() {
               <div className="flex items-start gap-3">
                 <div className="text-2xl shrink-0">📋</div>
                 <div>
-                  <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">
+                  <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm flex items-center gap-1">
                     Opponent submitted — your confirmation needed
+                    <CoachTip id="confirm.result" size={12} />
                   </div>
                   <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-1">
                     Recorded score: {match.player1_score}–{match.player2_score}. Submit your result below to confirm or dispute.
