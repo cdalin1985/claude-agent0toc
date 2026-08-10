@@ -1,4 +1,4 @@
-﻿/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import webpush from 'npm:web-push';
@@ -9,14 +9,58 @@ const corsHeaders = {
 };
 
 // deno-lint-ignore-file no-explicit-any
-async function sendPush(supabase: any, playerId: string, title: string, body: string, url: string): Promise<void> {
+// Kept in sync with supabase/functions/_shared/sendPush.ts. This function is
+// deployed as a standalone bundle, so it carries its own copy rather than
+// importing across directories.
+function vapidDetails(): { subject: string; publicKey: string; privateKey: string } | null {
+  const rawSubject = Deno.env.get('VAPID_SUBJECT') ?? '';
+  const publicKey = Deno.env.get('VAPID_PUBLIC_KEY') ?? '';
+  const privateKey = Deno.env.get('VAPID_PRIVATE_KEY') ?? '';
+  const missing = [rawSubject ? null : 'VAPID_SUBJECT', publicKey ? null : 'VAPID_PUBLIC_KEY', privateKey ? null : 'VAPID_PRIVATE_KEY'].filter((n): n is string => n !== null);
+  if (missing.length > 0) {
+    console.error(`[push] NOT CONFIGURED — missing ${missing.join(', ')}. No notification was sent.`);
+    return null;
+  }
+  const subject = /^(mailto:|https?:)/i.test(rawSubject) ? rawSubject : `mailto:${rawSubject}`;
+  return { subject, publicKey, privateKey };
+}
+
+// Never throws — push must not break challenge creation. But every exit path
+// logs, because a swallowed failure is indistinguishable from a delivery.
+// Two gates before sending: push_enabled is the master switch, and the
+// per-category preference is asked via player_accepts_notification — the SAME
+// function the notifications insert trigger uses, so a muted category cannot be
+// silent in the app and still buzz the phone. Every failure path sends anyway:
+// silence must not be the consequence of a lookup problem.
+async function playerWantsPush(supabase: any, playerId: string, notificationType?: string): Promise<boolean> {
+  const { data: prefs, error: prefsError } = await supabase.from('player_preferences').select('push_enabled').eq('player_id', playerId).maybeSingle();
+  if (prefsError) { console.error(`[push] could not read preferences for player ${playerId}, sending anyway: ${prefsError.message}`); return true; }
+  if (prefs && prefs.push_enabled === false) { console.info(`[push] player ${playerId} has push switched off — skipped.`); return false; }
+  if (!notificationType) return true;
+  const { data: accepts, error: acceptsError } = await supabase.rpc('player_accepts_notification', { p_player_id: playerId, p_type: notificationType });
+  if (acceptsError) { console.error(`[push] preference check failed for player ${playerId}, sending anyway: ${acceptsError.message}`); return true; }
+  if (accepts === false) { console.info(`[push] player ${playerId} has ${notificationType} muted — skipped.`); return false; }
+  return true;
+}
+
+async function sendPush(supabase: any, playerId: string, title: string, body: string, url: string, notificationType?: string): Promise<void> {
   try {
-    const { data: row } = await supabase.from('push_subscriptions').select('subscription').eq('player_id', playerId).single();
-    if (!row?.subscription) return;
-    webpush.setVapidDetails(`mailto:${Deno.env.get('VAPID_SUBJECT')}`, Deno.env.get('VAPID_PUBLIC_KEY') ?? '', Deno.env.get('VAPID_PRIVATE_KEY') ?? '');
+    if (!(await playerWantsPush(supabase, playerId, notificationType))) return;
+    const { data: row, error } = await supabase.from('push_subscriptions').select('subscription').eq('player_id', playerId).maybeSingle();
+    if (error) { console.error(`[push] could not read subscription for player ${playerId}: ${error.message}`); return; }
+    if (!row?.subscription) { console.info(`[push] player ${playerId} has no push subscription — skipped.`); return; }
+    const vapid = vapidDetails();
+    if (!vapid) return;
+    webpush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);
     await webpush.sendNotification(row.subscription, JSON.stringify({ title, body, url }));
-  } catch {
-    // Push delivery should never break challenge creation.
+    console.info(`[push] delivered to player ${playerId}: ${title}`);
+  } catch (e: any) {
+    if (e?.statusCode === 404 || e?.statusCode === 410) {
+      console.warn(`[push] subscription for player ${playerId} is gone (${e.statusCode}) — removing it.`);
+      await supabase.from('push_subscriptions').delete().eq('player_id', playerId);
+      return;
+    }
+    console.error(`[push] delivery failed for player ${playerId} (status ${e?.statusCode ?? 'none'}): ${e?.body ?? e?.message ?? String(e)}`);
   }
 }
 
@@ -52,6 +96,24 @@ function canChallenge(
   return null;
 }
 
+/**
+ * Whether a challenge consumes one of the challenger's weekly slots.
+ *
+ * README: "If you can't agree on a time: The challenge is a wash. No penalties
+ * for either player." Losing a weekly challenge to a wash is a penalty, so a
+ * wash — and a match ruled overdue, which is the same outcome reached by the
+ * clock rather than by agreement — does not count. Neither does a challenge that
+ * expired unanswered: the challenger did nothing wrong and got no match.
+ *
+ * A challenge the challenger withdrew before it was accepted DOES count.
+ * Otherwise the limit is unenforceable — you could create and withdraw all day.
+ */
+function countsAgainstWeeklyLimit(row: { status: string; cancel_reason: string | null }): boolean {
+  if (row.status === 'expired') return false;
+  if (row.status === 'cancelled' && (row.cancel_reason === 'wash' || row.cancel_reason === 'overdue')) return false;
+  return true;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -76,24 +138,24 @@ serve(async (req) => {
     const weeklyLimit = settings?.challenge_weekly_limit ?? 2;
 
     const validDisciplines = ['8 Ball', '9 Ball', '10 Ball'];
-    if (!validDisciplines.includes(discipline)) return new Response(JSON.stringify({ error: 'Invalid discipline.' }), { headers: corsHeaders });
-    if (!Number.isInteger(race_length) || race_length < minRace) return new Response(JSON.stringify({ error: `Race length must be at least ${minRace}.` }), { headers: corsHeaders });
-    if (Number.isInteger(maxRace) && race_length > maxRace) return new Response(JSON.stringify({ error: `Race length cannot exceed ${maxRace}.` }), { headers: corsHeaders });
+    if (!validDisciplines.includes(discipline)) return new Response(JSON.stringify({ error: 'Invalid discipline.' }), { status: 400, headers: corsHeaders });
+    if (!Number.isInteger(race_length) || race_length < minRace) return new Response(JSON.stringify({ error: `Race length must be at least ${minRace}.` }), { status: 400, headers: corsHeaders });
+    if (Number.isInteger(maxRace) && race_length > maxRace) return new Response(JSON.stringify({ error: `Race length cannot exceed ${maxRace}.` }), { status: 400, headers: corsHeaders });
 
     const { data: challenger } = await supabase.from('players').select('id, is_active').eq('profile_id', user.id).single();
-    if (!challenger) return new Response(JSON.stringify({ error: 'You must claim a player profile first.' }), { headers: corsHeaders });
-    if (!challenger.is_active) return new Response(JSON.stringify({ error: 'Your account is inactive.' }), { headers: corsHeaders });
-    if (challenger.id === challenged_player_id) return new Response(JSON.stringify({ error: 'You cannot challenge yourself.' }), { headers: corsHeaders });
+    if (!challenger) return new Response(JSON.stringify({ error: 'You must claim a player profile first.' }), { status: 400, headers: corsHeaders });
+    if (!challenger.is_active) return new Response(JSON.stringify({ error: 'Your account is inactive.' }), { status: 409, headers: corsHeaders });
+    if (challenger.id === challenged_player_id) return new Response(JSON.stringify({ error: 'You cannot challenge yourself.' }), { status: 400, headers: corsHeaders });
 
     const { data: challenged } = await supabase.from('players').select('id, is_active').eq('id', challenged_player_id).single();
-    if (!challenged) return new Response(JSON.stringify({ error: 'That player does not exist.' }), { headers: corsHeaders });
-    if (!challenged.is_active) return new Response(JSON.stringify({ error: 'That player is currently inactive and cannot be challenged.' }), { headers: corsHeaders });
+    if (!challenged) return new Response(JSON.stringify({ error: 'That player does not exist.' }), { status: 404, headers: corsHeaders });
+    if (!challenged.is_active) return new Response(JSON.stringify({ error: 'That player is currently inactive and cannot be challenged.' }), { status: 409, headers: corsHeaders });
 
     const [challengerRankRes, challengedRankRes] = await Promise.all([
       supabase.from('rankings').select('position').eq('player_id', challenger.id).single(),
       supabase.from('rankings').select('position').eq('player_id', challenged_player_id).single(),
     ]);
-    if (!challengerRankRes.data || !challengedRankRes.data) return new Response(JSON.stringify({ error: 'Could not retrieve rankings.' }), { headers: corsHeaders });
+    if (!challengerRankRes.data || !challengedRankRes.data) return new Response(JSON.stringify({ error: 'Could not retrieve rankings.' }), { status: 500, headers: corsHeaders });
 
     const myPos = challengerRankRes.data.position;
     const theirPos = challengedRankRes.data.position;
@@ -104,21 +166,50 @@ serve(async (req) => {
     const isFirstChallenge = (priorChallenges ?? 0) === 0;
 
     const eligibilityError = canChallenge(myPos, theirPos, isFirstChallenge, challengeRange, firstChallengeRange);
-    if (eligibilityError) return new Response(JSON.stringify({ error: eligibilityError }), { headers: corsHeaders });
+    if (eligibilityError) return new Response(JSON.stringify({ error: eligibilityError }), { status: 400, headers: corsHeaders });
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-    const { count: weeklyCount } = await supabase.from('challenges').select('id', { count: 'exact', head: true }).eq('challenger_id', challenger.id).gte('created_at', sevenDaysAgo);
-    if ((weeklyCount ?? 0) >= weeklyLimit) return new Response(JSON.stringify({ error: `You have reached the weekly challenge limit (${weeklyLimit} per 7 days).` }), { headers: corsHeaders });
+    const { data: recentChallenges, error: weeklyError } = await supabase
+      .from('challenges')
+      .select('status, cancel_reason')
+      .eq('challenger_id', challenger.id)
+      .gte('created_at', sevenDaysAgo);
+    if (weeklyError) {
+      console.error(`[create-challenge] weekly limit check failed for player ${challenger.id}: ${weeklyError.message}`);
+      return new Response(JSON.stringify({ error: 'Could not check your weekly challenge count. Please try again.' }), { status: 500, headers: corsHeaders });
+    }
+    const weeklyCount = (recentChallenges ?? []).filter(countsAgainstWeeklyLimit).length;
+    if (weeklyCount >= weeklyLimit) return new Response(JSON.stringify({ error: `You have reached the weekly challenge limit (${weeklyLimit} per 7 days).` }), { status: 409, headers: corsHeaders });
 
     const { data: existingOut } = await supabase.from('challenges').select('id').eq('challenger_id', challenger.id).in('status', ['pending', 'accepted', 'scheduled', 'in_progress']).maybeSingle();
-    if (existingOut) return new Response(JSON.stringify({ error: 'You already have an active outgoing challenge.' }), { headers: corsHeaders });
+    if (existingOut) return new Response(JSON.stringify({ error: 'You already have an active outgoing challenge.' }), { status: 409, headers: corsHeaders });
 
     const { data: existingIn } = await supabase.from('challenges').select('id').eq('challenged_id', challenged_player_id).in('status', ['pending', 'accepted', 'scheduled', 'in_progress']).maybeSingle();
-    if (existingIn) return new Response(JSON.stringify({ error: 'That player already has an active challenge they must resolve first.' }), { headers: corsHeaders });
+    if (existingIn) return new Response(JSON.stringify({ error: 'That player already has an active challenge they must resolve first.' }), { status: 409, headers: corsHeaders });
 
     const now = new Date().toISOString();
-    const { data: myCooldown } = await supabase.from('cooldowns').select('expires_at').eq('player_id', challenger.id).eq('type', 'post_match').gt('expires_at', now).maybeSingle();
-    if (myCooldown) return new Response(JSON.stringify({ error: `You are in a post-match cooldown period until ${new Date(myCooldown.expires_at).toLocaleString()}.` }), { headers: corsHeaders });
+    // Ordered limit rather than maybeSingle: a player can hold two overlapping
+    // post_match cooldowns (lose a match, then decline a challenge inside the
+    // window), and maybeSingle errors on more than one row. The latest expiry is
+    // the one that actually gates them.
+    const { data: activeCooldowns, error: cooldownError } = await supabase
+      .from('cooldowns')
+      .select('expires_at')
+      .eq('player_id', challenger.id)
+      .eq('type', 'post_match')
+      .gt('expires_at', now)
+      .order('expires_at', { ascending: false })
+      .limit(1);
+    const myCooldown = activeCooldowns?.[0];
+    if (cooldownError) {
+      console.error(`[create-challenge] cooldown check failed for player ${challenger.id}: ${cooldownError.message}`);
+      return new Response(JSON.stringify({ error: 'Could not check your cooldown status. Please try again.' }), { status: 500, headers: corsHeaders });
+    }
+    // README scopes the post-match cooldown to challenging UP — "wait 24 hours
+    // before challenging up again" — and separately grants top-10 players the
+    // right to challenge down 5 spots. Blocking a downward challenge would take
+    // away a challenge the rulebook gives you.
+    if (myCooldown && theirPos < myPos) return new Response(JSON.stringify({ error: `You are in a post-match cooldown and cannot challenge up until ${new Date(myCooldown.expires_at).toLocaleString()}. You can still challenge down.` }), { status: 409, headers: corsHeaders });
 
     const expiresAt = new Date(Date.now() + challengeExpiryDays * 24 * 3600 * 1000).toISOString();
     const { data: challenge, error: insertErr } = await supabase.from('challenges').insert({ challenger_id: challenger.id, challenged_id: challenged_player_id, discipline, race_length, status: 'pending', expires_at: expiresAt }).select().single();
@@ -159,7 +250,7 @@ serve(async (req) => {
       reference_id: challenge.id,
       reference_type: 'challenge',
     });
-    await sendPush(supabase, challenged_player_id, `${challengerPlayer?.full_name} challenged you!`, `${discipline} - Race to ${race_length}. Tap to respond.`, '/challenges');
+    await sendPush(supabase, challenged_player_id, `${challengerPlayer?.full_name} challenged you!`, `${discipline} - Race to ${race_length}. Tap to respond.`, '/challenges', 'challenge_received');
 
     await supabase.from('activity_feed').insert({
       event_type: 'challenge_issued',
@@ -170,7 +261,10 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ challenge_id: challenge.id }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: corsHeaders });
+    // Postgres errors carry constraint, column and table names. Log the real
+    // one for us; return something a player can act on.
+    console.error(`[create-challenge] unhandled: ${e instanceof Error ? e.message : String(e)}`);
+    return new Response(JSON.stringify({ error: 'Something went wrong on our end. Please try again.' }), { status: 500, headers: corsHeaders });
   }
 });
 

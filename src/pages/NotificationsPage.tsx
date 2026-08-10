@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell, CheckCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
+import { useLeagueSettings, venuesFrom } from '../hooks/useLeagueSettings';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 import { EmptyState } from '../components/EmptyState';
@@ -28,8 +29,9 @@ const TYPE_ICONS: Record<string, string> = {
   rank_changed:       '📈',
 };
 
-const VENUES = ['Eagles 4040', 'Valley Hub'] as const;
-type Venue = typeof VENUES[number];
+// Venues come from league_settings; a venue added in Admin appears here with
+// no code change.
+type Venue = string;
 
 function RespondInline({
   challengeId,
@@ -45,36 +47,55 @@ function RespondInline({
   const [time, setTime] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { data: leagueSettings } = useLeagueSettings();
+  const venues = venuesFrom(leagueSettings);
 
   const callFn = async (body: object) => {
     const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return { error: 'Your sign-in expired. Please sign in again.' };
     const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/respond-to-challenge`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify(body),
     });
-    return res.json() as Promise<{ success?: boolean; error?: string }>;
+    // A failing function can return a non-JSON body; don't let that throw.
+    const json = await res.json().catch(() => ({})) as { success?: boolean; error?: string };
+    if (!res.ok && !json.error) return { error: 'Something went wrong. Please try again.' };
+    return json;
   };
 
   const handleDecline = async () => {
     setLoading(true);
     setError('');
-    const json = await callFn({ challenge_id: challengeId, action: 'decline' });
-    setLoading(false);
-    if (json.error) { setError(json.error); return; }
-    setShowDeclineConfirm(false);
-    onDone();
+    try {
+      const json = await callFn({ challenge_id: challengeId, action: 'decline' });
+      if (json.error) { setError(json.error); return; }
+      setShowDeclineConfirm(false);
+      onDone();
+    } catch {
+      setError('Connection problem — nothing was sent. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleAccept = async () => {
-    if (!venue || !date || !time) { setError('Fill in all fields.'); return; }
+  // Suggests a time rather than locking one in: the challenger can counter, and
+  // the two go back and forth until one accepts. Answering from here starts
+  // that negotiation; the Challenges page carries the rest of it.
+  const handlePropose = async () => {
+    if (!venue || !date || !time) { setError('Pick a venue, a date and a time.'); return; }
     setLoading(true);
     setError('');
-    const scheduledAt = new Date(`${date}T${time}`).toISOString();
-    const json = await callFn({ challenge_id: challengeId, action: 'accept', venue, scheduled_at: scheduledAt });
-    setLoading(false);
-    if (json.error) { setError(json.error); return; }
-    onDone();
+    try {
+      const scheduledAt = new Date(`${date}T${time}`).toISOString();
+      const json = await callFn({ challenge_id: challengeId, action: 'propose', venue, scheduled_at: scheduledAt });
+      if (json.error) { setError(json.error); return; }
+      onDone();
+    } catch {
+      setError('Connection problem — nothing was sent. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!open) {
@@ -107,7 +128,7 @@ function RespondInline({
               Decline (forfeit)
             </Button>
             <Button variant="success" size="sm" onClick={() => { setError(''); setOpen(true); }}>
-              Accept ✓
+              Suggest a time ✓
             </Button>
           </div>
         )}
@@ -123,7 +144,7 @@ function RespondInline({
         className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
       >
         <option value="">Select venue…</option>
-        {VENUES.map((v) => <option key={v} value={v}>{v}</option>)}
+        {venues.map((v) => <option key={v} value={v}>{v}</option>)}
       </select>
       <div className="grid grid-cols-2 gap-2">
         <input
@@ -141,10 +162,13 @@ function RespondInline({
         />
       </div>
       {error && <p className="text-[#EF4444] text-xs font-[Barlow]">{error}</p>}
+      <p className="text-[#6B7280] text-xs font-[Barlow]">
+        They can accept this or suggest another time. Nothing is locked in until one of you agrees.
+      </p>
       <div className="flex gap-2">
         <Button variant="ghost" size="sm" fullWidth onClick={() => setOpen(false)}>Back</Button>
-        <Button variant="success" size="sm" fullWidth loading={loading} onClick={handleAccept}>
-          Confirm Accept
+        <Button variant="success" size="sm" fullWidth loading={loading} onClick={handlePropose}>
+          Send suggestion
         </Button>
       </div>
     </div>

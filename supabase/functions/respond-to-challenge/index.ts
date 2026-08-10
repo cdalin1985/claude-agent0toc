@@ -16,18 +16,33 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser(req.headers.get('Authorization')?.replace('Bearer ', ''));
     if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: cors });
 
-    const { challenge_id, action, venue, scheduled_at } = await req.json();
+    const { challenge_id, action, venue, scheduled_at, response_message } = await req.json();
 
     const { data: challenge } = await supabase.from('challenges').select('*').eq('id', challenge_id).single();
-    if (!challenge) return new Response(JSON.stringify({ error: 'Challenge not found.' }), { headers: cors });
+    if (!challenge) return new Response(JSON.stringify({ error: 'Challenge not found.' }), { status: 404, headers: cors });
 
     const { data: callerPlayer } = await supabase.from('players').select('id, full_name').eq('profile_id', user.id).single();
-    if (!callerPlayer) return new Response(JSON.stringify({ error: 'Player profile not found.' }), { headers: cors });
+    if (!callerPlayer) return new Response(JSON.stringify({ error: 'Player profile not found.' }), { status: 404, headers: cors });
 
-    if (action === 'accept') {
-      if (challenge.challenged_id !== callerPlayer.id) return new Response(JSON.stringify({ error: 'Not authorized.' }), { headers: cors });
-      if (challenge.status !== 'pending') return new Response(JSON.stringify({ error: 'Challenge is not pending.' }), { headers: cors });
-      if (!venue || !scheduled_at) return new Response(JSON.stringify({ error: 'venue and scheduled_at required.' }), { headers: cors });
+    // 'accept' is the legacy one-shot action: the challenged player picked both
+    // the venue and the time and it was locked in, with no way for the
+    // challenger to counter. It now means the same as 'propose' so a client
+    // still running the old bundle lands in the negotiation rather than
+    // breaking.
+    if (action === 'propose' || action === 'accept') {
+      const isChallenger = challenge.challenger_id === callerPlayer.id;
+      const isChallenged = challenge.challenged_id === callerPlayer.id;
+      if (!isChallenger && !isChallenged) return new Response(JSON.stringify({ error: 'Not authorized.' }), { status: 403, headers: cors });
+      if (!['pending', 'accepted'].includes(challenge.status)) {
+        return new Response(JSON.stringify({ error: 'This challenge is not open for scheduling.' }), { status: 409, headers: cors });
+      }
+      // The challenger has already made their move by issuing the challenge;
+      // the first word on when and where is the challenged player's.
+      if (challenge.status === 'pending' && !isChallenged) {
+        return new Response(JSON.stringify({ error: 'Wait for them to respond to your challenge first.' }), { status: 409, headers: cors });
+      }
+      if (!venue || !scheduled_at) return new Response(JSON.stringify({ error: 'venue and scheduled_at required.' }), { status: 400, headers: cors });
+
       const scheduledAt = new Date(scheduled_at);
       if (Number.isNaN(scheduledAt.getTime())) return new Response(JSON.stringify({ error: 'scheduled_at must be a valid date.' }), { status: 400, headers: cors });
       if (scheduledAt.getTime() < Date.now() - 5 * 60 * 1000) return new Response(JSON.stringify({ error: 'Match cannot be scheduled in the past.' }), { status: 400, headers: cors });
@@ -38,23 +53,144 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Venue is not in league settings.' }), { status: 400, headers: cors });
       }
 
-      // Match must be played within 10 days of acceptance
-      const matchDeadline = new Date(Date.now() + 10 * 24 * 3600 * 1000).toISOString();
+      const { data: liveProposal, error: liveError } = await supabase
+        .from('challenge_proposals')
+        .select('id, proposed_by_player_id')
+        .eq('challenge_id', challenge_id)
+        .eq('status', 'pending')
+        .maybeSingle();
+      if (liveError) throw liveError;
+
+      // Turn order: you cannot counter your own outstanding proposal. Without
+      // this a player could bury the other under proposals they never had a
+      // chance to answer.
+      if (liveProposal && liveProposal.proposed_by_player_id === callerPlayer.id) {
+        return new Response(JSON.stringify({ error: "You've already proposed a time — it's their turn to reply." }), { status: 409, headers: cors });
+      }
+
+      if (liveProposal) {
+        const { error: supersedeError } = await supabase
+          .from('challenge_proposals')
+          .update({ status: 'superseded', responded_at: new Date().toISOString() })
+          .eq('id', liveProposal.id)
+          .eq('status', 'pending');
+        if (supersedeError) throw supersedeError;
+      }
+
+      const { error: proposalError } = await supabase.from('challenge_proposals').insert({
+        challenge_id,
+        proposed_by_player_id: callerPlayer.id,
+        venue,
+        scheduled_at: scheduledAt.toISOString(),
+        message: typeof response_message === 'string' ? response_message.slice(0, 280) : null,
+      });
+      if (proposalError) throw proposalError;
+
+      // 'accepted' means "answered, now agreeing on when and where". Guarded so
+      // two simultaneous first proposals cannot both move the challenge.
+      if (challenge.status === 'pending') {
+        const { error: statusError } = await supabase
+          .from('challenges')
+          .update({ status: 'accepted' })
+          .eq('id', challenge_id)
+          .eq('status', 'pending');
+        if (statusError) throw statusError;
+      }
+
+      const otherId = isChallenger ? challenge.challenged_id : challenge.challenger_id;
+      const [{ data: mePlayer }, { data: themPlayer }] = await Promise.all([
+        supabase.from('players').select('full_name').eq('id', callerPlayer.id).single(),
+        supabase.from('players').select('full_name').eq('id', otherId).single(),
+      ]);
+      const when = `${scheduledAt.toLocaleDateString()} at ${venue}`;
+      const countering = Boolean(liveProposal);
+
+      const { error: notificationError } = await supabase.from('notifications').insert({
+        player_id: otherId,
+        type: 'challenge_accepted',
+        title: countering ? '🗓️ New time suggested' : '✅ Challenge answered',
+        body: countering
+          ? `${mePlayer?.full_name} suggested ${when} instead. Accept it or suggest another.`
+          : `${mePlayer?.full_name} suggested ${when} for your ${challenge.discipline} match. Accept it or suggest another.`,
+        reference_id: challenge_id,
+        reference_type: 'challenge',
+      });
+      if (notificationError) throw notificationError;
+      await sendPush(
+        supabase,
+        otherId,
+        countering ? '🗓️ New time suggested' : '✅ Challenge answered',
+        `${mePlayer?.full_name} suggested ${when}.`,
+        '/challenges',
+      );
+
+      const { error: activityError } = await supabase.from('activity_feed').insert({
+        event_type: 'challenge_accepted',
+        headline: countering
+          ? `${mePlayer?.full_name} countered with a new time against ${themPlayer?.full_name}.`
+          : `${mePlayer?.full_name} answered ${themPlayer?.full_name}'s ${challenge.discipline} challenge — working out a time.`,
+        detail: `Proposed ${when} · race to ${challenge.race_length}`,
+        actor_player_id: callerPlayer.id,
+      });
+      if (activityError) throw activityError;
+
+    } else if (action === 'accept_proposal') {
+      const isChallenger = challenge.challenger_id === callerPlayer.id;
+      const isChallenged = challenge.challenged_id === callerPlayer.id;
+      if (!isChallenger && !isChallenged) return new Response(JSON.stringify({ error: 'Not authorized.' }), { status: 403, headers: cors });
+      if (challenge.status !== 'accepted') {
+        return new Response(JSON.stringify({ error: 'There is nothing to agree to on this challenge.' }), { status: 409, headers: cors });
+      }
+
+      const { data: proposal, error: proposalReadError } = await supabase
+        .from('challenge_proposals')
+        .select('id, proposed_by_player_id, venue, scheduled_at')
+        .eq('challenge_id', challenge_id)
+        .eq('status', 'pending')
+        .maybeSingle();
+      if (proposalReadError) throw proposalReadError;
+      if (!proposal) {
+        return new Response(JSON.stringify({ error: 'That time is no longer on the table. Refresh and take another look.' }), { status: 409, headers: cors });
+      }
+      // You agree to THEIR proposal, not your own.
+      if (proposal.proposed_by_player_id === callerPlayer.id) {
+        return new Response(JSON.stringify({ error: "That's your own suggestion — you're waiting on them." }), { status: 409, headers: cors });
+      }
+
+      const scheduledAt = new Date(proposal.scheduled_at);
+      const { data: settings } = await supabase.from('league_settings').select('match_play_days').single();
+      // README: "Once accepted, the match must be played within 10 days."
+      // expire_overdue_matches() reads this deadline and rules anything past it a wash.
+      const matchPlayDays = settings?.match_play_days ?? 10;
+      const matchDeadline = new Date(Date.now() + matchPlayDays * 24 * 3600 * 1000).toISOString();
+
+      // Claim the proposal first: it is the narrowest row, and winning it is
+      // what entitles this request to create the match.
+      const { data: claimedProposal, error: claimError } = await supabase
+        .from('challenge_proposals')
+        .update({ status: 'accepted', responded_at: new Date().toISOString() })
+        .eq('id', proposal.id)
+        .eq('status', 'pending')
+        .select('id');
+      if (claimError) throw claimError;
+      if (!claimedProposal?.length) {
+        return new Response(JSON.stringify({ error: 'That time is no longer on the table. Refresh and take another look.' }), { status: 409, headers: cors });
+      }
 
       const { data: scheduledChallenge, error: updateError } = await supabase
         .from('challenges')
         .update({
           status: 'scheduled',
-          venue,
+          venue: proposal.venue,
           scheduled_at: scheduledAt.toISOString(),
           match_deadline: matchDeadline,
         })
         .eq('id', challenge_id)
-        .eq('status', 'pending')
+        .eq('status', 'accepted')
         .select('id');
       if (updateError) throw updateError;
       if (!scheduledChallenge?.length) {
-        return new Response(JSON.stringify({ error: 'Challenge is no longer pending.' }), { status: 409, headers: cors });
+        return new Response(JSON.stringify({ error: 'This challenge has already moved on.' }), { status: 409, headers: cors });
       }
 
       const { data: match, error: insertError } = await supabase.from('matches').insert({
@@ -63,7 +199,7 @@ serve(async (req) => {
         player2_id: challenge.challenged_id,
         discipline: challenge.discipline,
         race_length: challenge.race_length,
-        venue,
+        venue: proposal.venue,
         scheduled_at: scheduledAt.toISOString(),
         status: 'scheduled',
         // Single-scoreboard is claimed by whoever taps "Start Match" first during play.
@@ -71,30 +207,46 @@ serve(async (req) => {
       }).select().single();
       if (insertError) throw insertError;
 
-      const { data: challengedPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenged_id).single();
-      const { error: notificationError } = await supabase.from('notifications').insert({
-        player_id: challenge.challenger_id,
-        type: 'challenge_accepted',
-        title: `✅ Challenge accepted!`,
-        body: `${challengedPlayer?.full_name} accepted your ${challenge.discipline} challenge. Match on ${scheduledAt.toLocaleDateString()} at ${venue}.`,
-        reference_id: match?.id,
-        reference_type: 'match',
-      });
-      if (notificationError) throw notificationError;
-      await sendPush(supabase, challenge.challenger_id, `✅ Challenge accepted!`, `${challengedPlayer?.full_name} accepted. Match at ${venue}.`, `/match/${match?.id}`);
+      const otherId = isChallenger ? challenge.challenged_id : challenge.challenger_id;
+      const [{ data: mePlayer }, { data: themPlayer }] = await Promise.all([
+        supabase.from('players').select('full_name').eq('id', callerPlayer.id).single(),
+        supabase.from('players').select('full_name').eq('id', otherId).single(),
+      ]);
+      const when = `${scheduledAt.toLocaleDateString()} at ${proposal.venue}`;
 
-      const { data: challengerPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenger_id).single();
+      // Both players get this one — it is the moment the match becomes real.
+      const { error: notificationError } = await supabase.from('notifications').insert([
+        {
+          player_id: otherId,
+          type: 'challenge_accepted',
+          title: '🎱 Match locked in',
+          body: `${mePlayer?.full_name} agreed to ${when}. Race to ${challenge.race_length}, ${challenge.discipline}.`,
+          reference_id: match?.id,
+          reference_type: 'match',
+        },
+        {
+          player_id: callerPlayer.id,
+          type: 'challenge_accepted',
+          title: '🎱 Match locked in',
+          body: `You're on with ${themPlayer?.full_name} — ${when}. Race to ${challenge.race_length}, ${challenge.discipline}.`,
+          reference_id: match?.id,
+          reference_type: 'match',
+        },
+      ]);
+      if (notificationError) throw notificationError;
+      await sendPush(supabase, otherId, '🎱 Match locked in', `${mePlayer?.full_name} agreed to ${when}.`, `/match/${match?.id}`, 'challenge_accepted');
+
       const { error: activityError } = await supabase.from('activity_feed').insert({
         event_type: 'challenge_accepted',
-        headline: `${challengedPlayer?.full_name} accepted ${challengerPlayer?.full_name}'s ${challenge.discipline} challenge!`,
-        detail: `Match at ${venue} on ${scheduledAt.toLocaleDateString()} · race to ${challenge.race_length}`,
-        actor_player_id: challenge.challenged_id,
+        headline: `${themPlayer?.full_name} vs ${mePlayer?.full_name} is on — ${when}.`,
+        detail: `${challenge.discipline} · race to ${challenge.race_length}`,
+        actor_player_id: callerPlayer.id,
       });
       if (activityError) throw activityError;
 
     } else if (action === 'decline') {
-      if (challenge.challenged_id !== callerPlayer.id) return new Response(JSON.stringify({ error: 'Not authorized.' }), { headers: cors });
-      if (challenge.status !== 'pending') return new Response(JSON.stringify({ error: 'Challenge is not pending.' }), { headers: cors });
+      if (challenge.challenged_id !== callerPlayer.id) return new Response(JSON.stringify({ error: 'Not authorized.' }), { status: 403, headers: cors });
+      if (challenge.status !== 'pending') return new Response(JSON.stringify({ error: 'Challenge is not pending.' }), { status: 409, headers: cors });
 
       // A decline is a forfeit — ranking, cooldown, stats, activity, and notifications
       // are all written by apply_challenge_decline_forfeit so admin can later reverse it.
@@ -103,7 +255,8 @@ serve(async (req) => {
         p_actor_profile_id: user.id,
       });
       if (rpcError) {
-        return new Response(JSON.stringify({ error: rpcError.message ?? 'Could not record decline as forfeit.' }), { headers: cors });
+        console.error(`[respond-to-challenge] decline forfeit failed for ${challenge_id}: ${rpcError.message}`);
+        return new Response(JSON.stringify({ error: 'Could not record that decline. Please try again, or ask an admin.' }), { status: 500, headers: cors });
       }
 
       const { data: challengerPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenger_id).single();
@@ -136,7 +289,8 @@ serve(async (req) => {
         p_actor_profile_id: user.id,
       });
       if (rpcError) {
-        return new Response(JSON.stringify({ error: rpcError.message ?? 'Could not reverse decline.' }), { headers: cors });
+        console.error(`[respond-to-challenge] reverse decline failed for ${challenge_id}: ${rpcError.message}`);
+        return new Response(JSON.stringify({ error: 'Could not reverse that decline. The rankings or stats may have moved since.' }), { status: 409, headers: cors });
       }
 
       const { data: challengerPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenger_id).single();
@@ -162,45 +316,108 @@ serve(async (req) => {
       // Either player can declare a scheduling wash — treated as if the challenge never happened
       const isChallenger = challenge.challenger_id === callerPlayer.id;
       const isChallenged  = challenge.challenged_id === callerPlayer.id;
-      if (!isChallenger && !isChallenged) return new Response(JSON.stringify({ error: 'Not authorized.' }), { headers: cors });
+      if (!isChallenger && !isChallenged) return new Response(JSON.stringify({ error: 'Not authorized.' }), { status: 403, headers: cors });
       if (!['pending', 'accepted', 'scheduled'].includes(challenge.status)) {
-        return new Response(JSON.stringify({ error: 'Challenge cannot be washed at this stage.' }), { headers: cors });
+        return new Response(JSON.stringify({ error: 'Challenge cannot be washed at this stage.' }), { status: 409, headers: cors });
       }
 
-      // Cancel with no penalties — no cooldowns, no rank changes
-      await supabase.from('challenges').update({ status: 'cancelled' }).eq('id', challenge_id);
+      // The challenge row stays at 'scheduled' for the entire life of the match —
+      // only matches.status advances — so the check above does not on its own
+      // prove the match has not been played. Without this, a player losing 4-1
+      // could tap "Couldn't agree" and erase the match: no loss, no rank change,
+      // no cooldown, and since a wash is now refunded, no cost at all.
+      const { data: existingMatch, error: matchLookupError } = await supabase
+        .from('matches')
+        .select('id, status')
+        .eq('challenge_id', challenge_id)
+        .maybeSingle();
+      if (matchLookupError) throw matchLookupError;
+      if (existingMatch && existingMatch.status !== 'scheduled') {
+        return new Response(JSON.stringify({ error: 'This match is already under way. Submit the result, or ask an admin if something went wrong.' }), { status: 409, headers: cors });
+      }
 
-      // Also cancel the associated match if one was created
-      await supabase.from('matches').update({ status: 'resolved' }).eq('challenge_id', challenge_id);
+      // A wash is a failure to agree on a time, so it only exists once there was
+      // a time to agree on. Washing a still-pending challenge is really the
+      // challenger walking away, and is recorded as such — only a true wash is
+      // refunded against the weekly challenge limit.
+      const cancelReason = challenge.status === 'pending' ? 'withdrawn' : 'wash';
+
+      // Cancel with no penalties — no cooldowns, no rank changes
+      const { data: washed, error: cancelError } = await supabase
+        .from('challenges')
+        .update({ status: 'cancelled', cancel_reason: cancelReason })
+        .eq('id', challenge_id)
+        .in('status', ['pending', 'accepted', 'scheduled'])
+        .select('id');
+      if (cancelError) throw cancelError;
+      // Someone else moved the challenge on between the read and this write.
+      // Stop here rather than announcing a wash that did not happen.
+      if (!washed?.length) {
+        return new Response(JSON.stringify({ error: 'This challenge has already moved on. Refresh and take another look.' }), { status: 409, headers: cors });
+      }
+
+      // Close the unplayed match, if one was created. Scoped to 'scheduled' so a
+      // match that started in the moment between the check above and this write
+      // survives.
+      const { error: matchCancelError } = await supabase.from('matches').update({ status: 'resolved' }).eq('challenge_id', challenge_id).eq('status', 'scheduled');
+      if (matchCancelError) throw matchCancelError;
 
       const { data: challengerPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenger_id).single();
       const { data: challengedPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenged_id).single();
-      await supabase.from('activity_feed').insert({
+      const { error: washActivityError } = await supabase.from('activity_feed').insert({
         event_type: 'challenge_cancelled',
         headline: `${callerPlayer.full_name} declared a scheduling wash on ${challengerPlayer?.full_name ?? '?'} vs ${challengedPlayer?.full_name ?? '?'}.`,
         detail: `${challenge.discipline} · race to ${challenge.race_length} · no ranking change, no cooldown`,
         actor_player_id: callerPlayer.id,
       });
+      if (washActivityError) throw washActivityError;
+
+      const otherPlayerId = isChallenger ? challenge.challenged_id : challenge.challenger_id;
+      const { error: washNotifyError } = await supabase.from('notifications').insert({
+        player_id: otherPlayerId,
+        type: 'challenge_expired',
+        title: '🤝 Challenge washed',
+        body: `${callerPlayer.full_name} called your ${challenge.discipline} challenge a wash. No penalty for either of you.`,
+        reference_id: challenge_id,
+        reference_type: 'challenge',
+      });
+      if (washNotifyError) throw washNotifyError;
+      await sendPush(supabase, otherPlayerId, '🤝 Challenge washed', `${callerPlayer.full_name} called your ${challenge.discipline} challenge a wash.`, '/challenges', 'challenge_cancelled');
 
     } else if (action === 'cancel') {
       // Challenger cancels their own pending challenge
-      if (challenge.challenger_id !== callerPlayer.id) return new Response(JSON.stringify({ error: 'Not authorized.' }), { headers: cors });
-      if (challenge.status !== 'pending') return new Response(JSON.stringify({ error: 'Can only cancel pending challenges.' }), { headers: cors });
-      await supabase.from('challenges').update({ status: 'cancelled' }).eq('id', challenge_id);
+      if (challenge.challenger_id !== callerPlayer.id) return new Response(JSON.stringify({ error: 'Not authorized.' }), { status: 403, headers: cors });
+      if (challenge.status !== 'pending') return new Response(JSON.stringify({ error: 'Can only cancel pending challenges.' }), { status: 400, headers: cors });
+      // Withdrawing your own challenge still spends it — see countsAgainstWeeklyLimit
+      // in create-challenge.
+      const { data: withdrawn, error: withdrawError } = await supabase
+        .from('challenges')
+        .update({ status: 'cancelled', cancel_reason: 'withdrawn' })
+        .eq('id', challenge_id)
+        .eq('status', 'pending')
+        .select('id');
+      if (withdrawError) throw withdrawError;
+      if (!withdrawn?.length) {
+        return new Response(JSON.stringify({ error: 'This challenge has already been answered. Refresh and take another look.' }), { status: 409, headers: cors });
+      }
 
       const { data: challengedPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenged_id).single();
-      await supabase.from('activity_feed').insert({
+      const { error: cancelActivityError } = await supabase.from('activity_feed').insert({
         event_type: 'challenge_cancelled',
         headline: `${callerPlayer.full_name} cancelled their pending ${challenge.discipline} challenge to ${challengedPlayer?.full_name ?? '?'}.`,
         actor_player_id: callerPlayer.id,
       });
+      if (cancelActivityError) throw cancelActivityError;
 
     } else {
-      return new Response(JSON.stringify({ error: 'Invalid action.' }), { headers: cors });
+      return new Response(JSON.stringify({ error: 'Invalid action.' }), { status: 400, headers: cors });
     }
 
     return new Response(JSON.stringify({ success: true }), { headers: { ...cors, 'Content-Type': 'application/json' } });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: cors });
+    // Postgres errors carry constraint, column and table names. Log the real
+    // one for us; return something a player can act on.
+    console.error(`[respond-to-challenge] unhandled: ${e instanceof Error ? e.message : String(e)}`);
+    return new Response(JSON.stringify({ error: 'Something went wrong on our end. Please try again.' }), { status: 500, headers: cors });
   }
 });

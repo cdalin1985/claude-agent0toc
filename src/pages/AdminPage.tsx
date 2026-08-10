@@ -235,15 +235,15 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const [actionType, setActionType] = useState<'cancel' | 'forfeit' | 'reverse_decline' | null>(null);
   const [winnerId, setWinnerId]     = useState('');
   const [loading, setLoading]       = useState(false);
-  const [reverseError, setReverseError] = useState('');
+  const [actionError, setActionError] = useState('');
 
-  const resetAction = () => { setActioning(null); setActionType(null); setWinnerId(''); setReverseError(''); };
+  const resetAction = () => { setActioning(null); setActionType(null); setWinnerId(''); setActionError(''); };
 
   const handleReverseDecline = async (c: ChallengeRow) => {
     setLoading(true);
-    setReverseError('');
+    setActionError('');
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setLoading(false); setReverseError('Session expired — please log in again.'); return; }
+    if (!session) { setLoading(false); setActionError('Session expired — please log in again.'); return; }
     const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/respond-to-challenge`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
@@ -252,7 +252,7 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     const json = await res.json().catch(() => ({}));
     setLoading(false);
     if (!res.ok || json.error) {
-      setReverseError(json.error ?? 'Could not reverse this decline.');
+      setActionError(json.error ?? 'Could not reverse this decline.');
       return;
     }
     qc.invalidateQueries({ queryKey: ['admin-active-challenges'] });
@@ -265,7 +265,15 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
 
   const handleCancel = async (c: ChallengeRow) => {
     setLoading(true);
-    await supabase.from('challenges').update({ status: 'cancelled' }).eq('id', c.id);
+    // An admin cancelling on the players' behalf must not cost the challenger
+    // one of their two weekly challenges, so this records a wash rather than a
+    // withdrawal — see countsAgainstWeeklyLimit in the create-challenge function.
+    const { error } = await supabase.from('challenges').update({ status: 'cancelled', cancel_reason: 'wash' }).eq('id', c.id);
+    if (error) {
+      setActionError(`Could not cancel that challenge: ${error.message}`);
+      setLoading(false);
+      return;
+    }
     qc.invalidateQueries({ queryKey: ['admin-active-challenges'] });
     setLoading(false);
     resetAction();
@@ -277,22 +285,42 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setLoading(false); resetAction(); return; }
     const challengerWon = winnerId === c.challenger_id;
-    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-dispute`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({
-        match_id: c.match_id,
-        winner_id: winnerId,
-        final_score_player1: challengerWon ? c.race_length : 0,
-        final_score_player2: challengerWon ? 0 : c.race_length,
-        notes: 'Admin forfeit',
-        force_complete: true,
-      }),
-    });
-    await supabase.from('challenges').update({ status: 'forfeited' }).eq('id', c.id);
+    // A forfeit moves ladder positions. Failing silently and then closing the
+    // panel as if it worked leaves the admin believing a rank change happened
+    // that did not.
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-dispute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({
+          match_id: c.match_id,
+          winner_id: winnerId,
+          final_score_player1: challengerWon ? c.race_length : 0,
+          final_score_player2: challengerWon ? 0 : c.race_length,
+          notes: 'Admin forfeit',
+          force_complete: true,
+        }),
+      });
+      const json = await res.json().catch(() => ({})) as { error?: string };
+      if (!res.ok || json.error) {
+        setActionError(json.error ?? 'Could not record that forfeit. Nothing was changed.');
+        return;
+      }
+
+      const { error } = await supabase.from('challenges').update({ status: 'forfeited' }).eq('id', c.id);
+      if (error) {
+        // The match result landed; only the challenge row is out of step.
+        setActionError(`The result was recorded but the challenge did not close: ${error.message}`);
+        return;
+      }
+    } catch {
+      setActionError('Connection problem — the forfeit was not recorded. Try again.');
+      return;
+    } finally {
+      setLoading(false);
+    }
     qc.invalidateQueries({ queryKey: ['admin-active-challenges'] });
     qc.invalidateQueries({ queryKey: ['rankings'] });
-    setLoading(false);
     resetAction();
   };
 
@@ -337,7 +365,7 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
                       Reverse the decline. The challenge returns to pending only if the rankings, stats,
                       cooldown, and challenge row have not been touched since the forfeit.
                     </p>
-                    {reverseError && <p className="text-[#EF4444] text-xs font-[Barlow]">{reverseError}</p>}
+                    {actionError && <p className="text-[#EF4444] text-xs font-[Barlow]">{actionError}</p>}
                     <div className="flex gap-2">
                       <Button variant="ghost" size="sm" onClick={resetAction}>Back</Button>
                       <Button variant="primary" size="sm" loading={loading} onClick={() => handleReverseDecline(c)}>
@@ -366,6 +394,7 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
                       <p className="text-[#F59E0B] text-xs font-[Barlow]">No match started — this will cancel the challenge only.</p>
                     )
                   )}
+                  {actionError && <p className="text-[#EF4444] text-xs font-[Barlow]">{actionError}</p>}
                   <div className="flex gap-2">
                     <Button variant="ghost" size="sm" onClick={resetAction}>Back</Button>
                     <Button
@@ -385,7 +414,7 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
                 <div className="flex gap-2">
                   <Button
                     variant="secondary" size="sm"
-                    onClick={() => { setActioning(c.id); setActionType('reverse_decline'); setReverseError(''); }}
+                    onClick={() => { setActioning(c.id); setActionType('reverse_decline'); setActionError(''); }}
                   >
                     Reverse Decline
                   </Button>
@@ -395,8 +424,8 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
 
             return (
               <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={() => { setActioning(c.id); setActionType('cancel'); }}>Cancel</Button>
-                <Button variant="danger" size="sm" onClick={() => { setActioning(c.id); setActionType('forfeit'); setWinnerId(''); }}>
+                <Button variant="ghost" size="sm" onClick={() => { setActioning(c.id); setActionType('cancel'); setActionError(''); }}>Cancel</Button>
+                <Button variant="danger" size="sm" onClick={() => { setActioning(c.id); setActionType('forfeit'); setWinnerId(''); setActionError(''); }}>
                   {c.match_id ? 'Force Forfeit' : 'Force Cancel'}
                 </Button>
               </div>
@@ -417,7 +446,10 @@ function MatchesAdminTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
       const { data } = await supabase
         .from('matches')
         .select('*')
-        .in('status', ['scheduled', 'in_progress', 'submitted'])
+        // 'confirming' is included so a match stranded mid-confirmation is visible
+        // here and can be force-completed. Without it the row is invisible to every
+        // admin surface and only recoverable with direct SQL.
+        .in('status', ['scheduled', 'in_progress', 'submitted', 'confirming'])
         .order('created_at', { ascending: false });
       return data ?? [];
     },
@@ -439,24 +471,35 @@ function MatchesAdminTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const [p2Score, setP2Score]     = useState('');
   const [notes, setNotes]         = useState('');
   const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState('');
 
   const handleForceComplete = async (matchId: string) => {
     if (!winnerId) return;
     setLoading(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setLoading(false); return; }
-    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-dispute`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({ match_id: matchId, winner_id: winnerId, final_score_player1: parseInt(p1Score) || 0, final_score_player2: parseInt(p2Score) || 0, notes, force_complete: true }),
-    });
-    setLoading(false);
-    setResolving(null);
-    qc.invalidateQueries({ queryKey: ['admin-active-matches'] });
-    qc.invalidateQueries({ queryKey: ['rankings'] });
+    setError('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setError('Session expired — please log in again.'); return; }
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-dispute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ match_id: matchId, winner_id: winnerId, final_score_player1: parseInt(p1Score, 10), final_score_player2: parseInt(p2Score, 10), notes, force_complete: true }),
+      });
+      const json = await res.json().catch(() => ({}));
+      // The server rejects incomplete scores, so surface that instead of closing
+      // the dialog on a resolution that never happened.
+      if (!res.ok || json.error) { setError(json.error ?? `Could not force complete (HTTP ${res.status}).`); return; }
+      setResolving(null);
+      qc.invalidateQueries({ queryKey: ['admin-active-matches'] });
+      qc.invalidateQueries({ queryKey: ['rankings'] });
+    } catch {
+      setError('Network error — the match was not resolved. Try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const STATUS_BADGE: Record<string, string> = { scheduled: 'info', in_progress: 'loss', submitted: 'pending' };
+  const STATUS_BADGE: Record<string, string> = { scheduled: 'info', in_progress: 'loss', submitted: 'pending', confirming: 'loss' };
 
   if (matches.length === 0) {
     return (
@@ -506,6 +549,7 @@ function MatchesAdminTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
               </div>
               <textarea placeholder="Admin notes…" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
                 className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[#C62828] resize-none" />
+              {error && <p className="text-[#EF4444] text-xs font-[Barlow]">{error}</p>}
               <div className="flex gap-2">
                 <Button variant="ghost" size="sm" onClick={() => setResolving(null)}>Cancel</Button>
                 <Button variant="primary" size="sm" loading={loading} disabled={!winnerId} onClick={() => handleForceComplete(m.id)}>
@@ -514,7 +558,7 @@ function MatchesAdminTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
               </div>
             </div>
           ) : (
-            <Button variant="danger" size="sm" onClick={() => { setResolving(m.id); setWinnerId(''); setP1Score(''); setP2Score(''); setNotes(''); }}>
+            <Button variant="danger" size="sm" onClick={() => { setResolving(m.id); setWinnerId(''); setP1Score(''); setP2Score(''); setNotes(''); setError(''); }}>
               Force Complete
             </Button>
           )}
@@ -1123,14 +1167,14 @@ type SettingsFormState = {
   first_challenge_range: number | '';
 };
 
-const RULE_FIELDS: Array<{ key: keyof SettingsFormState; label: string; unit: string }> = [
+const RULE_FIELDS: Array<{ key: keyof SettingsFormState; label: string; unit: string; min?: number }> = [
   { key: 'min_race', label: 'Min race length', unit: 'games' },
   { key: 'challenge_range', label: 'Challenge range', unit: 'spots (normal)' },
   { key: 'first_challenge_range', label: 'First challenge range', unit: 'spots (first ever)' },
   { key: 'challenge_weekly_limit', label: 'Weekly challenge limit', unit: 'challenges per 7 days' },
   { key: 'challenge_response_hours', label: 'Challenge response window', unit: 'hours to accept/decline' },
   { key: 'match_play_days', label: 'Match play window', unit: 'days after acceptance' },
-  { key: 'cooldown_hours', label: 'Post-match cooldown', unit: 'hours after a win' },
+  { key: 'cooldown_hours', label: 'Post-match cooldown', unit: 'hours before challenging up' },
   { key: 'challenge_expiry_days', label: 'Challenge expiry', unit: 'days until auto-expire' },
 ];
 
@@ -1139,9 +1183,12 @@ type SettingsFieldProps = {
   unit: string;
   value: number | '';
   onChange: (value: number | '') => void;
+  // Every rule setting has a sensible floor of 1 except the reminder lead,
+  // where 0 is how an admin turns reminders off.
+  min?: number;
 };
 
-function SettingsField({ label, unit, value, onChange }: SettingsFieldProps) {
+function SettingsField({ label, unit, value, onChange, min = 1 }: SettingsFieldProps) {
   return (
     <div className="flex items-center justify-between py-3 border-b border-white/5 last:border-0">
       <div>
@@ -1150,7 +1197,7 @@ function SettingsField({ label, unit, value, onChange }: SettingsFieldProps) {
       </div>
       <input
         type="number"
-        min={1}
+        min={min}
         value={value}
         onChange={(event) => {
           const raw = event.target.value;
@@ -1175,6 +1222,7 @@ function SettingsTab() {
   const [edits, setEdits] = useState<Partial<SettingsFormState>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   if (!settings) return <div className="text-center py-12 text-[#6B7280] font-[Barlow]">Loading settings…</div>;
 
@@ -1203,8 +1251,16 @@ function SettingsTab() {
     if (!isDirty || hasBlankField) return;
     if (!window.confirm('Save these league rule changes?')) return;
     setSaving(true);
-    await supabase.from('league_settings').update(form).eq('id', settings.id);
+    setSaveError('');
+    const { error } = await supabase.from('league_settings').update(form).eq('id', settings.id);
     setSaving(false);
+    if (error) {
+      // These values drive every rule check in the app. Reporting success on a
+      // failed write would leave the admin believing the league runs on numbers
+      // it does not.
+      setSaveError(`Could not save: ${error.message}`);
+      return;
+    }
     setEdits({});
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -1223,11 +1279,15 @@ function SettingsTab() {
             value={form[field.key]}
             onChange={(value) => set(field.key, value)}
             unit={field.unit}
+            min={field.min}
           />
         ))}
       </GlassCard>
       {hasBlankField && (
         <p className="text-[#EF4444] text-xs font-[Barlow] px-1">Fill in every setting before saving.</p>
+      )}
+      {saveError && (
+        <p className="text-[#EF4444] text-xs font-[Barlow] px-1">{saveError}</p>
       )}
       <Button variant="primary" fullWidth loading={saving} disabled={!isDirty || hasBlankField} onClick={handleSave}>
         {saved ? '✓ Saved' : 'Save Settings'}

@@ -26,7 +26,11 @@ When doing TOC work:
 
 1. Protect TOC canon first.
 2. Use small branch/PR slices.
-3. Run lint/build before PR.
+3. Run lint/build before PR. If you touched `supabase/migrations/**`, also run
+   `./scripts/verify-db.sh` — it replays every migration against a throwaway
+   Postgres 17 and runs the runtime assertions. Reading a migration is not
+   verifying it: an index on a column that exists in production but not in this
+   repo's history passes review and fails on a fresh database.
 4. Do not modify .env, secrets, node_modules, dist, or lockfiles without explicit instruction.
 5. Keep app code in this repo, automation in the swarm folder, and project support files in TOC_WORKSPACE.
 6. For terminal snippets, always put the correct cd path as the first line.
@@ -38,7 +42,14 @@ When doing TOC work:
 - Regular non-top-10 = up to 5 spots above only.
 - Top 10 = up/down 5 spots.
 - Rank #1 can challenge anyone.
-- Post-loss cooldown = 24 hours.
+- Post-match cooldown = 24 hours, and it gates challenging UP only — you may
+  always challenge down. The loser always serves it; so does a winner who
+  climbed. A higher seed who successfully defends is exempt and may challenge up
+  immediately. One implementation only: `apply_post_match_cooldowns`.
+- Both players agree on the venue and time by proposal and counter-proposal;
+  nothing is scheduled until one of them accepts the other's suggestion.
+- A wash carries no penalty and does not consume a weekly challenge. Withdrawing
+  your own challenge does consume one.
 - Single unified ranking list.
 - Disciplines = 8 Ball, 9 Ball, 10 Ball.
 - Venues = Eagles 4040 and Valley Hub.

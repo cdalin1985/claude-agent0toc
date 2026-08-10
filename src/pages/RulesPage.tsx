@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { venuesFrom } from '../hooks/useLeagueSettings';
 import { GlassCard } from '../components/GlassCard';
 import { EKGLine } from '../components/EKGLine';
 import type { LeagueSettings } from '../types/database';
@@ -50,7 +51,8 @@ export default function RulesPage() {
   const weeklyLimit    = settings?.challenge_weekly_limit ?? 2;
   const expiryDays     = settings?.challenge_expiry_days ?? 7;
   const playDays       = settings?.match_play_days ?? 10;
-  const venues         = settings?.venues?.length ? settings.venues : ['Eagles 4040', 'Valley Hub'];
+  // One definition of the fallback list, shared with every other screen.
+  const venues         = venuesFrom(settings as LeagueSettings | null);
 
   return (
     <div className="min-h-screen px-4 pt-4 pb-8">
@@ -88,8 +90,10 @@ export default function RulesPage() {
 
         <Section icon="🕐" title="Timing">
           <Rule>A challenge expires if not answered within <strong>{expiryDays} days</strong>.</Rule>
-          <Rule>Once accepted, the match must be played within <strong>{playDays} days</strong>.</Rule>
-          <Rule>After losing a match, you must wait <strong>{cooldownHours} hours</strong> before challenging up again.</Rule>
+          <Rule>Once accepted, the match must be played within <strong>{playDays} days</strong>. If it isn't, it's automatically ruled a wash — no penalty for either player, and it doesn't use up a challenge.</Rule>
+          <Rule>After you <strong>lose</strong> a match, or after a win that <strong>moves you up</strong> the list, you must wait <strong>{cooldownHours} hours</strong> before challenging up again. You can still challenge down.</Rule>
+          <Rule>Successfully defending your spot costs you nothing — you can challenge up immediately.</Rule>
+          <Rule>You'll get a reminder before your match starts.</Rule>
         </Section>
 
         <GlassCard className="p-5 border border-[#EF4444]/40 bg-[#EF4444]/5">

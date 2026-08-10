@@ -1,4 +1,4 @@
-﻿/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import webpush from 'npm:web-push';
@@ -6,14 +6,58 @@ import webpush from 'npm:web-push';
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' };
 
 // deno-lint-ignore-file no-explicit-any
-async function sendPush(supabase: any, playerId: string, title: string, body: string, url: string): Promise<void> {
+// Kept in sync with supabase/functions/_shared/sendPush.ts. This function is
+// deployed as a standalone bundle, so it carries its own copy rather than
+// importing across directories.
+function vapidDetails(): { subject: string; publicKey: string; privateKey: string } | null {
+  const rawSubject = Deno.env.get('VAPID_SUBJECT') ?? '';
+  const publicKey = Deno.env.get('VAPID_PUBLIC_KEY') ?? '';
+  const privateKey = Deno.env.get('VAPID_PRIVATE_KEY') ?? '';
+  const missing = [rawSubject ? null : 'VAPID_SUBJECT', publicKey ? null : 'VAPID_PUBLIC_KEY', privateKey ? null : 'VAPID_PRIVATE_KEY'].filter((n): n is string => n !== null);
+  if (missing.length > 0) {
+    console.error(`[push] NOT CONFIGURED — missing ${missing.join(', ')}. No notification was sent.`);
+    return null;
+  }
+  const subject = /^(mailto:|https?:)/i.test(rawSubject) ? rawSubject : `mailto:${rawSubject}`;
+  return { subject, publicKey, privateKey };
+}
+
+// Never throws — push must not break match submission. But every exit path
+// logs, because a swallowed failure is indistinguishable from a delivery.
+// Two gates before sending: push_enabled is the master switch, and the
+// per-category preference is asked via player_accepts_notification — the SAME
+// function the notifications insert trigger uses, so a muted category cannot be
+// silent in the app and still buzz the phone. Every failure path sends anyway:
+// silence must not be the consequence of a lookup problem.
+async function playerWantsPush(supabase: any, playerId: string, notificationType?: string): Promise<boolean> {
+  const { data: prefs, error: prefsError } = await supabase.from('player_preferences').select('push_enabled').eq('player_id', playerId).maybeSingle();
+  if (prefsError) { console.error(`[push] could not read preferences for player ${playerId}, sending anyway: ${prefsError.message}`); return true; }
+  if (prefs && prefs.push_enabled === false) { console.info(`[push] player ${playerId} has push switched off — skipped.`); return false; }
+  if (!notificationType) return true;
+  const { data: accepts, error: acceptsError } = await supabase.rpc('player_accepts_notification', { p_player_id: playerId, p_type: notificationType });
+  if (acceptsError) { console.error(`[push] preference check failed for player ${playerId}, sending anyway: ${acceptsError.message}`); return true; }
+  if (accepts === false) { console.info(`[push] player ${playerId} has ${notificationType} muted — skipped.`); return false; }
+  return true;
+}
+
+async function sendPush(supabase: any, playerId: string, title: string, body: string, url: string, notificationType?: string): Promise<void> {
   try {
-    const { data: row } = await supabase.from('push_subscriptions').select('subscription').eq('player_id', playerId).single();
-    if (!row?.subscription) return;
-    webpush.setVapidDetails(`mailto:${Deno.env.get('VAPID_SUBJECT')}`, Deno.env.get('VAPID_PUBLIC_KEY') ?? '', Deno.env.get('VAPID_PRIVATE_KEY') ?? '');
+    if (!(await playerWantsPush(supabase, playerId, notificationType))) return;
+    const { data: row, error } = await supabase.from('push_subscriptions').select('subscription').eq('player_id', playerId).maybeSingle();
+    if (error) { console.error(`[push] could not read subscription for player ${playerId}: ${error.message}`); return; }
+    if (!row?.subscription) { console.info(`[push] player ${playerId} has no push subscription — skipped.`); return; }
+    const vapid = vapidDetails();
+    if (!vapid) return;
+    webpush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);
     await webpush.sendNotification(row.subscription, JSON.stringify({ title, body, url }));
-  } catch {
-    // Push delivery should never break match submission.
+    console.info(`[push] delivered to player ${playerId}: ${title}`);
+  } catch (e: any) {
+    if (e?.statusCode === 404 || e?.statusCode === 410) {
+      console.warn(`[push] subscription for player ${playerId} is gone (${e.statusCode}) — removing it.`);
+      await supabase.from('push_subscriptions').delete().eq('player_id', playerId);
+      return;
+    }
+    console.error(`[push] delivery failed for player ${playerId} (status ${e?.statusCode ?? 'none'}): ${e?.body ?? e?.message ?? String(e)}`);
   }
 }
 
@@ -200,12 +244,30 @@ async function recordSubmittedMatchFees(
   }
 }
 
-async function createPostLossCooldown(supabase: ReturnType<typeof createClient>, loserId: string): Promise<void> {
-  const { data: settings } = await supabase.from('league_settings').select('cooldown_hours').single();
-  const cooldownHours = settings?.cooldown_hours ?? 24;
-  if (cooldownHours <= 0) return;
-  const expiresAt = new Date(Date.now() + cooldownHours * 3600 * 1000).toISOString();
-  const { error } = await supabase.from('cooldowns').insert({ player_id: loserId, type: 'post_match', expires_at: expiresAt });
+/**
+ * README, "After a Match":
+ *   win as the lower seed  -> "You must wait 24 hours before challenging up again."
+ *   lose                   -> "You must either defend your new position or wait 24 hours..."
+ *   defend as higher seed  -> "You can challenge up immediately"
+ *
+ * So the loser always cools down, and the winner only when the win moved them up
+ * the list. Previously only the loser ever got one, which let a challenger climb
+ * and immediately challenge again. `climberId` is null on a successful defence.
+ *
+ * The rule has exactly one implementation — the apply_post_match_cooldowns SQL
+ * function — because it was previously written three times in three languages
+ * with three different answers, and the decline-forfeit path had drifted into
+ * leaving a climbing challenger free to challenge up again immediately.
+ */
+async function createPostMatchCooldowns(
+  supabase: ReturnType<typeof createClient>,
+  loserId: string,
+  climberId: string | null,
+): Promise<void> {
+  const { error } = await supabase.rpc('apply_post_match_cooldowns', {
+    p_loser_id: loserId,
+    p_climber_id: climberId,
+  });
   if (error) throw error;
 }
 
@@ -234,11 +296,64 @@ async function checkRank1Compliance(supabase: ReturnType<typeof createClient>) {
     const { data: rank1Player } = await supabase.from('players').select('id, full_name').eq('id', rank1.player_id).single();
     await supabase.rpc('apply_rank1_penalty', { p_player_id: rank1.player_id });
     if (rank1Player) {
-      await supabase.from('notifications').insert({ player_id: rank1Player.id, type: 'rank1_penalty', title: 'ðŸ“‰ Rank 1 obligation not met', body: 'You did not play a top-5 opponent twice in your 30-day window. You have been moved to #10.', reference_type: 'ranking' });
+      await supabase.from('notifications').insert({ player_id: rank1Player.id, type: 'rank1_penalty', title: '📉 Rank 1 obligation not met', body: 'You did not play a top-5 opponent twice in your 30-day window. You have been moved to #10.', reference_type: 'ranking' });
     }
     await supabase.from('activity_feed').insert({ event_type: 'rank1_penalty', headline: `${rank1Player?.full_name} was moved to #10 for failing the #1 top-5 obligation.`, actor_player_id: rank1.player_id });
   } else if (matchCount >= 2) {
     await supabase.from('rankings').update({ rank1_since: new Date().toISOString() }).eq('player_id', rank1.player_id);
+  }
+}
+
+/**
+ * Updates one of the "stats split by something" tables — by discipline, or by
+ * venue. They carry the same columns and the same rules, so they share one
+ * implementation: two copies of this would drift the first time someone fixed a
+ * streak bug in only one of them.
+ *
+ * participants is [playerId, isWinner, isChallenger] per player.
+ */
+async function updateSplitStats(
+  supabase: ReturnType<typeof createClient>,
+  table: 'player_discipline_stats' | 'player_venue_stats',
+  keyColumn: 'discipline' | 'venue',
+  keyValue: string,
+  participants: [string, boolean, boolean][],
+  raceLength: number,
+): Promise<void> {
+  const seeds = await Promise.all(
+    participants.map(([pid]) =>
+      supabase.from(table).upsert({ player_id: pid, [keyColumn]: keyValue }, { onConflict: `player_id,${keyColumn}`, ignoreDuplicates: true }),
+    ),
+  );
+  for (const seed of seeds) {
+    if (seed.error) throw seed.error;
+  }
+
+  const rows = await Promise.all(
+    participants.map(([pid]) => supabase.from(table).select('*').eq('player_id', pid).eq(keyColumn, keyValue).single()),
+  );
+
+  const updates = participants
+    .map(([pid, isWinner, isChallenger], i) => {
+      const s = rows[i].data;
+      if (!s) return null;
+      const newStreak = isWinner ? (s.current_streak >= 0 ? s.current_streak + 1 : 1) : 0;
+      return supabase.from(table).update({
+        matches_played: s.matches_played + 1,
+        wins: isWinner ? s.wins + 1 : s.wins,
+        losses: isWinner ? s.losses : s.losses + 1,
+        current_streak: newStreak,
+        best_streak: isWinner ? Math.max(s.best_streak, newStreak) : s.best_streak,
+        challenger_wins: isWinner && isChallenger ? s.challenger_wins + 1 : s.challenger_wins,
+        defender_wins: isWinner && !isChallenger ? s.defender_wins + 1 : s.defender_wins,
+        total_race_length: s.total_race_length + raceLength,
+        updated_at: new Date().toISOString(),
+      }).eq('player_id', pid).eq(keyColumn, keyValue);
+    })
+    .filter((p): p is NonNullable<typeof p> => p !== null);
+
+  for (const result of await Promise.all(updates)) {
+    if (result.error) throw result.error;
   }
 }
 
@@ -249,7 +364,7 @@ async function confirmResult(
   loserId: string,
   p1Score: number,
   p2Score: number,
-  match: { discipline: string; race_length: number; player1_id: string; player2_id: string; challenge_id: string },
+  match: { discipline: string; venue: string | null; race_length: number; player1_id: string; player2_id: string; challenge_id: string },
 ) {
   const { error: matchError } = await supabase.from('matches').update({ status: 'confirmed', winner_id: winnerId, loser_id: loserId, player1_score: p1Score, player2_score: p2Score, completed_at: new Date().toISOString() }).eq('id', matchId);
   if (matchError) throw matchError;
@@ -261,6 +376,11 @@ async function confirmResult(
     supabase.from('rankings').select('position, rank1_since').eq('player_id', winnerId).single(),
     supabase.from('rankings').select('position').eq('player_id', loserId).single(),
   ]);
+  // The match is already marked confirmed by this point. Swallowing a read
+  // failure here would silently skip the ranking cascade, both players' stats
+  // AND the cooldowns — leaving a confirmed match that changed nothing.
+  if (winnerRank.error) throw winnerRank.error;
+  if (loserRank.error) throw loserRank.error;
   const winnerIsChallenger = match.player1_id === winnerId;
   // Captured when a win causes a ranking swap, so the League Journal can report the move.
   let rankChange: { winnerOld: number; winnerNew: number; loserOld: number; loserNew: number } | null = null;
@@ -311,30 +431,18 @@ async function confirmResult(
     }
   }
 
-  await createPostLossCooldown(supabase, loserId);
+  // rankChange is set only when the win actually moved the winner up the list,
+  // which is exactly the case the README puts a cooldown on.
+  await createPostMatchCooldowns(supabase, loserId, rankChange ? winnerId : null);
 
-  const disc = match.discipline;
-  const disciplineSeeds = await Promise.all([winnerId, loserId].map((pid) => supabase.from('player_discipline_stats').upsert({ player_id: pid, discipline: disc }, { onConflict: 'player_id,discipline', ignoreDuplicates: true })));
-  for (const seed of disciplineSeeds) {
-    if (seed.error) throw seed.error;
-  }
+  const participants = [[winnerId, true, winnerIsChallenger], [loserId, false, !winnerIsChallenger]] as [string, boolean, boolean][];
 
-  const disciplineParticipants = [[winnerId, true, winnerIsChallenger], [loserId, false, !winnerIsChallenger]] as [string, boolean, boolean][];
-  const disciplineStatsRows = await Promise.all(
-    disciplineParticipants.map(([pid]) =>
-      supabase.from('player_discipline_stats').select('*').eq('player_id', pid).eq('discipline', disc).single(),
-    ),
-  );
-  const disciplineUpdates = disciplineParticipants
-    .map(([pid, isWinner, isChallenger], i) => {
-      const ds = disciplineStatsRows[i].data;
-      if (!ds) return null;
-      const newStreak = isWinner ? (ds.current_streak >= 0 ? ds.current_streak + 1 : 1) : 0;
-      return supabase.from('player_discipline_stats').update({ matches_played: ds.matches_played + 1, wins: isWinner ? ds.wins + 1 : ds.wins, losses: isWinner ? ds.losses : ds.losses + 1, current_streak: newStreak, best_streak: isWinner ? Math.max(ds.best_streak, newStreak) : ds.best_streak, challenger_wins: isWinner && isChallenger ? ds.challenger_wins + 1 : ds.challenger_wins, defender_wins: isWinner && !isChallenger ? ds.defender_wins + 1 : ds.defender_wins, total_race_length: ds.total_race_length + match.race_length, updated_at: new Date().toISOString() }).eq('player_id', pid).eq('discipline', disc);
-    })
-    .filter((p): p is NonNullable<typeof p> => p !== null);
-  for (const result of await Promise.all(disciplineUpdates)) {
-    if (result.error) throw result.error;
+  await updateSplitStats(supabase, 'player_discipline_stats', 'discipline', match.discipline, participants, match.race_length);
+
+  // Required: stats "itemized by venue and discipline". Venue is nullable on
+  // older rows, so skip rather than write a stats bucket named "null".
+  if (match.venue) {
+    await updateSplitStats(supabase, 'player_venue_stats', 'venue', match.venue, participants, match.race_length);
   }
 
   const [wp, lp] = await Promise.all([
@@ -343,15 +451,15 @@ async function confirmResult(
   ]);
 
   const { error: notificationError } = await supabase.from('notifications').insert([
-    { player_id: winnerId, type: 'result_confirmed', title: 'ðŸ† Match confirmed â€” Victory!', body: `Final: ${p1Score}â€“${p2Score}`, reference_id: matchId, reference_type: 'match' },
-    { player_id: loserId, type: 'result_confirmed', title: 'ðŸ“Š Match confirmed', body: `Final: ${p1Score}â€“${p2Score}`, reference_id: matchId, reference_type: 'match' },
+    { player_id: winnerId, type: 'result_confirmed', title: '🏆 Match confirmed — Victory!', body: `Final: ${p1Score}–${p2Score}`, reference_id: matchId, reference_type: 'match' },
+    { player_id: loserId, type: 'result_confirmed', title: '📊 Match confirmed', body: `Final: ${p1Score}–${p2Score}`, reference_id: matchId, reference_type: 'match' },
   ]);
   if (notificationError) throw notificationError;
   await Promise.all([
-    sendPush(supabase, winnerId, 'ðŸ† Match confirmed â€” Victory!', `Final: ${p1Score}â€“${p2Score}`, `/match/${matchId}`),
-    sendPush(supabase, loserId, 'ðŸ“Š Match confirmed', `Final: ${p1Score}â€“${p2Score}`, `/match/${matchId}`),
+    sendPush(supabase, winnerId, '🏆 Match confirmed — Victory!', `Final: ${p1Score}–${p2Score}`, `/match/${matchId}`, 'result_confirmed'),
+    sendPush(supabase, loserId, '📊 Match confirmed', `Final: ${p1Score}–${p2Score}`, `/match/${matchId}`, 'result_confirmed'),
   ]);
-  const { error: activityError } = await supabase.from('activity_feed').insert({ event_type: 'match_confirmed', headline: `${wp.data?.full_name} def. ${lp.data?.full_name} Â· ${p1Score}â€“${p2Score}`, actor_player_id: winnerId });
+  const { error: activityError } = await supabase.from('activity_feed').insert({ event_type: 'match_confirmed', headline: `${wp.data?.full_name} def. ${lp.data?.full_name} · ${p1Score}–${p2Score}`, actor_player_id: winnerId });
   if (activityError) throw activityError;
 
   // Report any ranking movement to the League Journal.
@@ -391,21 +499,21 @@ serve(async (req) => {
 
     const { match_id, winner_id, final_score_player1, final_score_player2, payment_method } = await req.json();
     const normalizedPayment = normalizePayment(payment_method);
-    if (payment_method != null && payment_method !== '' && normalizedPayment === null) return new Response(JSON.stringify({ error: 'Invalid payment method.' }), { headers: cors });
+    if (payment_method != null && payment_method !== '' && normalizedPayment === null) return new Response(JSON.stringify({ error: 'Invalid payment method.' }), { status: 400, headers: cors });
 
     const { data: match } = await supabase.from('matches').select('*').eq('id', match_id).single();
-    if (!match) return new Response(JSON.stringify({ error: 'Match not found.' }), { headers: cors });
-    if (!['in_progress', 'scheduled', 'submitted'].includes(match.status)) return new Response(JSON.stringify({ error: 'Match is not in progress.' }), { headers: cors });
+    if (!match) return new Response(JSON.stringify({ error: 'Match not found.' }), { status: 404, headers: cors });
+    if (!['in_progress', 'scheduled', 'submitted'].includes(match.status)) return new Response(JSON.stringify({ error: 'Match is not in progress.' }), { status: 409, headers: cors });
 
     const raceTarget = match.race_length;
     const scoreError = validateFinalScore(winner_id, match.player1_id, match.player2_id, final_score_player1, final_score_player2, raceTarget);
-    if (scoreError) return new Response(JSON.stringify({ error: scoreError }), { headers: cors });
+    if (scoreError) return new Response(JSON.stringify({ error: scoreError }), { status: 400, headers: cors });
 
     const { data: caller } = await supabase.from('players').select('id').eq('profile_id', user.id).single();
-    if (!caller) return new Response(JSON.stringify({ error: 'Player not found.' }), { headers: cors });
+    if (!caller) return new Response(JSON.stringify({ error: 'Player not found.' }), { status: 404, headers: cors });
     const isP1 = match.player1_id === caller.id;
     const isP2 = match.player2_id === caller.id;
-    if (!isP1 && !isP2) return new Response(JSON.stringify({ error: 'Not a participant.' }), { headers: cors });
+    if (!isP1 && !isP2) return new Response(JSON.stringify({ error: 'Not a participant.' }), { status: 403, headers: cors });
 
     const submissionUpdates: Record<string, unknown> = { status: 'submitted' };
     const submittedAt = new Date().toISOString();
@@ -433,7 +541,7 @@ serve(async (req) => {
     if (submissionError) throw submissionError;
 
     const { data: updated } = await supabase.from('matches').select('*').eq('id', match_id).single();
-    if (!updated) return new Response(JSON.stringify({ error: 'Update failed.' }), { headers: cors });
+    if (!updated) return new Response(JSON.stringify({ error: 'Update failed.' }), { status: 500, headers: cors });
 
     if (updated.player1_submitted && updated.player2_submitted) {
       const { data: claimed } = await supabase.from('matches').update({ status: 'confirming' } as Record<string, unknown>).eq('id', match_id).eq('status', 'submitted').select('id');
@@ -491,13 +599,16 @@ serve(async (req) => {
     } else {
       const otherId = isP1 ? match.player2_id : match.player1_id;
       const { data: callerPlayer } = await supabase.from('players').select('full_name').eq('id', caller.id).single();
-      await supabase.from('notifications').insert({ player_id: otherId, type: 'result_submitted', title: 'ðŸ“Š Opponent submitted result', body: `${callerPlayer?.full_name} submitted the match result. Please submit yours to confirm.`, reference_id: match_id, reference_type: 'match' });
-      await sendPush(supabase, otherId, 'ðŸ“Š Opponent submitted result', `${callerPlayer?.full_name} submitted. Tap to confirm.`, `/match/${match_id}`);
+      await supabase.from('notifications').insert({ player_id: otherId, type: 'result_submitted', title: '📊 Opponent submitted result', body: `${callerPlayer?.full_name} submitted the match result. Please submit yours to confirm.`, reference_id: match_id, reference_type: 'match' });
+      await sendPush(supabase, otherId, '📊 Opponent submitted result', `${callerPlayer?.full_name} submitted. Tap to confirm.`, `/match/${match_id}`, 'result_submitted');
     }
 
     return new Response(JSON.stringify({ success: true }), { headers: { ...cors, 'Content-Type': 'application/json' } });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: cors });
+    // Postgres errors carry constraint, column and table names. Log the real
+    // one for us; return something a player can act on.
+    console.error(`[submit-result] unhandled: ${e instanceof Error ? e.message : String(e)}`);
+    return new Response(JSON.stringify({ error: 'Something went wrong on our end. Please try again.' }), { status: 500, headers: cors });
   }
 });
 

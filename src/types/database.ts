@@ -24,8 +24,19 @@ export interface Database {
           bio: string | null;
           preferred_discipline: '8 Ball' | '9 Ball' | '10 Ball' | null;
           avatar_url: string | null;
+          // Public to logged-in members, and the only columns beyond bio,
+          // preferred_discipline and avatar_url that a player may edit on their
+          // own row — players carries a column-level UPDATE allowlist for
+          // `authenticated`, so anything not granted stays closed.
           banner_url: string | null;
+          nickname: string | null;
+          tagline: string | null;
+          // Restricted to the TOC preset palette by a CHECK constraint added in
+          // 20260807010000_profile_banner_accent.sql.
           accent_color: string | null;
+          home_venue: string | null;
+          years_playing: number | null;
+          cue_brand: string | null;
           is_active: boolean;
           created_at: string;
           updated_at: string;
@@ -67,6 +78,10 @@ export interface Database {
           venue: 'Eagles 4040' | 'Valley Hub' | null;
           scheduled_at: string | null;
           match_deadline: string | null;
+          // Set when status is 'cancelled'. Only 'wash' and 'overdue' are
+          // refunded against the weekly challenge limit — see
+          // countsAgainstWeeklyLimit in the create-challenge function.
+          cancel_reason: 'wash' | 'withdrawn' | 'overdue' | null;
           expires_at: string;
           response_message: string | null;
           created_at: string;
@@ -299,6 +314,63 @@ export interface Database {
         };
         Update: Partial<Database['public']['Tables']['challenge_forfeiture_events']['Insert']>;
       };
+      player_venue_stats: {
+        Row: {
+          id: string;
+          player_id: string;
+          // Unconstrained on purpose: venues live in league_settings.venues and
+          // an admin may change them without a migration.
+          venue: string;
+          matches_played: number;
+          wins: number;
+          losses: number;
+          current_streak: number;
+          best_streak: number;
+          challenger_wins: number;
+          defender_wins: number;
+          total_race_length: number;
+          updated_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['player_venue_stats']['Row'], 'id' | 'updated_at'>;
+        Update: Partial<Database['public']['Tables']['player_venue_stats']['Insert']>;
+      };
+      player_preferences: {
+        Row: {
+          player_id: string;
+          notify_challenges: boolean;
+          notify_reminders: boolean;
+          notify_results: boolean;
+          notify_activity: boolean;
+          push_enabled: boolean;
+          show_stats_publicly: boolean;
+          show_profile_details: boolean;
+          updated_at: string;
+        };
+        // Rows are created by a trigger, one per player, so the client never
+        // inserts — it only ever updates its own.
+        Insert: never;
+        Update: Partial<Omit<Database['public']['Tables']['player_preferences']['Row'], 'player_id'>>;
+      };
+      challenge_proposals: {
+        Row: {
+          id: string;
+          challenge_id: string;
+          proposed_by_player_id: string;
+          venue: string;
+          scheduled_at: string;
+          message: string | null;
+          // At most one 'pending' row per challenge; its author is the player
+          // waiting, and the other player owes an accept or a counter.
+          status: 'pending' | 'accepted' | 'superseded';
+          created_at: string;
+          responded_at: string | null;
+        };
+        Insert: Omit<Database['public']['Tables']['challenge_proposals']['Row'], 'id' | 'created_at' | 'status' | 'responded_at'> & {
+          status?: 'pending' | 'accepted' | 'superseded';
+          responded_at?: string | null;
+        };
+        Update: Partial<Database['public']['Tables']['challenge_proposals']['Insert']>;
+      };
       league_settings: {
         Row: {
           id: string;
@@ -382,6 +454,9 @@ export type PlayerSeasonStats = Database['public']['Tables']['player_season_stat
 export type PlayerDisciplineStats = Database['public']['Tables']['player_discipline_stats']['Row'];
 export type TreasuryEntry = Database['public']['Tables']['treasury_ledger']['Row'];
 export type ChallengeForfeitureEvent = Database['public']['Tables']['challenge_forfeiture_events']['Row'];
+export type ChallengeProposal = Database['public']['Tables']['challenge_proposals']['Row'];
+export type PlayerVenueStats = Database['public']['Tables']['player_venue_stats']['Row'];
+export type PlayerPreferences = Database['public']['Tables']['player_preferences']['Row'];
 export type TreasuryLedgerEffect = Database['public']['Views']['treasury_ledger_effects']['Row'];
 export type TreasurySummary = Database['public']['Views']['treasury_summary']['Row'];
 export type LeagueSettings = Database['public']['Tables']['league_settings']['Row'];
