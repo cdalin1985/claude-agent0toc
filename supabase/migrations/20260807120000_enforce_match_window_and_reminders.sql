@@ -20,10 +20,20 @@
 -- Settings
 -- ---------------------------------------------------------------------------
 
--- Already present in production; added here so a database built from this repo
--- alone matches. The 10-day window comes from the README.
+-- These three exist in production but appear nowhere in this repo's migration
+-- history -- they were added by migrations production has and these files do
+-- not. A database built from this repo alone therefore lacks them, and the
+-- enforcement below reads match_deadline directly. IF NOT EXISTS makes each a
+-- no-op against production while making a fresh build correct.
 ALTER TABLE public.league_settings
   ADD COLUMN IF NOT EXISTS match_play_days INTEGER NOT NULL DEFAULT 10;
+
+ALTER TABLE public.league_settings
+  ADD COLUMN IF NOT EXISTS challenge_response_hours INTEGER NOT NULL DEFAULT 48;
+
+-- Written by respond-to-challenge on acceptance; read by expire_overdue_matches.
+ALTER TABLE public.challenges
+  ADD COLUMN IF NOT EXISTS match_deadline TIMESTAMPTZ;
 
 -- How far ahead of a match to send the reminder. Zero or less disables them.
 ALTER TABLE public.league_settings

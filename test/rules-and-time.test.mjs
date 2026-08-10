@@ -271,6 +271,16 @@ test('the play window comes from league_settings, not a hardcoded 10', () => {
   assert.doesNotMatch(respondToChallenge, /Date\.now\(\) \+ 10 \* 24 \* 3600 \* 1000/);
 });
 
+test('the migration creates the production-only columns it depends on', () => {
+  // match_deadline, challenge_response_hours and match_play_days all exist in
+  // production but appear nowhere in this repo's migration history. A database
+  // built from these files alone lacked them, so indexing match_deadline failed
+  // on a fresh replay while working fine against production. Caught by the
+  // migration-replay CI job, which no static assertion could have caught.
+  assert.match(migration, /ALTER TABLE public\.challenges\s+ADD COLUMN IF NOT EXISTS match_deadline TIMESTAMPTZ/i);
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS challenge_response_hours INTEGER NOT NULL DEFAULT 48/i);
+});
+
 test('the migration adds the settings and columns the enforcement reads', () => {
   assert.match(migration, /ADD COLUMN IF NOT EXISTS match_play_days INTEGER NOT NULL DEFAULT 10/i);
   assert.match(migration, /ADD COLUMN IF NOT EXISTS match_reminder_hours INTEGER NOT NULL DEFAULT 24/i);

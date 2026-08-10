@@ -1,0 +1,74 @@
+name: Migration replay
+
+# Two things static tests cannot do: prove every migration APPLIES, in filename
+# order, to a database built from this repo alone; and prove the functions they
+# install actually behave correctly.
+#
+# This caught a real one. 20260807120000 indexed challenges.match_deadline,
+# which exists in production but appears nowhere in this repo's migration
+# history -- so the migration worked against production and would have failed
+# on any fresh build. Reviewing the SQL could not surface that; running it did
+# so immediately.
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/tests/migrations/**'
+      - '.github/workflows/migration-replay-check.yml'
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # Matches production's major version.
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the Supabase shim
+        run: psql -v ON_ERROR_STOP=1 -q -f supabase/tests/migrations/00_supabase_shim.sql
+
+      - name: Replay every migration in filename order
+        run: |
+          set -euo pipefail
+          for f in $(ls supabase/migrations/*.sql | sort); do
+            echo "--> $(basename "$f")"
+            psql -v ON_ERROR_STOP=1 -q -f "$f"
+          done
+
+      - name: Assert the league rules actually behave correctly
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/migrations/01_rules_assert.sql
+
+      - name: Re-apply the newest migrations to prove they are idempotent
+        # Production runs ahead of this repo, so a NEW migration must be safe to
+        # apply to a database that already contains objects it did not create,
+        # and safe to apply twice.
+        #
+        # Deliberately not the whole history: the December 2025 migrations
+        # target a schema the March 2026 rebuild replaced, so replaying those
+        # against a current database fails by design. A migration history is
+        # run once, in order, on a fresh database -- only the new ones have to
+        # tolerate being re-run.
+        run: |
+          set -euo pipefail
+          for f in $(ls supabase/migrations/20260807*.sql | sort); do
+            echo "--> re-apply $(basename "$f")"
+            psql -v ON_ERROR_STOP=1 -q -f "$f"
+          done
+
+      - name: Assert behaviour still holds after re-application
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/migrations/01_rules_assert.sql
