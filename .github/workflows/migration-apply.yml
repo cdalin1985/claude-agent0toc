@@ -1,0 +1,111 @@
+name: Apply migrations to production
+
+# Applying migrations by hand is the step that keeps getting missed: the drift
+# check in migration-deploy-check.yml exists precisely because three June-25
+# migrations sat merged on main and never reached production. This closes it by
+# applying them.
+#
+# Ordering matters. Vercel builds a production deployment the moment main moves,
+# and it does NOT wait for this workflow — so on a push to main the new frontend
+# and the new schema race. Everything here is additive (ADD COLUMN IF NOT
+# EXISTS / CREATE TABLE IF NOT EXISTS), so the worst case is a page erroring for
+# a minute rather than data being damaged, but the way to avoid the race
+# entirely is:
+#
+#   1. Run this workflow manually against the release branch FIRST
+#      (Actions -> Apply migrations to production -> Run workflow -> pick the branch).
+#   2. Then merge the PR. The push-to-main run finds nothing left to do.
+#
+# Requires the same PROD_DB_URL secret the drift check uses, but this one WRITES,
+# so it needs a role that can run DDL.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'List what would be applied without applying it'
+        type: boolean
+        default: false
+
+concurrency:
+  # Never let two runs apply migrations to the same database at once.
+  group: apply-migrations-production
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Prove the set is sound against a throwaway database before touching the
+      # live one. A migration that fails here must never reach production.
+      - name: Rehearse the full migration set on a scratch Postgres
+        run: |
+          set -euo pipefail
+          docker run -d --name rehearsal -e POSTGRES_PASSWORD=postgres -p 55432:5432 postgres:17
+          for _ in $(seq 1 30); do
+            PGPASSWORD=postgres psql -h localhost -p 55432 -U postgres -c 'select 1' >/dev/null 2>&1 && break
+            sleep 2
+          done
+          export PGPASSWORD=postgres
+          PSQL="psql -h localhost -p 55432 -U postgres -v ON_ERROR_STOP=1 -q"
+          $PSQL -d postgres -c 'CREATE DATABASE rehearsal;'
+          $PSQL -d rehearsal -f supabase/tests/migrations/00_supabase_shim.sql
+          for f in $(ls supabase/migrations/*.sql | sort); do
+            echo "--> $(basename "$f")"
+            $PSQL -d rehearsal -f "$f"
+          done
+          for t in supabase/tests/migrations/[0-9][0-9]_*_assert.sql; do
+            psql -h localhost -p 55432 -U postgres -v ON_ERROR_STOP=1 -d rehearsal -f "$t"
+          done
+
+      - name: Apply anything production is missing, in filename order
+        env:
+          PROD_DB_URL: ${{ secrets.PROD_DB_URL }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${PROD_DB_URL:-}" ]; then
+            echo "::error::PROD_DB_URL secret is not set. Add it in repo settings; this workflow cannot apply migrations without it."
+            exit 1
+          fi
+
+          applied=$(psql "$PROD_DB_URL" -v ON_ERROR_STOP=1 -At -c \
+            "SELECT version FROM supabase_migrations.schema_migrations;")
+
+          pending=""
+          for f in $(ls supabase/migrations/*.sql | sort); do
+            version=$(basename "$f" | grep -oE '^[0-9]+')
+            if ! grep -qx "$version" <<< "$applied"; then
+              pending="$pending $f"
+            fi
+          done
+
+          if [ -z "$pending" ]; then
+            echo "Production is up to date; nothing to apply."
+            exit 0
+          fi
+
+          echo "Pending:"
+          for f in $pending; do echo "  $(basename "$f")"; done
+
+          if [ "${DRY_RUN:-false}" = "true" ]; then
+            echo "::notice::Dry run — nothing was applied."
+            exit 0
+          fi
+
+          for f in $pending; do
+            version=$(basename "$f" | grep -oE '^[0-9]+')
+            name=$(basename "$f" .sql | sed -E 's/^[0-9]+_//')
+            echo "==> applying $(basename "$f")"
+            # One transaction per migration: it either lands completely and is
+            # recorded, or it rolls back and the run fails with nothing half-done.
+            psql "$PROD_DB_URL" -v ON_ERROR_STOP=1 --single-transaction \
+              -c "\\i $f" \
+              -c "INSERT INTO supabase_migrations.schema_migrations (version, name) VALUES ('$version', '$name') ON CONFLICT (version) DO NOTHING;"
+          done
+
+          echo "::notice::Applied $(echo $pending | wc -w) migration(s) to production."
