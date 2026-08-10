@@ -39,7 +39,7 @@ BEGIN
   INSERT INTO rankings (player_id, position)
   VALUES (p_top, base + 1), (p_mid, base + 2), (p_low, base + 3), (p_other, base + 4);
 
-  UPDATE league_settings SET cooldown_hours = 24, match_play_days = 10, match_reminder_hours = 24;
+  UPDATE league_settings SET cooldown_hours = 24, match_play_days = 10;
 
   -- ------------------------------------------- apply_post_match_cooldowns ---
   -- Loser only (a successful defence): exactly one cooldown, for the loser.
@@ -127,65 +127,12 @@ BEGIN
   n := public.expire_overdue_matches();
   IF n <> 0 THEN failures := array_append(failures, format('expire: re-run affected %s rows, expected 0', n)); END IF;
 
-  -- --------------------------------------------------- send_match_reminders ---
-  DELETE FROM notifications;
-  INSERT INTO challenges (challenger_id, challenged_id, discipline, race_length, status, expires_at)
-  VALUES (p_low, p_top, '8 Ball', 7, 'scheduled', now() + interval '30 days')
-  RETURNING id INTO c_over;
-  INSERT INTO matches (challenge_id, player1_id, player2_id, discipline, race_length, venue, scheduled_at, status)
-  VALUES (c_over, p_low, p_top, '8 Ball', 7, 'Eagles 4040', now() + interval '6 hours', 'scheduled')
-  RETURNING id INTO m_soon;
-
-  INSERT INTO challenges (challenger_id, challenged_id, discipline, race_length, status, expires_at)
-  VALUES (p_mid, p_other, '9 Ball', 7, 'scheduled', now() + interval '60 days')
-  RETURNING id INTO c_played;
-  INSERT INTO matches (challenge_id, player1_id, player2_id, discipline, race_length, venue, scheduled_at, status)
-  VALUES (c_played, p_mid, p_other, '9 Ball', 7, 'Valley Hub', now() + interval '9 days', 'scheduled')
-  RETURNING id INTO m_far;
-
-  n := public.send_match_reminders();
-  IF n <> 1 THEN failures := array_append(failures, format('reminders: expected 1 match reminded, got %s', n)); END IF;
-
-  SELECT count(*) INTO n FROM notifications WHERE reference_id = m_soon AND type = 'match_reminder';
-  IF n <> 2 THEN failures := array_append(failures, format('reminders: expected 2 notifications, got %s', n)); END IF;
-  IF NOT EXISTS (SELECT 1 FROM notifications WHERE reference_id = m_soon AND body LIKE '%Top Player%') THEN
-    failures := array_append(failures, 'reminders: notification does not name the opponent');
-  END IF;
-  IF EXISTS (SELECT 1 FROM notifications WHERE reference_id = m_far) THEN
-    failures := array_append(failures, 'reminders: a match outside the window was reminded');
-  END IF;
-  IF (SELECT reminder_sent_at FROM matches WHERE id = m_soon) IS NULL THEN
-    failures := array_append(failures, 'reminders: reminder_sent_at was not stamped');
-  END IF;
-
-  -- Idempotent: this is what stops a player being buzzed every hour.
-  n := public.send_match_reminders();
-  IF n <> 0 THEN failures := array_append(failures, format('reminders: re-run sent %s again, expected 0', n)); END IF;
-  SELECT count(*) INTO n FROM notifications WHERE reference_id = m_soon;
-  IF n <> 2 THEN failures := array_append(failures, format('reminders: re-run duplicated notifications (%s total)', n)); END IF;
-
-  -- 0 disables reminders.
-  UPDATE matches SET reminder_sent_at = NULL WHERE id = m_soon;
-  UPDATE league_settings SET match_reminder_hours = 0;
-  n := public.send_match_reminders();
-  IF n <> 0 THEN failures := array_append(failures, 'reminders: match_reminder_hours=0 still sent'); END IF;
-
-  -- An unusable timezone must fall back, not abort and kill reminders league-wide.
-  UPDATE league_settings SET match_reminder_hours = 24, display_timezone = 'Not/AZone';
-  BEGIN
-    n := public.send_match_reminders();
-    IF n <> 1 THEN failures := array_append(failures, format('reminders: bad timezone changed the result (%s)', n)); END IF;
-  EXCEPTION WHEN others THEN
-    failures := array_append(failures, 'reminders: an invalid display_timezone aborted the run');
-  END;
-
   -- ------------------------------------------------------------- privileges ---
   IF has_function_privilege('authenticated', 'public.apply_post_match_cooldowns(uuid, uuid)', 'EXECUTE')
      OR has_function_privilege('anon', 'public.apply_post_match_cooldowns(uuid, uuid)', 'EXECUTE') THEN
     failures := array_append(failures, 'apply_post_match_cooldowns is callable by a player role');
   END IF;
-  IF has_function_privilege('authenticated', 'public.expire_overdue_matches()', 'EXECUTE')
-     OR has_function_privilege('authenticated', 'public.send_match_reminders()', 'EXECUTE') THEN
+  IF has_function_privilege('authenticated', 'public.expire_overdue_matches()', 'EXECUTE') THEN
     failures := array_append(failures, 'a scheduled job function is callable by a player role');
   END IF;
   IF NOT has_function_privilege('service_role', 'public.apply_post_match_cooldowns(uuid, uuid)', 'EXECUTE') THEN

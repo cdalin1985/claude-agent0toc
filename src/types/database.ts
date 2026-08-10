@@ -28,9 +28,11 @@ export interface Database {
           // preferred_discipline and avatar_url that a player may edit on their
           // own row — players carries a column-level UPDATE allowlist for
           // `authenticated`, so anything not granted stays closed.
+          banner_url: string | null;
           nickname: string | null;
           tagline: string | null;
-          // '#RRGGBB', enforced by a CHECK constraint.
+          // Restricted to the TOC preset palette by a CHECK constraint added in
+          // 20260807010000_profile_banner_accent.sql.
           accent_color: string | null;
           home_venue: string | null;
           years_playing: number | null;
@@ -120,9 +122,6 @@ export interface Database {
           started_at: string | null;
           completed_at: string | null;
           initiated_by_player_id: string | null;
-          // Stamped by send_match_reminders(); its presence is what stops a
-          // pre-match reminder firing twice for the same match.
-          reminder_sent_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -384,8 +383,6 @@ export interface Database {
           challenge_expiry_days: number;
           challenge_response_hours: number;
           match_play_days: number;
-          match_reminder_hours: number;
-          display_timezone: string;
           challenge_weekly_limit: number;
           first_challenge_range: number;
           updated_at: string;

@@ -81,7 +81,7 @@ echo "==> re-applying the newest migrations (they must be idempotent)"
 # Only the new ones: the December 2025 migrations target a schema the March 2026
 # rebuild replaced, so replaying the whole history fails by design. A migration
 # history runs once, in order, on a fresh database.
-newest=$(ls supabase/migrations/*.sql | sort | tail -n 3)
+newest=$(ls supabase/migrations/20260807*.sql | sort)
 for f in $newest; do
   $PSQL -d "$DB" -q -f "$f"
 done

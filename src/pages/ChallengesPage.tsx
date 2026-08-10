@@ -11,6 +11,7 @@ import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { EmptyState } from '../components/EmptyState';
+import { CoachTip } from '../components/CoachTip';
 import { RankingRowSkeleton } from '../components/Skeleton';
 import { QueryError } from '../components/QueryError';
 import { formatDateTime } from '../utils/time';
@@ -267,8 +268,9 @@ function RespondModal({
 
         {showDeclineConfirm ? (
           <div className="space-y-3 mb-2 p-3 rounded-xl border border-[#EF4444]/40 bg-[#EF4444]/5">
-            <div className="text-sm font-[Barlow] font-semibold text-[#E8E2D6]">
+            <div className="text-sm font-[Barlow] font-semibold text-[#E8E2D6] flex items-center gap-1">
               Decline counts as a forfeit
+              <CoachTip id="decline.forfeit" size={12} />
             </div>
             <ul className="text-xs font-[Barlow] text-[#9CA3AF] space-y-1 list-disc list-inside">
               <li>The challenger gets a win by forfeit and may take your spot if they are lower ranked.</li>

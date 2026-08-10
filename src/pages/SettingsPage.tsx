@@ -17,8 +17,20 @@ const DISCIPLINES = ['8 Ball', '9 Ball', '10 Ball'] as const;
 
 const PRESET_ICONS = ['🎱','🔵','🟡','🦁','🐺','🦅','🐉','⚡','🔥','🎯','💀','🌙'];
 
-// Drawn from the app's own palette so a customised profile still looks like TOC.
-const ACCENT_SWATCHES = ['#C62828', '#D4AF37', '#22C55E', '#3B82F6', '#A855F7', '#EC4899', '#F59E0B', '#14B8A6'];
+// Exactly the palette the players.accent_color CHECK constraint permits
+// (20260807010000_profile_banner_accent.sql). Naming them makes the picker
+// legible, and keeping this list identical to the constraint means no swatch
+// can ever fail to save.
+const ACCENT_COLORS = [
+  { hex: '#C62828', name: 'TOC Red' },
+  { hex: '#E53935', name: 'Bright Red' },
+  { hex: '#D4AF37', name: 'Gold' },
+  { hex: '#22C55E', name: 'Green' },
+  { hex: '#3B82F6', name: 'Blue' },
+  { hex: '#A855F7', name: 'Purple' },
+  { hex: '#F59E0B', name: 'Amber' },
+  { hex: '#06B6D4', name: 'Cyan' },
+];
 
 /**
  * One switch row. Extracted because there are now eight of them, and eight
@@ -74,6 +86,7 @@ export default function SettingsPage() {
   const { supported: pushSupported, subscribed: pushSubscribed, permission: pushPermission, loading: pushLoading, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications();
   const { data: rankings = [] } = useRankings();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
   const { data: leagueSettings } = useLeagueSettings();
   const venues = venuesFrom(leagueSettings);
 
@@ -82,7 +95,9 @@ export default function SettingsPage() {
   const [preferredDisc, setPreferredDisc] = useState<typeof DISCIPLINES[number] | ''>('');
   const [nickname,      setNickname]      = useState('');
   const [tagline,       setTagline]       = useState('');
-  const [accentColor,   setAccentColor]   = useState('');
+  const [accentColor,   setAccentColor]   = useState<string | null>(null);
+  const [bannerSaving,  setBannerSaving]  = useState(false);
+  const [bannerError,   setBannerError]   = useState('');
   const [homeVenue,     setHomeVenue]     = useState('');
   const [yearsPlaying,  setYearsPlaying]  = useState('');
   const [cueBrand,      setCueBrand]      = useState('');
@@ -110,7 +125,7 @@ export default function SettingsPage() {
           setPreferredDisc((data.preferred_discipline as typeof DISCIPLINES[number] | null) ?? '');
           setNickname(data.nickname ?? '');
           setTagline(data.tagline ?? '');
-          setAccentColor(data.accent_color ?? '');
+          setAccentColor(data.accent_color ?? null);
           setHomeVenue(data.home_venue ?? '');
           setYearsPlaying(data.years_playing === null ? '' : String(data.years_playing));
           setCueBrand(data.cue_brand ?? '');
@@ -165,18 +180,12 @@ export default function SettingsPage() {
       setProfileError('Years playing must be a whole number between 0 and 90.');
       return;
     }
-    if (accentColor && !/^#[0-9A-Fa-f]{6}$/.test(accentColor)) {
-      setProfileError('Pick a colour from the swatches, or leave it blank.');
-      return;
-    }
-
     setSaving(true);
     const { error } = await supabase.from('players').update({
       bio: bio.trim() || null,
       preferred_discipline: preferredDisc || null,
       nickname: nickname.trim() || null,
       tagline: tagline.trim() || null,
-      accent_color: accentColor || null,
       home_venue: homeVenue || null,
       years_playing: years,
       cue_brand: cueBrand.trim() || null,
@@ -189,6 +198,47 @@ export default function SettingsPage() {
     }
     setProfileSaved(true);
     setTimeout(() => setProfileSaved(false), 2500);
+  };
+
+  const handleBannerUpload = async (file: File) => {
+    if (!player || !profile) return;
+    if (file.size > 5 * 1024 * 1024) { setBannerError('Banner must be under 5 MB.'); return; }
+    setBannerSaving(true);
+    setBannerError('');
+    const ext  = file.name.split('.').pop() ?? 'jpg';
+    const path = `${profile.id}/banner.${ext}`;
+    const { error: uploadErr } = await supabase.storage.from('banners').upload(path, file, { upsert: true });
+    if (uploadErr) { setBannerError(uploadErr.message); setBannerSaving(false); return; }
+    const { data: { publicUrl } } = supabase.storage.from('banners').getPublicUrl(path);
+    const { error: saveErr } = await supabase.from('players').update({ banner_url: publicUrl }).eq('id', player.id);
+    if (saveErr) { setBannerError(`Uploaded, but could not save it: ${saveErr.message}`); setBannerSaving(false); return; }
+    const { data } = await supabase.from('players').select('*').eq('id', player.id).single();
+    if (data) setPlayer(data);
+    setBannerSaving(false);
+  };
+
+  const handleRemoveBanner = async () => {
+    if (!player) return;
+    setBannerSaving(true);
+    setBannerError('');
+    const { error } = await supabase.from('players').update({ banner_url: null }).eq('id', player.id);
+    if (error) { setBannerError(`Could not remove that banner: ${error.message}`); setBannerSaving(false); return; }
+    const { data } = await supabase.from('players').select('*').eq('id', player.id).single();
+    if (data) setPlayer(data);
+    setBannerSaving(false);
+  };
+
+  // Saves on tap. Reverted with a reason on failure, like the toggles.
+  const handleSelectAccent = async (hex: string | null) => {
+    if (!player) return;
+    const previous = accentColor;
+    setAccentColor(hex);
+    setProfileError('');
+    const { error } = await supabase.from('players').update({ accent_color: hex }).eq('id', player.id);
+    if (error) {
+      setAccentColor(previous);
+      setProfileError(`Could not save that colour: ${error.message}`);
+    }
   };
 
   const handleSelectIcon = async (icon: string) => {
@@ -412,34 +462,70 @@ export default function SettingsPage() {
               <div className="text-right text-xs text-[#6B7280] font-[Barlow] mt-1">{tagline.length}/80</div>
             </div>
 
-            {/* Accent colour — swatches rather than a text field, so the value is
-                always valid and it is a single tap on a phone. */}
-            <div className="mb-4">
-              <label className="block text-[#9CA3AF] text-sm font-[Barlow] mb-2">Accent Colour</label>
-              <div className="flex flex-wrap gap-2">
-                {ACCENT_SWATCHES.map((c) => (
+            {/* Banner and accent both save on tap rather than waiting for Save
+                Profile: the change is visible immediately, which is what makes
+                picking a colour feel like picking a colour. */}
+            <div className="mb-5">
+              <label className="block text-[#9CA3AF] text-sm font-[Barlow] mb-2">Profile Banner</label>
+              <div className="flex items-center gap-3">
+                <div className="relative w-full h-16 rounded-lg overflow-hidden bg-[#252525] border border-[#333] flex items-center justify-center">
+                  {player.banner_url ? (
+                    <>
+                      <img src={player.banner_url} alt="Your profile banner" className="w-full h-full object-cover" />
+                      <button
+                        onClick={handleRemoveBanner}
+                        disabled={bannerSaving}
+                        aria-label="Remove banner"
+                        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center text-xs"
+                      >
+                        ×
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-[#6B7280] text-xs font-[Barlow]">No banner yet</span>
+                  )}
+                </div>
+                <input
+                  ref={bannerInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleBannerUpload(file);
+                  }}
+                />
+                <Button variant="secondary" size="sm" loading={bannerSaving} onClick={() => bannerInputRef.current?.click()}>
+                  {player.banner_url ? 'Change' : 'Upload'}
+                </Button>
+              </div>
+              {bannerError && <p className="text-[#EF4444] text-xs font-[Barlow] mt-2">{bannerError}</p>}
+
+              <label className="block text-[#9CA3AF] text-sm font-[Barlow] mt-4 mb-2">Accent Colour</label>
+              <div className="flex flex-wrap gap-2 items-center">
+                {ACCENT_COLORS.map((c) => (
                   <button
-                    key={c}
+                    key={c.hex}
                     type="button"
-                    aria-label={`Accent colour ${c}`}
-                    onClick={() => setAccentColor(accentColor === c ? '' : c)}
+                    onClick={() => handleSelectAccent(c.hex)}
+                    aria-label={c.name}
+                    title={c.name}
                     className={[
-                      'w-9 h-9 rounded-full border-2 transition-all',
-                      accentColor === c ? 'border-[#E8E2D6] scale-110' : 'border-transparent',
+                      'w-8 h-8 rounded-full border transition-all active:scale-95',
+                      accentColor === c.hex ? 'border-white ring-2 ring-white/40' : 'border-[#333]',
                     ].join(' ')}
-                    style={{ background: c }}
+                    style={{ background: c.hex }}
                   />
                 ))}
-                <button
-                  type="button"
-                  onClick={() => setAccentColor('')}
-                  className={[
-                    'px-3 h-9 rounded-full border text-xs font-[Barlow] transition-all',
-                    accentColor === '' ? 'border-[#E8E2D6] text-[#E8E2D6]' : 'border-[#333] text-[#6B7280]',
-                  ].join(' ')}
-                >
-                  Default
-                </button>
+                {accentColor && (
+                  <button
+                    type="button"
+                    onClick={() => handleSelectAccent(null)}
+                    className="text-[#6B7280] text-xs font-[Barlow] underline ml-2"
+                  >
+                    Clear
+                  </button>
+                )}
               </div>
             </div>
 

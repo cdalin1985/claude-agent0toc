@@ -223,24 +223,6 @@ test('a failed league-settings save is reported rather than showing Saved', () =
   assert.match(adminPage, /\{saveError && \(/);
 });
 
-test('the reminder lead time is reachable from the admin settings form', () => {
-  assert.match(adminPage, /key: 'match_reminder_hours', label: 'Pre-match reminder'/);
-  // 0 turns reminders off, so this one field must not inherit the min-of-1 floor.
-  assert.match(adminPage, /unit: 'hours before the match \(0 = off\)', min: 0/);
-  assert.match(adminPage, /function SettingsField\(\{ label, unit, value, onChange, min = 1 \}/);
-  assert.match(adminPage, /match_reminder_hours: edits\.match_reminder_hours \?\? settings\.match_reminder_hours,/);
-  // The cooldown label used to say "hours after a win", which was never the
-  // whole rule and is now plainly wrong.
-  assert.doesNotMatch(adminPage, /unit: 'hours after a win'/);
-});
-
-test('an unusable display_timezone falls back instead of killing reminders league-wide', () => {
-  // AT TIME ZONE raises on an unknown zone, which would abort the statement,
-  // roll back the reminder_sent_at claim, and silently stop every reminder.
-  assert.match(migration, /NOT EXISTS \(SELECT 1 FROM pg_timezone_names WHERE name = v_timezone\)/i);
-  assert.match(migration, /v_timezone := 'America\/Denver';/);
-});
-
 test('the in-app rulebook matches the shipped cooldown and play-window behaviour', () => {
   // RulesPage is the only rulebook most players will read. If it still says the
   // cooldown is loss-only, a blocked climber concludes the app is broken.
@@ -290,9 +272,7 @@ test('the migration creates the production-only columns it depends on', () => {
 
 test('the migration adds the settings and columns the enforcement reads', () => {
   assert.match(migration, /ADD COLUMN IF NOT EXISTS match_play_days INTEGER NOT NULL DEFAULT 10/i);
-  assert.match(migration, /ADD COLUMN IF NOT EXISTS match_reminder_hours INTEGER NOT NULL DEFAULT 24/i);
   assert.match(migration, /ALTER TABLE public\.challenges\s+ADD COLUMN IF NOT EXISTS cancel_reason TEXT/i);
-  assert.match(migration, /ALTER TABLE public\.matches\s+ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ/i);
   assert.match(migration, /CHECK \(cancel_reason IS NULL OR cancel_reason IN \('wash', 'withdrawn', 'overdue'\)\)/i);
 });
 
@@ -327,47 +307,31 @@ test('overdue notifications name the opponent so a player knows which match', ()
   assert.match(migration, /' match with ' \|\| p\.opponent_name/);
 });
 
-// --- Pre-match reminders ----------------------------------------------------
-
-test('reminders claim the match in the same statement that sends them', () => {
-  assert.match(migration, /CREATE OR REPLACE FUNCTION public\.send_match_reminders\(\)/i);
-  assert.match(migration, /SET reminder_sent_at = NOW\(\)/i);
-  assert.match(migration, /AND m\.reminder_sent_at IS NULL/i);
-  assert.match(migration, /'match_reminder'/);
-  assert.match(
-    migration,
-    /CROSS JOIN LATERAL \(VALUES \(n\.player1_id, n\.player2_name\),\s*\n?\s*\(n\.player2_id, n\.player1_name\)\) AS p\(player_id, opponent_name\)/i,
-  );
-});
-
-test('the reminder lead time and display timezone are configurable, not literals', () => {
-  assert.match(migration, /SELECT match_reminder_hours, display_timezone\s*\n\s*INTO v_lead_hours, v_timezone/i);
-  assert.match(migration, /ADD COLUMN IF NOT EXISTS display_timezone TEXT NOT NULL DEFAULT 'America\/Denver'/i);
-  assert.match(migration, /AT TIME ZONE v_timezone/i);
-  assert.match(migration, /IF v_lead_hours <= 0 THEN\s*\n\s*RETURN 0;/i);
-  assert.match(migration, /make_interval\(hours => v_lead_hours\)/i);
-  // The settings read must be deterministic if a second row ever appears.
-  assert.match(migration, /ORDER BY updated_at DESC, id\s*\n\s*LIMIT 1;/i);
-});
-
 // --- Privilege and scheduling hygiene ---------------------------------------
 
-test('both new scheduled functions are locked to service_role', () => {
-  for (const fn of ['expire_overdue_matches', 'send_match_reminders']) {
+test('the new scheduled function is locked to service_role', () => {
+  for (const fn of ['expire_overdue_matches']) {
     assert.match(migration, new RegExp(`REVOKE ALL ON FUNCTION public\\.${fn}\\(\\) FROM anon, authenticated`, 'i'));
     assert.match(migration, new RegExp(`GRANT EXECUTE ON FUNCTION public\\.${fn}\\(\\) TO service_role`, 'i'));
   }
-  assert.doesNotMatch(migration, /GRANT EXECUTE ON FUNCTION public\.(expire_overdue_matches|send_match_reminders)\(\) TO authenticated/i);
+  assert.doesNotMatch(migration, /GRANT EXECUTE ON FUNCTION public\.expire_overdue_matches\(\) TO authenticated/i);
 });
 
-test('both scheduled functions pin their search_path', () => {
+test('the scheduled function pins its search_path', () => {
   const definers = migration.match(/SECURITY DEFINER\s*\n\s*SET search_path = public/gi) ?? [];
-  assert.equal(definers.length, 2);
+  assert.equal(definers.length, 1);
 });
 
 test('cron wiring follows the existing guarded, re-runnable pattern', () => {
   assert.match(migration, /IF EXISTS \(SELECT 1 FROM pg_extension WHERE extname = 'pg_cron'\)/i);
-  for (const job of ['overdue-match-check', 'match-reminder-check']) {
+  // Deliberately NOT match-reminder-check: that name belongs to the live 24h/1h
+  // reminder job from 20260807000000. Scheduling it here would unschedule a
+  // working system and silently replace it.
+  // Asserted on the CALLS, not on any mention: the comment above explains why
+  // the name is absent, and that explanation is worth keeping in the file.
+  assert.doesNotMatch(migration, /cron\.schedule\([\s\S]{0,20}'match-reminder-check'/);
+  assert.doesNotMatch(migration, /cron\.unschedule\('match-reminder-check'\)/);
+  for (const job of ['overdue-match-check']) {
     assert.match(migration, new RegExp(`IF EXISTS \\(SELECT 1 FROM cron\\.job WHERE jobname = '${job}'\\)`, 'i'));
     assert.match(migration, new RegExp(`PERFORM cron\\.unschedule\\('${job}'\\)`, 'i'));
     assert.match(migration, new RegExp(`'${job}',`, 'i'));
@@ -387,7 +351,6 @@ test('the migration is safe against a database that already has these objects', 
 
 test('the generated types carry the new columns', () => {
   assert.match(databaseTypes, /cancel_reason: 'wash' \| 'withdrawn' \| 'overdue' \| null;/);
-  assert.match(databaseTypes, /reminder_sent_at: string \| null;/);
 });
 
 // --- Encoding ---------------------------------------------------------------

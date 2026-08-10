@@ -141,9 +141,9 @@ BEGIN
 
   -- ------------------------------------------------------ profile guard rails ---
   BEGIN
-    UPDATE players SET accent_color = 'not-a-colour' WHERE id = p_win;
-    failures := array_append(failures, 'an invalid accent_color was accepted');
-  EXCEPTION WHEN check_violation THEN NULL;  -- expected
+    UPDATE players SET accent_color = '#123456' WHERE id = p_win;
+    failures := array_append(failures, 'an off-palette accent_color was accepted');
+  EXCEPTION WHEN check_violation THEN NULL;  -- expected: palette CHECK from 20260807010000
   END;
   BEGIN
     UPDATE players SET accent_color = '#C62828' WHERE id = p_win;

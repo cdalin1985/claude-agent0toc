@@ -158,8 +158,14 @@ export default function PlayerPage() {
       {/* Hero card */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
         <GlassCard className="p-6 text-center relative overflow-hidden mb-4">
+          {showDetails && player.banner_url && (
+            <div
+              className="absolute inset-0 opacity-25 pointer-events-none bg-cover bg-center"
+              style={{ backgroundImage: `url(${player.banner_url})` }}
+            />
+          )}
           <div className="absolute inset-0 bg-gradient-to-br from-[#C62828]/5 to-transparent pointer-events-none" />
-          <Avatar player={player} size={80} className="mx-auto mb-4" />
+          <Avatar player={player} size={80} className="mx-auto mb-4 relative" />
           {player && !player.is_active && (
             <InactivePlayerBanner playerName={player.full_name} />
           )}

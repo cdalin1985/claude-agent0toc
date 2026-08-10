@@ -120,7 +120,6 @@ test('players cannot write their own stats', () => {
 test('new profile columns are bounded so one player cannot wreck the roster', () => {
   assert.match(migration, /char_length\(nickname\)\s+<= 24/i);
   assert.match(migration, /char_length\(tagline\)\s+<= 80/i);
-  assert.match(migration, /accent_color ~ '\^#\[0-9A-Fa-f\]\{6\}\$'/);
   assert.match(migration, /years_playing >= 0 AND years_playing <= 90/i);
 });
 
@@ -188,12 +187,19 @@ test('the settings screen tells the player what cannot be switched off', () => {
 test('saving a profile reports failure instead of pretending it worked', () => {
   assert.match(settingsPage, /Couldn't save your profile/);
   assert.match(settingsPage, /Years playing must be a whole number between 0 and 90\./);
-  assert.match(settingsPage, /Pick a colour from the swatches/);
+  assert.match(settingsPage, /Could not save that colour/);
 });
 
-test('the accent colour cannot be set to an invalid value from the UI', () => {
-  // Swatches rather than a text field: always valid, and one tap on a phone.
-  assert.match(settingsPage, /const ACCENT_SWATCHES = \[/);
+test('every accent swatch is one the database will actually accept', () => {
+  // The picker must be a subset of the players.accent_color CHECK palette in
+  // 20260807010000, or a swatch silently fails to save.
+  const palette = readFileSync(join(root, 'supabase', 'migrations', '20260807010000_profile_banner_accent.sql'), 'utf8');
+  const allowed = new Set((palette.match(/'#[0-9A-Fa-f]{6}'/g) ?? []).map((h) => h.replace(/'/g, '').toUpperCase()));
+  const offered = (settingsPage.match(/hex: '#[0-9A-Fa-f]{6}'/g) ?? []).map((h) => h.split("'")[1].toUpperCase());
+  assert.ok(offered.length >= 8, 'expected the full accent palette in the picker');
+  for (const hex of offered) {
+    assert.ok(allowed.has(hex), `swatch ${hex} is not permitted by the accent_color CHECK`);
+  }
   assert.doesNotMatch(settingsPage, /type="color"/);
 });
 

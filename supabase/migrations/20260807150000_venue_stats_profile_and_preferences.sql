@@ -133,7 +133,6 @@ COMMENT ON TABLE public.player_venue_stats IS
 
 ALTER TABLE public.players ADD COLUMN IF NOT EXISTS nickname      TEXT;
 ALTER TABLE public.players ADD COLUMN IF NOT EXISTS tagline       TEXT;
-ALTER TABLE public.players ADD COLUMN IF NOT EXISTS accent_color  TEXT;
 ALTER TABLE public.players ADD COLUMN IF NOT EXISTS home_venue    TEXT;
 ALTER TABLE public.players ADD COLUMN IF NOT EXISTS years_playing INTEGER;
 ALTER TABLE public.players ADD COLUMN IF NOT EXISTS cue_brand     TEXT;
@@ -147,10 +146,9 @@ ALTER TABLE public.players ADD CONSTRAINT players_profile_text_bounds CHECK (
   (bio       IS NULL OR char_length(bio)       <= 500)
 );
 
-ALTER TABLE public.players DROP CONSTRAINT IF EXISTS players_accent_color_format;
-ALTER TABLE public.players ADD CONSTRAINT players_accent_color_format CHECK (
-  accent_color IS NULL OR accent_color ~ '^#[0-9A-Fa-f]{6}$'
-);
+-- accent_color is created and constrained to the TOC preset palette by
+-- 20260807010000_profile_banner_accent.sql. A second CHECK here would be
+-- redundant at best, and would fight it at worst.
 
 ALTER TABLE public.players DROP CONSTRAINT IF EXISTS players_years_playing_range;
 ALTER TABLE public.players ADD CONSTRAINT players_years_playing_range CHECK (
@@ -160,7 +158,7 @@ ALTER TABLE public.players ADD CONSTRAINT players_years_playing_range CHECK (
 -- players UPDATE for `authenticated` is a column-level allowlist, so new columns
 -- are NOT writable until named here. That default-deny is deliberate; grant only
 -- the cosmetic ones and never role, is_active or profile_id.
-GRANT UPDATE (nickname, tagline, accent_color, home_venue, years_playing, cue_brand)
+GRANT UPDATE (nickname, tagline, accent_color, banner_url, home_venue, years_playing, cue_brand)
   ON public.players TO authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -237,7 +235,11 @@ AS $$
     WHEN p_type IN ('challenge_received', 'challenge_issued', 'challenge_accepted',
                     'challenge_expired', 'challenge_cancelled', 'challenge_declined')
       THEN 'challenges'
-    WHEN p_type IN ('match_reminder', 'match_scheduled')
+    -- match_reminder_24h and match_reminder_1h are what the live reminder
+    -- system actually sends (20260807000000_match_reminders.sql). Without them
+    -- here they would map to NULL, be treated as mandatory, and the Match
+    -- Reminders toggle would do nothing.
+    WHEN p_type IN ('match_reminder', 'match_reminder_24h', 'match_reminder_1h', 'match_scheduled')
       THEN 'reminders'
     WHEN p_type IN ('result_submitted', 'result_confirmed', 'match_confirmed',
                     'match_started', 'match_fee_recorded')

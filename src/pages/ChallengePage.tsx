@@ -9,6 +9,7 @@ import { PoolBall } from '../components/PoolBall';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 import { InactivePlayerBanner } from '../components/InactivePlayerBanner';
+import { CoachTip } from '../components/CoachTip';
 import { EmptyState } from '../components/EmptyState';
 import { QueryError } from '../components/QueryError';
 
@@ -162,7 +163,10 @@ export default function ChallengePage() {
         <PoolBall position={target.ranking.position} size={44} />
         <div>
           <div className="font-[Barlow] font-semibold text-[#E8E2D6]">{target.player.full_name}</div>
-          <div className="text-[#9CA3AF] text-xs font-[Azeret_Mono]">Rank #{target.ranking.position}</div>
+          <div className="text-[#9CA3AF] text-xs font-[Azeret_Mono] flex items-center gap-1">
+            Rank #{target.ranking.position}
+            <CoachTip id="challenge.range" size={12} />
+          </div>
         </div>
         <div className="ml-auto text-2xl font-[Bebas_Neue] text-[#6B7280]">VS</div>
         {myRanking && <PoolBall position={myRanking.ranking.position} size={44} />}
@@ -232,7 +236,10 @@ export default function ChallengePage() {
               <div className={`text-sm mt-2 font-[Barlow] ${raceError ? 'text-[#EF4444]' : 'text-[#C62828]'}`}>
                 {raceError || `First to ${race} wins`}
               </div>
-              <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">Minimum race to 6 · No maximum</div>
+              <div className="text-[#6B7280] text-xs font-[Barlow] mt-1 flex items-center justify-center gap-1">
+                Minimum race to 6 · No maximum
+                <CoachTip id="race.min" size={12} />
+              </div>
             </GlassCard>
 
             <Button variant="primary" fullWidth size="lg" disabled={!!raceError || race < 6} onClick={() => setStep(3)}>

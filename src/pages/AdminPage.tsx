@@ -1163,7 +1163,6 @@ type SettingsFormState = {
   challenge_expiry_days: number | '';
   challenge_response_hours: number | '';
   match_play_days: number | '';
-  match_reminder_hours: number | '';
   challenge_weekly_limit: number | '';
   first_challenge_range: number | '';
 };
@@ -1175,7 +1174,6 @@ const RULE_FIELDS: Array<{ key: keyof SettingsFormState; label: string; unit: st
   { key: 'challenge_weekly_limit', label: 'Weekly challenge limit', unit: 'challenges per 7 days' },
   { key: 'challenge_response_hours', label: 'Challenge response window', unit: 'hours to accept/decline' },
   { key: 'match_play_days', label: 'Match play window', unit: 'days after acceptance' },
-  { key: 'match_reminder_hours', label: 'Pre-match reminder', unit: 'hours before the match (0 = off)', min: 0 },
   { key: 'cooldown_hours', label: 'Post-match cooldown', unit: 'hours before challenging up' },
   { key: 'challenge_expiry_days', label: 'Challenge expiry', unit: 'days until auto-expire' },
 ];
@@ -1235,7 +1233,6 @@ function SettingsTab() {
     challenge_expiry_days: edits.challenge_expiry_days ?? settings.challenge_expiry_days,
     challenge_response_hours: edits.challenge_response_hours ?? settings.challenge_response_hours,
     match_play_days: edits.match_play_days ?? settings.match_play_days,
-    match_reminder_hours: edits.match_reminder_hours ?? settings.match_reminder_hours,
     challenge_weekly_limit: edits.challenge_weekly_limit ?? settings.challenge_weekly_limit,
     first_challenge_range: edits.first_challenge_range ?? settings.first_challenge_range,
   };
