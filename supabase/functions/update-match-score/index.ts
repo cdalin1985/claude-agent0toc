@@ -17,17 +17,17 @@ serve(async (req) => {
     }
 
     const { data: match } = await supabase.from('matches').select('*').eq('id', match_id).single();
-    if (!match) return new Response(JSON.stringify({ error: 'Match not found.' }), { headers: cors });
+    if (!match) return new Response(JSON.stringify({ error: 'Match not found.' }), { status: 404, headers: cors });
     if (!MATCH_SCORE_STATUSES.includes(match.status)) {
       return new Response(JSON.stringify({ error: 'Scores can only be changed before result submission.' }), { status: 409, headers: cors });
     }
 
     const { data: caller } = await supabase.from('players').select('id').eq('profile_id', user.id).single();
-    if (!caller) return new Response(JSON.stringify({ error: 'Player not found.' }), { headers: cors });
+    if (!caller) return new Response(JSON.stringify({ error: 'Player not found.' }), { status: 404, headers: cors });
 
     const isP1 = match.player1_id === caller.id;
     const isP2 = match.player2_id === caller.id;
-    if (!isP1 && !isP2) return new Response(JSON.stringify({ error: 'Not a participant in this match.' }), { headers: cors });
+    if (!isP1 && !isP2) return new Response(JSON.stringify({ error: 'Not a participant in this match.' }), { status: 403, headers: cors });
 
     // Single scoreboard: once an initiator is recorded, only they may keep score.
     // Older matches without an initiator stay open to either participant.
@@ -40,12 +40,12 @@ serve(async (req) => {
 
     // Prevent scores exceeding race_length
     if (newP1Score > match.race_length || newP2Score > match.race_length) {
-      return new Response(JSON.stringify({ error: 'Score cannot exceed race length.' }), { headers: cors });
+      return new Response(JSON.stringify({ error: 'Score cannot exceed race length.' }), { status: 400, headers: cors });
     }
 
     // Prevent ties — once one player reaches race_length the other cannot also reach it
     if (newP1Score >= match.race_length && newP2Score >= match.race_length) {
-      return new Response(JSON.stringify({ error: 'Tie not possible. Only one player can win.' }), { headers: cors });
+      return new Response(JSON.stringify({ error: 'Tie not possible. Only one player can win.' }), { status: 400, headers: cors });
     }
 
     const updates: Record<string, unknown> = {};
@@ -86,6 +86,9 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ success: true }), { headers: { ...cors, 'Content-Type': 'application/json' } });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: cors });
+    // Postgres errors carry constraint, column and table names. Log the real
+    // one for us; return something a player can act on.
+    console.error(`[update-match-score] unhandled: ${e instanceof Error ? e.message : String(e)}`);
+    return new Response(JSON.stringify({ error: 'Something went wrong on our end. Please try again.' }), { status: 500, headers: cors });
   }
 });

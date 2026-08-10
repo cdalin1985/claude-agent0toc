@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell, CheckCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
+import { useLeagueSettings, venuesFrom } from '../hooks/useLeagueSettings';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 import { EmptyState } from '../components/EmptyState';
@@ -26,8 +27,9 @@ const TYPE_ICONS: Record<string, string> = {
   rank_changed:       '📈',
 };
 
-const VENUES = ['Eagles 4040', 'Valley Hub'] as const;
-type Venue = typeof VENUES[number];
+// Venues come from league_settings; a venue added in Admin appears here with
+// no code change.
+type Venue = string;
 
 function RespondInline({
   challengeId,
@@ -43,6 +45,8 @@ function RespondInline({
   const [time, setTime] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { data: leagueSettings } = useLeagueSettings();
+  const venues = venuesFrom(leagueSettings);
 
   const callFn = async (body: object) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -138,7 +142,7 @@ function RespondInline({
         className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
       >
         <option value="">Select venue…</option>
-        {VENUES.map((v) => <option key={v} value={v}>{v}</option>)}
+        {venues.map((v) => <option key={v} value={v}>{v}</option>)}
       </select>
       <div className="grid grid-cols-2 gap-2">
         <input

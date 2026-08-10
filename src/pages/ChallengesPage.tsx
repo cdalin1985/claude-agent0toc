@@ -6,6 +6,7 @@ import { Clock, MapPin, Calendar } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useRankings } from '../hooks/useRankings';
+import { useLeagueSettings, venuesFrom } from '../hooks/useLeagueSettings';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
@@ -15,8 +16,9 @@ import { QueryError } from '../components/QueryError';
 import { formatDateTime } from '../utils/time';
 import type { Challenge, ChallengeProposal } from '../types/database';
 
-const VENUES = ['Eagles 4040', 'Valley Hub'] as const;
-type Venue = typeof VENUES[number];
+// Venues come from league_settings; a venue added in Admin appears here with
+// no code change.
+type Venue = string;
 type ChallengeWithHoursLeft = Challenge & { hours_left: number };
 
 function usePlayerChallenges(playerId: string | undefined) {
@@ -88,6 +90,8 @@ function RespondModal({
   const theirProposal = proposal && proposal.proposed_by_player_id !== myPlayerId ? proposal : null;
   const myProposal    = proposal && proposal.proposed_by_player_id === myPlayerId ? proposal : null;
   const [showCounter, setShowCounter] = useState(false);
+  const { data: leagueSettings } = useLeagueSettings();
+  const venues = venuesFrom(leagueSettings);
   const negotiating = challenge.status === 'accepted';
 
   const callFn = async (body: object) => {
@@ -139,18 +143,33 @@ function RespondModal({
   const handleDecline = async () => {
     setLoading(true);
     setError('');
-    const json = await callFn({ challenge_id: challenge.id, action: 'decline' });
-    setLoading(false);
-    if (json.error) { setError(json.error); return; }
-    setShowDeclineConfirm(false);
-    onSuccess();
+    try {
+      const json = await callFn({ challenge_id: challenge.id, action: 'decline' });
+      if (json.error) { setError(json.error); return; }
+      setShowDeclineConfirm(false);
+      onSuccess();
+    } catch {
+      setError('Connection problem — nothing was sent. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleWash = async () => {
     setLoading(true);
-    await callFn({ challenge_id: challenge.id, action: 'wash' });
-    setLoading(false);
-    onSuccess();
+    setError('');
+    try {
+      // The result was discarded here, so a refused wash — the match has already
+      // started, someone else moved the challenge on — closed the modal as if it
+      // had worked.
+      const json = await callFn({ challenge_id: challenge.id, action: 'wash' });
+      if (json.error) { setError(json.error); return; }
+      onSuccess();
+    } catch {
+      setError('Connection problem — nothing was sent. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -214,7 +233,7 @@ function RespondModal({
               className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
             >
               <option value="">Select venue…</option>
-              {VENUES.map((v) => <option key={v} value={v}>{v}</option>)}
+              {venues.map((v) => <option key={v} value={v}>{v}</option>)}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -323,6 +342,7 @@ export default function ChallengesPage() {
   const [tab, setTab] = useState<'incoming' | 'outgoing' | 'history'>('incoming');
   const [responding, setResponding] = useState<Challenge | null>(null);
   const [actioningId, setActioningId] = useState<string | null>(null);
+  const [listError, setListError] = useState('');
 
   const { data: challengesData, isLoading, isError, refetch, isRefetching } = usePlayerChallenges(player?.id);
   // Memoized because negotiatingIds derives from it; a fresh [] each render
@@ -364,18 +384,26 @@ export default function ChallengesPage() {
 
   const callFn = async (body: object) => {
     const { data: { session } } = await supabase.auth.getSession();
-    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/respond-to-challenge`, {
+    if (!session) throw new Error('Your sign-in expired. Please sign in again.');
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/respond-to-challenge`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify(body),
     });
+    const json = await res.json().catch(() => ({})) as { error?: string };
+    if (!res.ok || json.error) throw new Error(json.error ?? 'Something went wrong. Please try again.');
     qc.invalidateQueries({ queryKey: ['challenges'] });
   };
 
   const runChallengeAction = async (challengeId: string, action: 'cancel' | 'wash') => {
     setActioningId(challengeId);
+    setListError('');
     try {
       await callFn({ challenge_id: challengeId, action });
+    } catch (e) {
+      // This is the path that reports "you can't wash a match that's already
+      // under way". Swallowing it made the button look like it did nothing.
+      setListError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
     } finally {
       setActioningId(null);
     }
@@ -386,6 +414,12 @@ export default function ChallengesPage() {
   return (
     <div className="min-h-screen px-4 pt-8 pb-4">
       <h1 className="font-[Bebas_Neue] text-5xl tracking-wide text-[#E8E2D6] mb-5">Challenges</h1>
+
+      {listError && (
+        <div className="mb-4 p-3 rounded-xl border border-[#EF4444]/40 bg-[#EF4444]/5">
+          <p className="text-[#EF4444] text-sm font-[Barlow]">{listError}</p>
+        </div>
+      )}
 
       <div className="flex gap-1 mb-5 bg-[#1A1A1A] rounded-xl p-1">
         {([

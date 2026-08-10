@@ -190,7 +190,12 @@ test('a wash cannot void a match that is already under way', () => {
 test('the wash guard returns a conflict status rather than a bare 200', () => {
   const washBranch = respondToChallenge.match(/action === 'wash'[\s\S]*?action === 'cancel'/);
   assert.ok(washBranch, 'expected a wash branch');
-  assert.equal((washBranch[0].match(/status: 409/g) ?? []).length, 2);
+  // Assert WHICH guards conflict, not how many — a count breaks the moment a
+  // legitimate fourth guard is added, which tells you nothing useful.
+  assert.match(washBranch[0], /This match is already under way[\s\S]*?status: 409/);
+  assert.match(washBranch[0], /This challenge has already moved on[\s\S]*?status: 409/);
+  // And nothing in the branch reports a failure as success.
+  assert.doesNotMatch(washBranch[0], /JSON\.stringify\(\{ error[^}]*\}\), \{ headers:/);
 });
 
 test('an admin cancelling a challenge does not charge the challenger for it', () => {

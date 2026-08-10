@@ -19,10 +19,10 @@ serve(async (req) => {
     const { challenge_id, action, venue, scheduled_at, response_message } = await req.json();
 
     const { data: challenge } = await supabase.from('challenges').select('*').eq('id', challenge_id).single();
-    if (!challenge) return new Response(JSON.stringify({ error: 'Challenge not found.' }), { headers: cors });
+    if (!challenge) return new Response(JSON.stringify({ error: 'Challenge not found.' }), { status: 404, headers: cors });
 
     const { data: callerPlayer } = await supabase.from('players').select('id, full_name').eq('profile_id', user.id).single();
-    if (!callerPlayer) return new Response(JSON.stringify({ error: 'Player profile not found.' }), { headers: cors });
+    if (!callerPlayer) return new Response(JSON.stringify({ error: 'Player profile not found.' }), { status: 404, headers: cors });
 
     // 'accept' is the legacy one-shot action: the challenged player picked both
     // the venue and the time and it was locked in, with no way for the
@@ -245,8 +245,8 @@ serve(async (req) => {
       if (activityError) throw activityError;
 
     } else if (action === 'decline') {
-      if (challenge.challenged_id !== callerPlayer.id) return new Response(JSON.stringify({ error: 'Not authorized.' }), { headers: cors });
-      if (challenge.status !== 'pending') return new Response(JSON.stringify({ error: 'Challenge is not pending.' }), { headers: cors });
+      if (challenge.challenged_id !== callerPlayer.id) return new Response(JSON.stringify({ error: 'Not authorized.' }), { status: 403, headers: cors });
+      if (challenge.status !== 'pending') return new Response(JSON.stringify({ error: 'Challenge is not pending.' }), { status: 409, headers: cors });
 
       // A decline is a forfeit — ranking, cooldown, stats, activity, and notifications
       // are all written by apply_challenge_decline_forfeit so admin can later reverse it.
@@ -255,7 +255,8 @@ serve(async (req) => {
         p_actor_profile_id: user.id,
       });
       if (rpcError) {
-        return new Response(JSON.stringify({ error: rpcError.message ?? 'Could not record decline as forfeit.' }), { headers: cors });
+        console.error(`[respond-to-challenge] decline forfeit failed for ${challenge_id}: ${rpcError.message}`);
+        return new Response(JSON.stringify({ error: 'Could not record that decline. Please try again, or ask an admin.' }), { status: 500, headers: cors });
       }
 
       const { data: challengerPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenger_id).single();
@@ -288,7 +289,8 @@ serve(async (req) => {
         p_actor_profile_id: user.id,
       });
       if (rpcError) {
-        return new Response(JSON.stringify({ error: rpcError.message ?? 'Could not reverse decline.' }), { headers: cors });
+        console.error(`[respond-to-challenge] reverse decline failed for ${challenge_id}: ${rpcError.message}`);
+        return new Response(JSON.stringify({ error: 'Could not reverse that decline. The rankings or stats may have moved since.' }), { status: 409, headers: cors });
       }
 
       const { data: challengerPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenger_id).single();
@@ -314,9 +316,9 @@ serve(async (req) => {
       // Either player can declare a scheduling wash — treated as if the challenge never happened
       const isChallenger = challenge.challenger_id === callerPlayer.id;
       const isChallenged  = challenge.challenged_id === callerPlayer.id;
-      if (!isChallenger && !isChallenged) return new Response(JSON.stringify({ error: 'Not authorized.' }), { headers: cors });
+      if (!isChallenger && !isChallenged) return new Response(JSON.stringify({ error: 'Not authorized.' }), { status: 403, headers: cors });
       if (!['pending', 'accepted', 'scheduled'].includes(challenge.status)) {
-        return new Response(JSON.stringify({ error: 'Challenge cannot be washed at this stage.' }), { headers: cors });
+        return new Response(JSON.stringify({ error: 'Challenge cannot be washed at this stage.' }), { status: 409, headers: cors });
       }
 
       // The challenge row stays at 'scheduled' for the entire life of the match —
@@ -384,8 +386,8 @@ serve(async (req) => {
 
     } else if (action === 'cancel') {
       // Challenger cancels their own pending challenge
-      if (challenge.challenger_id !== callerPlayer.id) return new Response(JSON.stringify({ error: 'Not authorized.' }), { headers: cors });
-      if (challenge.status !== 'pending') return new Response(JSON.stringify({ error: 'Can only cancel pending challenges.' }), { headers: cors });
+      if (challenge.challenger_id !== callerPlayer.id) return new Response(JSON.stringify({ error: 'Not authorized.' }), { status: 403, headers: cors });
+      if (challenge.status !== 'pending') return new Response(JSON.stringify({ error: 'Can only cancel pending challenges.' }), { status: 400, headers: cors });
       // Withdrawing your own challenge still spends it — see countsAgainstWeeklyLimit
       // in create-challenge.
       const { data: withdrawn, error: withdrawError } = await supabase
@@ -408,11 +410,14 @@ serve(async (req) => {
       if (cancelActivityError) throw cancelActivityError;
 
     } else {
-      return new Response(JSON.stringify({ error: 'Invalid action.' }), { headers: cors });
+      return new Response(JSON.stringify({ error: 'Invalid action.' }), { status: 400, headers: cors });
     }
 
     return new Response(JSON.stringify({ success: true }), { headers: { ...cors, 'Content-Type': 'application/json' } });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: cors });
+    // Postgres errors carry constraint, column and table names. Log the real
+    // one for us; return something a player can act on.
+    console.error(`[respond-to-challenge] unhandled: ${e instanceof Error ? e.message : String(e)}`);
+    return new Response(JSON.stringify({ error: 'Something went wrong on our end. Please try again.' }), { status: 500, headers: cors });
   }
 });

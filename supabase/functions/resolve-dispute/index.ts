@@ -79,14 +79,14 @@ serve(async (req) => {
     const explicitPlayer1Payment = normalizePayment(player1_payment_method);
     const explicitPlayer2Payment = normalizePayment(player2_payment_method);
     if (player1_payment_method != null && player1_payment_method !== '' && explicitPlayer1Payment === null) {
-      return new Response(JSON.stringify({ error: 'Invalid player1 payment method.' }), { headers: cors });
+      return new Response(JSON.stringify({ error: 'Invalid player1 payment method.' }), { status: 400, headers: cors });
     }
     if (player2_payment_method != null && player2_payment_method !== '' && explicitPlayer2Payment === null) {
-      return new Response(JSON.stringify({ error: 'Invalid player2 payment method.' }), { headers: cors });
+      return new Response(JSON.stringify({ error: 'Invalid player2 payment method.' }), { status: 400, headers: cors });
     }
 
     const { data: match } = await supabase.from('matches').select('*').eq('id', match_id).single();
-    if (!match) return new Response(JSON.stringify({ error: 'Match not found.' }), { headers: cors });
+    if (!match) return new Response(JSON.stringify({ error: 'Match not found.' }), { status: 404, headers: cors });
     const canResolveDispute = ALLOWED_RESOLUTION_STATUSES.includes(match.status);
     const canForceComplete = force_complete === true && FORCE_COMPLETE_STATUSES.includes(match.status);
     if (!canResolveDispute && !canForceComplete) {
@@ -294,6 +294,9 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ success: true }), { headers: { ...cors, 'Content-Type': 'application/json' } });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: cors });
+    // Postgres errors carry constraint, column and table names. Log the real
+    // one for us; return something a player can act on.
+    console.error(`[resolve-dispute] unhandled: ${e instanceof Error ? e.message : String(e)}`);
+    return new Response(JSON.stringify({ error: 'Something went wrong on our end. Please try again.' }), { status: 500, headers: cors });
   }
 });

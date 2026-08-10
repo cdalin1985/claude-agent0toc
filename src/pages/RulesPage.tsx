@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { venuesFrom } from '../hooks/useLeagueSettings';
 import { GlassCard } from '../components/GlassCard';
 import { EKGLine } from '../components/EKGLine';
 import type { LeagueSettings } from '../types/database';
@@ -50,7 +51,8 @@ export default function RulesPage() {
   const weeklyLimit    = settings?.challenge_weekly_limit ?? 2;
   const expiryDays     = settings?.challenge_expiry_days ?? 7;
   const playDays       = settings?.match_play_days ?? 10;
-  const venues         = settings?.venues?.length ? settings.venues : ['Eagles 4040', 'Valley Hub'];
+  // One definition of the fallback list, shared with every other screen.
+  const venues         = venuesFrom(settings as LeagueSettings | null);
 
   return (
     <div className="min-h-screen px-4 pt-4 pb-8">

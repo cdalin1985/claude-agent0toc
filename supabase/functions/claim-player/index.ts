@@ -22,7 +22,7 @@ serve(async (req) => {
     if (authErr || !user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
 
     const { player_id } = await req.json();
-    if (!player_id) return new Response(JSON.stringify({ error: 'player_id required' }), { headers: corsHeaders });
+    if (!player_id) return new Response(JSON.stringify({ error: 'player_id required' }), { status: 400, headers: corsHeaders });
 
     // Check user hasn't already claimed
     const { data: existingPlayer } = await supabase
@@ -30,7 +30,7 @@ serve(async (req) => {
       .select('id')
       .eq('profile_id', user.id)
       .maybeSingle();
-    if (existingPlayer) return new Response(JSON.stringify({ error: 'You have already claimed a player profile.' }), { headers: corsHeaders });
+    if (existingPlayer) return new Response(JSON.stringify({ error: 'You have already claimed a player profile.' }), { status: 409, headers: corsHeaders });
 
     // Check target player is unclaimed. This is only for a friendly up-front
     // message — the claim below re-checks atomically and is the real gate.
@@ -39,8 +39,8 @@ serve(async (req) => {
       .select('id, profile_id, full_name')
       .eq('id', player_id)
       .maybeSingle();
-    if (!targetPlayer) return new Response(JSON.stringify({ error: 'Player not found.' }), { headers: corsHeaders });
-    if (targetPlayer.profile_id) return new Response(JSON.stringify({ error: 'This player has already been claimed.' }), { headers: corsHeaders });
+    if (!targetPlayer) return new Response(JSON.stringify({ error: 'Player not found.' }), { status: 404, headers: corsHeaders });
+    if (targetPlayer.profile_id) return new Response(JSON.stringify({ error: 'This player has already been claimed.' }), { status: 409, headers: corsHeaders });
 
     // Claim it. `.is('profile_id', null)` makes the check and the write a single
     // statement, so two people tapping the same name cannot both pass. Previously
@@ -77,6 +77,9 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: corsHeaders });
+    // Postgres errors carry constraint, column and table names. Log the real
+    // one for us; return something a player can act on.
+    console.error(`[claim-player] unhandled: ${e instanceof Error ? e.message : String(e)}`);
+    return new Response(JSON.stringify({ error: 'Something went wrong on our end. Please try again.' }), { status: 500, headers: corsHeaders });
   }
 });

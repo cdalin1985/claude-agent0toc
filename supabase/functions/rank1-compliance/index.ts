@@ -131,6 +131,9 @@ serve(async (req) => {
           : 'The #1 player is still inside the 30-day obligation window.',
     });
   } catch (e) {
-    return json({ error: String(e) }, 500);
+    // Postgres errors carry constraint, column and table names. Log the real
+    // one for us; return something a player can act on.
+    console.error(`[rank1-compliance] unhandled: ${e instanceof Error ? e.message : String(e)}`);
+    return json({ error: 'Something went wrong on our end. Please try again.' }, 500);
   }
 });

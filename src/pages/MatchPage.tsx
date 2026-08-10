@@ -282,11 +282,20 @@ export default function MatchPage() {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify(body),
     });
+    let json: { error?: string } & Record<string, unknown>;
     try {
-      return await res.json();
+      json = await res.json();
     } catch {
       throw new Error(`Unexpected server response (${res.status})`);
     }
+    // Throw rather than return a failure: every caller already wraps this in a
+    // try/catch that surfaces e.message, so one check here makes all of them
+    // correct — including the score buttons, where a silently failed update
+    // would leave the scoreboard showing a point the server never recorded.
+    if (!res.ok || json.error) {
+      throw new Error(typeof json.error === 'string' ? json.error : `Request failed (${res.status})`);
+    }
+    return json;
   };
 
   const sendScore = async (p1Score: number, p2Score: number) => {

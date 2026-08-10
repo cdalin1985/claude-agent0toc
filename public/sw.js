@@ -67,15 +67,47 @@ self.addEventListener('fetch', (event) => {
   }
 });
 
+// A push payload is data from the network. Resolve any URL in it against our
+// own origin and refuse anything that lands elsewhere, so a notification can
+// never carry a player off-site. Returns a same-origin path, never an absolute
+// URL, because that is all the app ever needs to navigate to.
+function safePath(raw) {
+  if (typeof raw !== 'string' || raw === '') return '/';
+  try {
+    const resolved = new URL(raw, self.location.origin);
+    if (resolved.origin !== self.location.origin) return '/';
+    return resolved.pathname + resolved.search + resolved.hash;
+  } catch {
+    return '/';
+  }
+}
+
 self.addEventListener('push', (event) => {
-  const data = event.data?.json() ?? {};
+  let data = {};
+  // A malformed or non-JSON payload must still produce a notification rather
+  // than throwing inside the handler and dropping it silently.
+  try {
+    data = event.data?.json() ?? {};
+  } catch {
+    data = {};
+  }
+
+  const url = safePath(data.url);
+  // Tags collapse notifications: same tag replaces, rather than stacks. The old
+  // fixed 'toc' tag meant a player with three pending challenges saw only the
+  // last one. Collapsing is now opt-in via an explicit tag from the server;
+  // the default is unique, so every notification survives.
+  const tag = typeof data.tag === 'string' && data.tag
+    ? data.tag
+    : `toc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
   event.waitUntil(
     self.registration.showNotification(data.title ?? 'Top of the Capital', {
       body: data.body ?? '',
       icon: '/toc-icon.svg',
       badge: '/toc-icon.svg',
-      data: { url: data.url ?? '/' },
-      tag: 'toc',
+      data: { url },
+      tag,
       renotify: true,
     })
   );
@@ -85,9 +117,13 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-      const url = event.notification.data?.url ?? '/';
+      // Re-validated rather than trusted: this data was stored by the push
+      // handler, but the check is cheap and this is the line that navigates.
+      const url = safePath(event.notification.data?.url);
       for (const client of list) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
+        // startsWith, not includes: 'evil.test/?x=https://toc.app' contains our
+        // origin without being it.
+        if (client.url.startsWith(self.location.origin) && 'focus' in client) {
           client.navigate(url);
           return client.focus();
         }
