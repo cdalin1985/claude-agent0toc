@@ -1,19 +1,71 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { LogOut, User, Volume2, VolumeX, Shield, Bell, BellOff, FileText, Camera, X } from 'lucide-react';
+import { LogOut, User, Volume2, VolumeX, Shield, Bell, BellOff, FileText, Camera, X, Swords, Clock, Trophy } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useUIStore } from '../stores/uiStore';
 import { useRankings } from '../hooks/useRankings';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+import { useLeagueSettings, venuesFrom } from '../hooks/useLeagueSettings';
 import { Avatar } from '../components/Avatar';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
+import type { PlayerPreferences } from '../types/database';
 
 const DISCIPLINES = ['8 Ball', '9 Ball', '10 Ball'] as const;
 
 const PRESET_ICONS = ['🎱','🔵','🟡','🦁','🐺','🦅','🐉','⚡','🔥','🎯','💀','🌙'];
+
+// Drawn from the app's own palette so a customised profile still looks like TOC.
+const ACCENT_SWATCHES = ['#C62828', '#D4AF37', '#22C55E', '#3B82F6', '#A855F7', '#EC4899', '#F59E0B', '#14B8A6'];
+
+/**
+ * One switch row. Extracted because there are now eight of them, and eight
+ * copies of the same markup is eight places to fix a padding bug.
+ */
+function ToggleRow({
+  icon,
+  title,
+  description,
+  checked,
+  disabled,
+  onChange,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between py-3 border-b border-white/5 last:border-0">
+      <div className="flex items-center gap-3 min-w-0">
+        <span className="text-[#9CA3AF] shrink-0">{icon}</span>
+        <div className="min-w-0">
+          <div className="font-[Barlow] font-medium text-[#E8E2D6] text-sm">{title}</div>
+          <div className="text-[#6B7280] text-xs font-[Barlow]">{description}</div>
+        </div>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={title}
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className={[
+          'w-12 h-6 rounded-full transition-colors relative shrink-0 ml-3',
+          checked ? 'bg-[#C62828]' : 'bg-[#333]',
+          disabled ? 'opacity-40' : '',
+        ].join(' ')}
+      >
+        <div className={`w-5 h-5 rounded-full bg-white absolute top-0.5 transition-transform ${checked ? 'translate-x-6' : 'translate-x-0.5'}`} />
+      </button>
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const navigate  = useNavigate();
@@ -22,10 +74,22 @@ export default function SettingsPage() {
   const { supported: pushSupported, subscribed: pushSubscribed, permission: pushPermission, loading: pushLoading, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications();
   const { data: rankings = [] } = useRankings();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { data: leagueSettings } = useLeagueSettings();
+  const venues = venuesFrom(leagueSettings);
 
   const [displayName,   setDisplayName]   = useState(profile?.display_name ?? '');
   const [bio,           setBio]           = useState('');
   const [preferredDisc, setPreferredDisc] = useState<typeof DISCIPLINES[number] | ''>('');
+  const [nickname,      setNickname]      = useState('');
+  const [tagline,       setTagline]       = useState('');
+  const [accentColor,   setAccentColor]   = useState('');
+  const [homeVenue,     setHomeVenue]     = useState('');
+  const [yearsPlaying,  setYearsPlaying]  = useState('');
+  const [cueBrand,      setCueBrand]      = useState('');
+  const [profileError,  setProfileError]  = useState('');
+  const [profileSaved,  setProfileSaved]  = useState(false);
+  const [prefs,         setPrefs]         = useState<PlayerPreferences | null>(null);
+  const [prefsError,    setPrefsError]    = useState('');
   const [saving,        setSaving]        = useState(false);
   const [signingOut,    setSigningOut]    = useState(false);
   const [avatarSaving,  setAvatarSaving]  = useState(false);
@@ -37,14 +101,50 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!playerId) return;
-    supabase.from('players').select('bio, preferred_discipline').eq('id', playerId).single()
+    supabase.from('players')
+      .select('bio, preferred_discipline, nickname, tagline, accent_color, home_venue, years_playing, cue_brand')
+      .eq('id', playerId).single()
       .then(({ data }) => {
         if (data) {
           setBio(data.bio ?? '');
           setPreferredDisc((data.preferred_discipline as typeof DISCIPLINES[number] | null) ?? '');
+          setNickname(data.nickname ?? '');
+          setTagline(data.tagline ?? '');
+          setAccentColor(data.accent_color ?? '');
+          setHomeVenue(data.home_venue ?? '');
+          setYearsPlaying(data.years_playing === null ? '' : String(data.years_playing));
+          setCueBrand(data.cue_brand ?? '');
         }
       });
   }, [playerId]);
+
+  // Preferences are created by a trigger, one row per player, so this only ever
+  // reads and updates — never inserts.
+  useEffect(() => {
+    if (!playerId) return;
+    supabase.from('player_preferences').select('*').eq('player_id', playerId).maybeSingle()
+      .then(({ data }) => { if (data) setPrefs(data); });
+  }, [playerId]);
+
+  /**
+   * Writes one toggle immediately. Optimistic so the switch never lags under a
+   * thumb, and reverted with an explanation if the write fails — a toggle that
+   * silently springs back is the worst version of this.
+   */
+  const setPreference = async (key: keyof PlayerPreferences, value: boolean) => {
+    if (!player || !prefs) return;
+    const previous = prefs;
+    setPrefs({ ...prefs, [key]: value });
+    setPrefsError('');
+    const { error } = await supabase
+      .from('player_preferences')
+      .update({ [key]: value, updated_at: new Date().toISOString() })
+      .eq('player_id', player.id);
+    if (error) {
+      setPrefs(previous);
+      setPrefsError(`Couldn't save that setting: ${error.message}`);
+    }
+  };
 
   const handleSaveName = async () => {
     if (!profile || !displayName.trim()) return;
@@ -55,12 +155,40 @@ export default function SettingsPage() {
 
   const handleSaveProfile = async () => {
     if (!player) return;
+    setProfileError('');
+    setProfileSaved(false);
+
+    // Mirrors the CHECK constraints so a player gets a plain sentence instead of
+    // a Postgres constraint name.
+    const years = yearsPlaying.trim() === '' ? null : Number(yearsPlaying);
+    if (years !== null && (!Number.isInteger(years) || years < 0 || years > 90)) {
+      setProfileError('Years playing must be a whole number between 0 and 90.');
+      return;
+    }
+    if (accentColor && !/^#[0-9A-Fa-f]{6}$/.test(accentColor)) {
+      setProfileError('Pick a colour from the swatches, or leave it blank.');
+      return;
+    }
+
     setSaving(true);
-    await supabase.from('players').update({
+    const { error } = await supabase.from('players').update({
       bio: bio.trim() || null,
       preferred_discipline: preferredDisc || null,
+      nickname: nickname.trim() || null,
+      tagline: tagline.trim() || null,
+      accent_color: accentColor || null,
+      home_venue: homeVenue || null,
+      years_playing: years,
+      cue_brand: cueBrand.trim() || null,
     }).eq('id', player.id);
     setSaving(false);
+
+    if (error) {
+      setProfileError(`Couldn't save your profile: ${error.message}`);
+      return;
+    }
+    setProfileSaved(true);
+    setTimeout(() => setProfileSaved(false), 2500);
   };
 
   const handleSelectIcon = async (icon: string) => {
@@ -258,6 +386,110 @@ export default function SettingsPage() {
               </div>
             </div>
 
+            {/* Nickname + tagline */}
+            <div className="mb-4">
+              <label className="block text-[#9CA3AF] text-sm font-[Barlow] mb-2">Nickname</label>
+              <input
+                type="text"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                maxLength={24}
+                placeholder="What they call you at the table"
+                className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] transition-colors"
+              />
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-[#9CA3AF] text-sm font-[Barlow] mb-2">Tagline</label>
+              <input
+                type="text"
+                value={tagline}
+                onChange={(e) => setTagline(e.target.value)}
+                maxLength={80}
+                placeholder="A line that shows on your profile"
+                className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] transition-colors"
+              />
+              <div className="text-right text-xs text-[#6B7280] font-[Barlow] mt-1">{tagline.length}/80</div>
+            </div>
+
+            {/* Accent colour — swatches rather than a text field, so the value is
+                always valid and it is a single tap on a phone. */}
+            <div className="mb-4">
+              <label className="block text-[#9CA3AF] text-sm font-[Barlow] mb-2">Accent Colour</label>
+              <div className="flex flex-wrap gap-2">
+                {ACCENT_SWATCHES.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    aria-label={`Accent colour ${c}`}
+                    onClick={() => setAccentColor(accentColor === c ? '' : c)}
+                    className={[
+                      'w-9 h-9 rounded-full border-2 transition-all',
+                      accentColor === c ? 'border-[#E8E2D6] scale-110' : 'border-transparent',
+                    ].join(' ')}
+                    style={{ background: c }}
+                  />
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setAccentColor('')}
+                  className={[
+                    'px-3 h-9 rounded-full border text-xs font-[Barlow] transition-all',
+                    accentColor === '' ? 'border-[#E8E2D6] text-[#E8E2D6]' : 'border-[#333] text-[#6B7280]',
+                  ].join(' ')}
+                >
+                  Default
+                </button>
+              </div>
+            </div>
+
+            {/* Home venue */}
+            <div className="mb-4">
+              <label className="block text-[#9CA3AF] text-sm font-[Barlow] mb-2">Home Venue</label>
+              <select
+                value={homeVenue}
+                onChange={(e) => setHomeVenue(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
+              >
+                <option value="">No preference</option>
+                {venues.map((v) => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 mb-5">
+              <div>
+                <label className="block text-[#9CA3AF] text-sm font-[Barlow] mb-2">Years Playing</label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={90}
+                  value={yearsPlaying}
+                  onChange={(e) => setYearsPlaying(e.target.value)}
+                  placeholder="—"
+                  className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
+                />
+              </div>
+              <div>
+                <label className="block text-[#9CA3AF] text-sm font-[Barlow] mb-2">Cue</label>
+                <input
+                  type="text"
+                  value={cueBrand}
+                  onChange={(e) => setCueBrand(e.target.value)}
+                  maxLength={40}
+                  placeholder="Predator, McDermott…"
+                  className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
+                />
+              </div>
+            </div>
+
+            {profileError && (
+              <p className="text-[#EF4444] text-xs font-[Barlow] mb-3">{profileError}</p>
+            )}
+            {profileSaved && (
+              <p className="text-[#22C55E] text-xs font-[Barlow] mb-3">Saved — this is what other players see.</p>
+            )}
+
             <Button variant="primary" fullWidth loading={saving} onClick={handleSaveProfile}>
               Save Profile
             </Button>
@@ -346,6 +578,92 @@ export default function SettingsPage() {
           </div>
         </GlassCard>
       </motion.div>
+
+      {/* Notifications — these are enforced server-side by a trigger on the
+          notifications table, so switching one off stops it everywhere, not just
+          in this app's UI. */}
+      {player && (
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+          <GlassCard className="p-5 mb-4">
+            <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-1">Notify Me About</h2>
+            <p className="text-[#6B7280] text-xs font-[Barlow] mb-3">
+              Forfeits, disputes and anything affecting your rank or the treasury always come through.
+            </p>
+
+            {prefsError && <p className="text-[#EF4444] text-xs font-[Barlow] mb-2">{prefsError}</p>}
+
+            {!prefs ? (
+              <div className="space-y-2">
+                {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-10 rounded-lg" />)}
+              </div>
+            ) : (
+              <>
+                <ToggleRow
+                  icon={<Swords size={18} />}
+                  title="Challenges"
+                  description="New challenges, replies and scheduling"
+                  checked={prefs.notify_challenges}
+                  onChange={(v) => setPreference('notify_challenges', v)}
+                />
+                <ToggleRow
+                  icon={<Clock size={18} />}
+                  title="Match Reminders"
+                  description="A nudge before your match starts"
+                  checked={prefs.notify_reminders}
+                  onChange={(v) => setPreference('notify_reminders', v)}
+                />
+                <ToggleRow
+                  icon={<Trophy size={18} />}
+                  title="Results"
+                  description="Submitted and confirmed match results"
+                  checked={prefs.notify_results}
+                  onChange={(v) => setPreference('notify_results', v)}
+                />
+                <ToggleRow
+                  icon={<Bell size={18} />}
+                  title="League Activity"
+                  description="Rank changes and new members"
+                  checked={prefs.notify_activity}
+                  onChange={(v) => setPreference('notify_activity', v)}
+                />
+                <ToggleRow
+                  icon={<BellOff size={18} />}
+                  title="Send to My Phone"
+                  description="Master switch for push notifications"
+                  checked={prefs.push_enabled}
+                  onChange={(v) => setPreference('push_enabled', v)}
+                />
+              </>
+            )}
+          </GlassCard>
+        </motion.div>
+      )}
+
+      {/* Privacy */}
+      {player && prefs && (
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}>
+          <GlassCard className="p-5 mb-4">
+            <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-1">What Others See</h2>
+            <p className="text-[#6B7280] text-xs font-[Barlow] mb-3">
+              Your name, rank and match history stay on the ladder either way — that's the league record.
+            </p>
+            <ToggleRow
+              icon={<Trophy size={18} />}
+              title="Detailed Stats"
+              description="Your by-discipline and by-venue breakdowns"
+              checked={prefs.show_stats_publicly}
+              onChange={(v) => setPreference('show_stats_publicly', v)}
+            />
+            <ToggleRow
+              icon={<User size={18} />}
+              title="Profile Details"
+              description="Nickname, tagline, bio, cue and home venue"
+              checked={prefs.show_profile_details}
+              onChange={(v) => setPreference('show_profile_details', v)}
+            />
+          </GlassCard>
+        </motion.div>
+      )}
 
       {/* App info */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.16 }}>

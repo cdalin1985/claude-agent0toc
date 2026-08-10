@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ChevronLeft, Swords } from 'lucide-react';
@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useRankings } from '../hooks/useRankings';
+import { useLeagueSettings, venuesFrom } from '../hooks/useLeagueSettings';
 import { Avatar } from '../components/Avatar';
 import { GlassCard } from '../components/GlassCard';
 import { InactivePlayerBanner } from '../components/InactivePlayerBanner';
@@ -13,7 +14,7 @@ import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { CardSkeleton } from '../components/Skeleton';
 import { formatDate } from '../utils/time';
-import type { Match, PlayerDisciplineStats } from '../types/database';
+import type { Match, PlayerDisciplineStats, PlayerVenueStats, PlayerPreferences } from '../types/database';
 
 type Discipline = '8 Ball' | '9 Ball' | '10 Ball';
 const DISCIPLINES: Discipline[] = ['8 Ball', '9 Ball', '10 Ball'];
@@ -71,6 +72,54 @@ export default function PlayerPage() {
     enabled: !!id,
   });
 
+  const { data: venueStats = [] } = useQuery<PlayerVenueStats[]>({
+    queryKey: ['player-venue-stats', id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('player_venue_stats')
+        .select('*')
+        .eq('player_id', id);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!id,
+  });
+
+  // This player's own display choices. Absent row means show everything —
+  // defaults live in the table, and a failed read must not blank a profile.
+  const { data: prefs } = useQuery<PlayerPreferences | null>({
+    queryKey: ['player-preferences', id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('player_preferences')
+        .select('*')
+        .eq('player_id', id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+  const showDetails = prefs?.show_profile_details ?? true;
+  const showStats   = prefs?.show_stats_publicly ?? true;
+  const isSelf      = myPlayer?.id === id;
+
+  const { data: leagueSettings } = useLeagueSettings();
+  // Venues are admin-editable, so the tabs come from settings. A venue added in
+  // Admin shows up here with no code change; one removed still shows if this
+  // player has a record there, because hiding it would silently delete history.
+  const venues = useMemo(() => {
+    const configured = venuesFrom(leagueSettings);
+    const played = venueStats.map((v) => v.venue);
+    return [...configured, ...played.filter((v) => !configured.includes(v))];
+  }, [leagueSettings, venueStats]);
+
+  const [venueTab, setVenueTab] = useState<string | null>(null);
+  const activeVenue = venueTab ?? venues[0] ?? null;
+  const vs = venueStats.find((v) => v.venue === activeVenue) ?? null;
+  const vsWinPct = vs && vs.matches_played > 0 ? Math.round((vs.wins / vs.matches_played) * 100) : 0;
+  const vsAvgRace = vs && vs.matches_played > 0 ? (vs.total_race_length / vs.matches_played).toFixed(1) : '—';
+
   if (!targetRanking) {
     return (
       <div className="min-h-screen px-4 pt-8 space-y-4">
@@ -115,8 +164,19 @@ export default function PlayerPage() {
             <InactivePlayerBanner playerName={player.full_name} />
           )}
           <h1 className="font-[Bebas_Neue] text-4xl text-[#E8E2D6]">{player.full_name}</h1>
+          {showDetails && player.nickname && (
+            <div className="font-[Barlow] text-sm text-[#9CA3AF] -mt-1">“{player.nickname}”</div>
+          )}
+          {showDetails && player.tagline && (
+            <p className="text-[#C9C3B8] text-sm font-[Barlow] italic mt-1 max-w-xs mx-auto leading-snug">
+              {player.tagline}
+            </p>
+          )}
           <div className="flex items-center justify-center flex-wrap gap-2 mt-2">
-            <span className="font-[Azeret_Mono] text-2xl font-bold text-[#C62828]">
+            <span
+              className="font-[Azeret_Mono] text-2xl font-bold"
+              style={{ color: (showDetails && player.accent_color) || '#C62828' }}
+            >
               #{ranking.position}
             </span>
             {metrics?.fargo_rating && <Badge variant="default">FR {metrics.fargo_rating}</Badge>}
@@ -131,7 +191,18 @@ export default function PlayerPage() {
               Robustness: {metrics.fargo_robustness}
             </div>
           )}
-          {player.bio && (
+          {showDetails && (player.home_venue || player.years_playing !== null || player.cue_brand) && (
+            <div className="flex items-center justify-center flex-wrap gap-2 mt-3">
+              {player.home_venue && <Badge variant="default">📍 {player.home_venue}</Badge>}
+              {player.years_playing !== null && (
+                <Badge variant="default">
+                  🕰️ {player.years_playing} {player.years_playing === 1 ? 'yr' : 'yrs'} playing
+                </Badge>
+              )}
+              {player.cue_brand && <Badge variant="default">🎯 {player.cue_brand}</Badge>}
+            </div>
+          )}
+          {showDetails && player.bio && (
             <p className="text-[#9CA3AF] text-sm font-[Barlow] mt-3 max-w-xs mx-auto leading-snug">
               {player.bio}
             </p>
@@ -187,6 +258,25 @@ export default function PlayerPage() {
         </GlassCard>
       </motion.div>
 
+      {/* A player may keep their itemised stats private. They always see their
+          own, or the toggle would look broken from the inside. */}
+      {!showStats && !isSelf && (
+        <GlassCard className="p-4 mb-4 text-center">
+          <p className="text-[#6B7280] text-sm font-[Barlow]">
+            {player.full_name} keeps their detailed stats private.
+          </p>
+        </GlassCard>
+      )}
+
+      {(showStats || isSelf) && (<>
+      {!showStats && isSelf && (
+        <GlassCard className="p-3 mb-4 border border-[#D4AF37]/30 bg-[#D4AF37]/5">
+          <p className="text-[#D4AF37] text-xs font-[Barlow] text-center">
+            Only you can see these — detailed stats are switched off in your settings.
+          </p>
+        </GlassCard>
+      )}
+
       {/* Per-discipline stats */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.35 }}>
         <GlassCard className="p-4 mb-4">
@@ -232,6 +322,53 @@ export default function PlayerPage() {
           )}
         </GlassCard>
       </motion.div>
+
+      {/* Per-venue stats */}
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12, duration: 0.35 }}>
+        <GlassCard className="p-4 mb-4">
+          <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-3">By Venue</h2>
+          <div className="flex gap-1 mb-4 bg-[#1A1A1A] rounded-xl p-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+            {venues.map((v) => (
+              <button
+                key={v}
+                onClick={() => setVenueTab(v)}
+                className={[
+                  'flex-1 py-2 px-3 rounded-lg text-xs font-[Barlow] font-medium transition-all duration-200 whitespace-nowrap',
+                  activeVenue === v ? 'bg-[#C62828] text-white' : 'text-[#9CA3AF]',
+                ].join(' ')}
+              >
+                📍 {v}
+              </button>
+            ))}
+          </div>
+          {vs && vs.matches_played > 0 ? (
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: 'Wins',         value: vs.wins,            color: '#22C55E' },
+                { label: 'Losses',       value: vs.losses,          color: '#EF4444' },
+                { label: 'Win %',        value: `${vsWinPct}%`,     color: '#E8E2D6' },
+                { label: 'Streak',       value: vs.current_streak,  color: vs.current_streak > 0 ? '#22C55E' : '#9CA3AF' },
+                { label: 'Best Streak',  value: vs.best_streak,     color: '#9CA3AF' },
+                { label: 'Avg Race',     value: vsAvgRace,          color: '#9CA3AF' },
+                { label: 'Challenger W', value: vs.challenger_wins, color: '#22C55E' },
+                { label: 'Defender W',   value: vs.defender_wins,   color: '#22C55E' },
+                { label: 'Played',       value: vs.matches_played,  color: '#9CA3AF' },
+              ].map((s) => (
+                <div key={s.label} className="text-center bg-[#252525]/60 rounded-xl p-3">
+                  <div className="font-[Azeret_Mono] font-bold text-2xl" style={{ color: s.color }}>{s.value}</div>
+                  <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">{s.label}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[#6B7280] text-sm font-[Barlow] text-center py-4">
+              No matches played at {activeVenue ?? 'this venue'} yet.
+            </p>
+          )}
+        </GlassCard>
+      </motion.div>
+
+      </>)}
 
       {/* Head-to-head */}
       {h2h.length > 0 && myPlayer && (
