@@ -13,7 +13,7 @@ import { EmptyState } from '../components/EmptyState';
 import { RankingRowSkeleton } from '../components/Skeleton';
 import { QueryError } from '../components/QueryError';
 import { formatDateTime } from '../utils/time';
-import type { Challenge } from '../types/database';
+import type { Challenge, ChallengeProposal } from '../types/database';
 
 const VENUES = ['Eagles 4040', 'Valley Hub'] as const;
 type Venue = typeof VENUES[number];
@@ -40,12 +40,41 @@ function usePlayerChallenges(playerId: string | undefined) {
   });
 }
 
+/**
+ * The live proposal on each challenge, keyed by challenge id. At most one row
+ * per challenge is 'pending' (enforced by a partial unique index), and its
+ * author is the player waiting — so this is also what decides whose turn it is.
+ */
+function usePendingProposals(challengeIds: string[]) {
+  const key = challengeIds.join(',');
+  return useQuery<Map<string, ChallengeProposal>>({
+    queryKey: ['challenge-proposals', key],
+    queryFn: async () => {
+      if (challengeIds.length === 0) return new Map();
+      const { data, error } = await supabase
+        .from('challenge_proposals')
+        .select('*')
+        .in('challenge_id', challengeIds)
+        .eq('status', 'pending');
+      if (error) throw error;
+      return new Map((data ?? []).map((p) => [p.challenge_id, p as ChallengeProposal]));
+    },
+    enabled: challengeIds.length > 0,
+  });
+}
+
 function RespondModal({
   challenge,
+  proposal,
+  myPlayerId,
+  playerName,
   onClose,
   onSuccess,
 }: {
   challenge: Challenge;
+  proposal: ChallengeProposal | null;
+  myPlayerId: string;
+  playerName: (id: string) => string;
   onClose: () => void;
   onSuccess: () => void;
 }) {
@@ -54,26 +83,55 @@ function RespondModal({
   const [time, setTime]       = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
+  // Whose turn it is. A proposal you made yourself is one you are waiting on,
+  // not one you can answer.
+  const theirProposal = proposal && proposal.proposed_by_player_id !== myPlayerId ? proposal : null;
+  const myProposal    = proposal && proposal.proposed_by_player_id === myPlayerId ? proposal : null;
+  const [showCounter, setShowCounter] = useState(false);
+  const negotiating = challenge.status === 'accepted';
 
   const callFn = async (body: object) => {
     const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return { error: 'Your sign-in expired. Please sign in again.' };
     const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/respond-to-challenge`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify(body),
     });
-    return res.json() as Promise<{ success?: boolean; error?: string }>;
+    // A failing function can return a non-JSON body; don't let that throw.
+    const json = await res.json().catch(() => ({})) as { success?: boolean; error?: string };
+    if (!res.ok && !json.error) return { error: 'Something went wrong. Please try again.' };
+    return json;
   };
 
-  const handleAccept = async () => {
-    if (!venue || !date || !time) { setError('Please fill in all fields.'); return; }
+  const handlePropose = async () => {
+    if (!venue || !date || !time) { setError('Pick a venue, a date and a time.'); return; }
     setLoading(true);
     setError('');
-    const scheduledAt = new Date(`${date}T${time}`).toISOString();
-    const json = await callFn({ challenge_id: challenge.id, action: 'accept', venue, scheduled_at: scheduledAt });
-    setLoading(false);
-    if (json.error) { setError(json.error); return; }
-    onSuccess();
+    try {
+      const scheduledAt = new Date(`${date}T${time}`).toISOString();
+      const json = await callFn({ challenge_id: challenge.id, action: 'propose', venue, scheduled_at: scheduledAt });
+      if (json.error) { setError(json.error); return; }
+      onSuccess();
+    } catch {
+      setError('Connection problem — nothing was sent. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAcceptProposal = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const json = await callFn({ challenge_id: challenge.id, action: 'accept_proposal' });
+      if (json.error) { setError(json.error); return; }
+      onSuccess();
+    } catch {
+      setError('Connection problem — nothing was sent. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const [showDeclineConfirm, setShowDeclineConfirm] = useState(false);
@@ -108,12 +166,44 @@ function RespondModal({
         className="glass-card p-6 w-full max-w-sm"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="font-[Bebas_Neue] text-2xl text-[#E8E2D6] mb-1">Respond to Challenge</h2>
+        <h2 className="font-[Bebas_Neue] text-2xl text-[#E8E2D6] mb-1">
+          {negotiating ? 'Sort out a time' : 'Respond to Challenge'}
+        </h2>
         <p className="text-[#9CA3AF] text-sm font-[Barlow] mb-4">
           {challenge.discipline} · Race to {challenge.race_length}
         </p>
 
-        <div className="space-y-3 mb-4">
+        {theirProposal && (
+          <div className="mb-4 p-3 rounded-xl border border-[#22C55E]/40 bg-[#22C55E]/5">
+            <div className="text-[#9CA3AF] text-xs font-[Barlow] mb-1">
+              {playerName(theirProposal.proposed_by_player_id)} suggested
+            </div>
+            <div className="text-[#E8E2D6] font-[Barlow] font-semibold text-sm">
+              📅 {formatDateTime(theirProposal.scheduled_at)}
+            </div>
+            <div className="text-[#E8E2D6] font-[Barlow] text-sm">📍 {theirProposal.venue}</div>
+            {theirProposal.message && (
+              <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-1.5 italic">“{theirProposal.message}”</div>
+            )}
+          </div>
+        )}
+
+        {myProposal && (
+          <div className="mb-4 p-3 rounded-xl border border-[#333] bg-[#252525]/50">
+            <div className="text-[#9CA3AF] text-xs font-[Barlow] mb-1">
+              Waiting on {playerName(challenge.challenger_id === myPlayerId ? challenge.challenged_id : challenge.challenger_id)}
+            </div>
+            <div className="text-[#E8E2D6] font-[Barlow] font-semibold text-sm">
+              📅 {formatDateTime(myProposal.scheduled_at)}
+            </div>
+            <div className="text-[#E8E2D6] font-[Barlow] text-sm">📍 {myProposal.venue}</div>
+            <div className="text-[#6B7280] text-xs font-[Barlow] mt-1.5">
+              You suggested this. They can accept it or suggest another.
+            </div>
+          </div>
+        )}
+
+        <div className={`space-y-3 mb-4 ${theirProposal && !showCounter ? 'hidden' : ''}`}>
           <div>
             <label className="block text-[#9CA3AF] text-xs font-[Barlow] mb-1.5 flex items-center gap-1">
               <MapPin size={12} /> Venue
@@ -179,13 +269,41 @@ function RespondModal({
               </Button>
             </div>
           </div>
+        ) : negotiating ? (
+          <div className="space-y-2 mb-2">
+            {theirProposal && !showCounter && (
+              <>
+                <Button variant="success" fullWidth onClick={handleAcceptProposal} loading={loading}>
+                  That works ✓
+                </Button>
+                <Button variant="secondary" fullWidth onClick={() => setShowCounter(true)} disabled={loading}>
+                  Suggest a different time
+                </Button>
+              </>
+            )}
+            {theirProposal && showCounter && (
+              <>
+                <Button variant="success" fullWidth onClick={handlePropose} loading={loading}>
+                  Send this suggestion
+                </Button>
+                <Button variant="ghost" fullWidth size="sm" onClick={() => setShowCounter(false)} disabled={loading}>
+                  Back
+                </Button>
+              </>
+            )}
+            {myProposal && (
+              <Button variant="secondary" fullWidth disabled>
+                Waiting for their reply…
+              </Button>
+            )}
+          </div>
         ) : (
           <div className="flex gap-2 mb-2">
             <Button variant="danger" fullWidth onClick={() => setShowDeclineConfirm(true)} disabled={loading}>
               Decline (forfeit)
             </Button>
-            <Button variant="success" fullWidth onClick={handleAccept} loading={loading}>
-              Accept ✓
+            <Button variant="success" fullWidth onClick={handlePropose} loading={loading}>
+              Suggest this time ✓
             </Button>
           </div>
         )}
@@ -207,7 +325,9 @@ export default function ChallengesPage() {
   const [actioningId, setActioningId] = useState<string | null>(null);
 
   const { data: challengesData, isLoading, isError, refetch, isRefetching } = usePlayerChallenges(player?.id);
-  const challenges = challengesData ?? [];
+  // Memoized because negotiatingIds derives from it; a fresh [] each render
+  // would refetch the proposals on every render.
+  const challenges = useMemo(() => challengesData ?? [], [challengesData]);
 
   const playerNameById = useMemo(
     () => new Map(rankings.map((r) => [r.player.id, r.player.full_name])),
@@ -215,7 +335,15 @@ export default function ChallengesPage() {
   );
   const getPlayerName = (id: string) => playerNameById.get(id) ?? 'Unknown';
 
-  const incoming = challenges.filter((c) => c.challenged_id === player?.id && c.status === 'pending');
+  const negotiatingIds = useMemo(
+    () => challenges.filter((c) => c.status === 'accepted').map((c) => c.id),
+    [challenges],
+  );
+  const { data: pendingProposals = new Map<string, ChallengeProposal>() } = usePendingProposals(negotiatingIds);
+
+  // 'accepted' means the two are still agreeing on when and where, so a
+  // challenge sits in Incoming while the reply is owed by this player.
+  const incoming = challenges.filter((c) => c.challenged_id === player?.id && ['pending', 'accepted'].includes(c.status));
   const outgoing = challenges.filter((c) => c.challenger_id === player?.id && ['pending', 'accepted', 'scheduled'].includes(c.status));
   const history  = challenges.filter((c) => ['confirmed', 'declined', 'expired', 'forfeited', 'cancelled', 'in_progress', 'submitted'].includes(c.status));
 
@@ -367,6 +495,15 @@ export default function ChallengesPage() {
                           Respond
                         </Button>
                       )}
+                      {c.status === 'accepted' && (
+                        <Button
+                          variant={pendingProposals.get(c.id)?.proposed_by_player_id === player?.id ? 'secondary' : 'primary'}
+                          size="sm"
+                          onClick={() => setResponding(c)}
+                        >
+                          {pendingProposals.get(c.id)?.proposed_by_player_id === player?.id ? 'Waiting…' : 'Pick a time'}
+                        </Button>
+                      )}
                       {tab === 'outgoing' && c.status === 'pending' && (
                         <Button variant="ghost" size="sm" loading={actioningId === c.id} onClick={() => runChallengeAction(c.id, 'cancel')}>
                           Cancel
@@ -397,9 +534,12 @@ export default function ChallengesPage() {
       )}
 
       <AnimatePresence>
-        {responding && (
+        {responding && player && (
           <RespondModal
             challenge={responding}
+            proposal={pendingProposals.get(responding.id) ?? null}
+            myPlayerId={player.id}
+            playerName={getPlayerName}
             onClose={() => setResponding(null)}
             onSuccess={handleSuccess}
           />

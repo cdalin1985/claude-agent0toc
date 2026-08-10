@@ -16,7 +16,7 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser(req.headers.get('Authorization')?.replace('Bearer ', ''));
     if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: cors });
 
-    const { challenge_id, action, venue, scheduled_at } = await req.json();
+    const { challenge_id, action, venue, scheduled_at, response_message } = await req.json();
 
     const { data: challenge } = await supabase.from('challenges').select('*').eq('id', challenge_id).single();
     if (!challenge) return new Response(JSON.stringify({ error: 'Challenge not found.' }), { headers: cors });
@@ -24,39 +24,173 @@ serve(async (req) => {
     const { data: callerPlayer } = await supabase.from('players').select('id, full_name').eq('profile_id', user.id).single();
     if (!callerPlayer) return new Response(JSON.stringify({ error: 'Player profile not found.' }), { headers: cors });
 
-    if (action === 'accept') {
-      if (challenge.challenged_id !== callerPlayer.id) return new Response(JSON.stringify({ error: 'Not authorized.' }), { headers: cors });
-      if (challenge.status !== 'pending') return new Response(JSON.stringify({ error: 'Challenge is not pending.' }), { headers: cors });
-      if (!venue || !scheduled_at) return new Response(JSON.stringify({ error: 'venue and scheduled_at required.' }), { headers: cors });
+    // 'accept' is the legacy one-shot action: the challenged player picked both
+    // the venue and the time and it was locked in, with no way for the
+    // challenger to counter. It now means the same as 'propose' so a client
+    // still running the old bundle lands in the negotiation rather than
+    // breaking.
+    if (action === 'propose' || action === 'accept') {
+      const isChallenger = challenge.challenger_id === callerPlayer.id;
+      const isChallenged = challenge.challenged_id === callerPlayer.id;
+      if (!isChallenger && !isChallenged) return new Response(JSON.stringify({ error: 'Not authorized.' }), { status: 403, headers: cors });
+      if (!['pending', 'accepted'].includes(challenge.status)) {
+        return new Response(JSON.stringify({ error: 'This challenge is not open for scheduling.' }), { status: 409, headers: cors });
+      }
+      // The challenger has already made their move by issuing the challenge;
+      // the first word on when and where is the challenged player's.
+      if (challenge.status === 'pending' && !isChallenged) {
+        return new Response(JSON.stringify({ error: 'Wait for them to respond to your challenge first.' }), { status: 409, headers: cors });
+      }
+      if (!venue || !scheduled_at) return new Response(JSON.stringify({ error: 'venue and scheduled_at required.' }), { status: 400, headers: cors });
+
       const scheduledAt = new Date(scheduled_at);
       if (Number.isNaN(scheduledAt.getTime())) return new Response(JSON.stringify({ error: 'scheduled_at must be a valid date.' }), { status: 400, headers: cors });
       if (scheduledAt.getTime() < Date.now() - 5 * 60 * 1000) return new Response(JSON.stringify({ error: 'Match cannot be scheduled in the past.' }), { status: 400, headers: cors });
 
-      const { data: settings } = await supabase.from('league_settings').select('venues, match_play_days').single();
+      const { data: settings } = await supabase.from('league_settings').select('venues').single();
       const validVenues = Array.isArray(settings?.venues) && settings.venues.length > 0 ? settings.venues : VALID_VENUES;
       if (typeof venue !== 'string' || !validVenues.includes(venue)) {
         return new Response(JSON.stringify({ error: 'Venue is not in league settings.' }), { status: 400, headers: cors });
       }
 
+      const { data: liveProposal, error: liveError } = await supabase
+        .from('challenge_proposals')
+        .select('id, proposed_by_player_id')
+        .eq('challenge_id', challenge_id)
+        .eq('status', 'pending')
+        .maybeSingle();
+      if (liveError) throw liveError;
+
+      // Turn order: you cannot counter your own outstanding proposal. Without
+      // this a player could bury the other under proposals they never had a
+      // chance to answer.
+      if (liveProposal && liveProposal.proposed_by_player_id === callerPlayer.id) {
+        return new Response(JSON.stringify({ error: "You've already proposed a time — it's their turn to reply." }), { status: 409, headers: cors });
+      }
+
+      if (liveProposal) {
+        const { error: supersedeError } = await supabase
+          .from('challenge_proposals')
+          .update({ status: 'superseded', responded_at: new Date().toISOString() })
+          .eq('id', liveProposal.id)
+          .eq('status', 'pending');
+        if (supersedeError) throw supersedeError;
+      }
+
+      const { error: proposalError } = await supabase.from('challenge_proposals').insert({
+        challenge_id,
+        proposed_by_player_id: callerPlayer.id,
+        venue,
+        scheduled_at: scheduledAt.toISOString(),
+        message: typeof response_message === 'string' ? response_message.slice(0, 280) : null,
+      });
+      if (proposalError) throw proposalError;
+
+      // 'accepted' means "answered, now agreeing on when and where". Guarded so
+      // two simultaneous first proposals cannot both move the challenge.
+      if (challenge.status === 'pending') {
+        const { error: statusError } = await supabase
+          .from('challenges')
+          .update({ status: 'accepted' })
+          .eq('id', challenge_id)
+          .eq('status', 'pending');
+        if (statusError) throw statusError;
+      }
+
+      const otherId = isChallenger ? challenge.challenged_id : challenge.challenger_id;
+      const [{ data: mePlayer }, { data: themPlayer }] = await Promise.all([
+        supabase.from('players').select('full_name').eq('id', callerPlayer.id).single(),
+        supabase.from('players').select('full_name').eq('id', otherId).single(),
+      ]);
+      const when = `${scheduledAt.toLocaleDateString()} at ${venue}`;
+      const countering = Boolean(liveProposal);
+
+      const { error: notificationError } = await supabase.from('notifications').insert({
+        player_id: otherId,
+        type: 'challenge_accepted',
+        title: countering ? '🗓️ New time suggested' : '✅ Challenge answered',
+        body: countering
+          ? `${mePlayer?.full_name} suggested ${when} instead. Accept it or suggest another.`
+          : `${mePlayer?.full_name} suggested ${when} for your ${challenge.discipline} match. Accept it or suggest another.`,
+        reference_id: challenge_id,
+        reference_type: 'challenge',
+      });
+      if (notificationError) throw notificationError;
+      await sendPush(
+        supabase,
+        otherId,
+        countering ? '🗓️ New time suggested' : '✅ Challenge answered',
+        `${mePlayer?.full_name} suggested ${when}.`,
+        '/challenges',
+      );
+
+      const { error: activityError } = await supabase.from('activity_feed').insert({
+        event_type: 'challenge_accepted',
+        headline: countering
+          ? `${mePlayer?.full_name} countered with a new time against ${themPlayer?.full_name}.`
+          : `${mePlayer?.full_name} answered ${themPlayer?.full_name}'s ${challenge.discipline} challenge — working out a time.`,
+        detail: `Proposed ${when} · race to ${challenge.race_length}`,
+        actor_player_id: callerPlayer.id,
+      });
+      if (activityError) throw activityError;
+
+    } else if (action === 'accept_proposal') {
+      const isChallenger = challenge.challenger_id === callerPlayer.id;
+      const isChallenged = challenge.challenged_id === callerPlayer.id;
+      if (!isChallenger && !isChallenged) return new Response(JSON.stringify({ error: 'Not authorized.' }), { status: 403, headers: cors });
+      if (challenge.status !== 'accepted') {
+        return new Response(JSON.stringify({ error: 'There is nothing to agree to on this challenge.' }), { status: 409, headers: cors });
+      }
+
+      const { data: proposal, error: proposalReadError } = await supabase
+        .from('challenge_proposals')
+        .select('id, proposed_by_player_id, venue, scheduled_at')
+        .eq('challenge_id', challenge_id)
+        .eq('status', 'pending')
+        .maybeSingle();
+      if (proposalReadError) throw proposalReadError;
+      if (!proposal) {
+        return new Response(JSON.stringify({ error: 'That time is no longer on the table. Refresh and take another look.' }), { status: 409, headers: cors });
+      }
+      // You agree to THEIR proposal, not your own.
+      if (proposal.proposed_by_player_id === callerPlayer.id) {
+        return new Response(JSON.stringify({ error: "That's your own suggestion — you're waiting on them." }), { status: 409, headers: cors });
+      }
+
+      const scheduledAt = new Date(proposal.scheduled_at);
+      const { data: settings } = await supabase.from('league_settings').select('match_play_days').single();
       // README: "Once accepted, the match must be played within 10 days."
       // expire_overdue_matches() reads this deadline and rules anything past it a wash.
       const matchPlayDays = settings?.match_play_days ?? 10;
       const matchDeadline = new Date(Date.now() + matchPlayDays * 24 * 3600 * 1000).toISOString();
 
+      // Claim the proposal first: it is the narrowest row, and winning it is
+      // what entitles this request to create the match.
+      const { data: claimedProposal, error: claimError } = await supabase
+        .from('challenge_proposals')
+        .update({ status: 'accepted', responded_at: new Date().toISOString() })
+        .eq('id', proposal.id)
+        .eq('status', 'pending')
+        .select('id');
+      if (claimError) throw claimError;
+      if (!claimedProposal?.length) {
+        return new Response(JSON.stringify({ error: 'That time is no longer on the table. Refresh and take another look.' }), { status: 409, headers: cors });
+      }
+
       const { data: scheduledChallenge, error: updateError } = await supabase
         .from('challenges')
         .update({
           status: 'scheduled',
-          venue,
+          venue: proposal.venue,
           scheduled_at: scheduledAt.toISOString(),
           match_deadline: matchDeadline,
         })
         .eq('id', challenge_id)
-        .eq('status', 'pending')
+        .eq('status', 'accepted')
         .select('id');
       if (updateError) throw updateError;
       if (!scheduledChallenge?.length) {
-        return new Response(JSON.stringify({ error: 'Challenge is no longer pending.' }), { status: 409, headers: cors });
+        return new Response(JSON.stringify({ error: 'This challenge has already moved on.' }), { status: 409, headers: cors });
       }
 
       const { data: match, error: insertError } = await supabase.from('matches').insert({
@@ -65,7 +199,7 @@ serve(async (req) => {
         player2_id: challenge.challenged_id,
         discipline: challenge.discipline,
         race_length: challenge.race_length,
-        venue,
+        venue: proposal.venue,
         scheduled_at: scheduledAt.toISOString(),
         status: 'scheduled',
         // The challenger keeps the single scoreboard during play.
@@ -73,24 +207,40 @@ serve(async (req) => {
       }).select().single();
       if (insertError) throw insertError;
 
-      const { data: challengedPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenged_id).single();
-      const { error: notificationError } = await supabase.from('notifications').insert({
-        player_id: challenge.challenger_id,
-        type: 'challenge_accepted',
-        title: `✅ Challenge accepted!`,
-        body: `${challengedPlayer?.full_name} accepted your ${challenge.discipline} challenge. Match on ${scheduledAt.toLocaleDateString()} at ${venue}.`,
-        reference_id: match?.id,
-        reference_type: 'match',
-      });
-      if (notificationError) throw notificationError;
-      await sendPush(supabase, challenge.challenger_id, `✅ Challenge accepted!`, `${challengedPlayer?.full_name} accepted. Match at ${venue}.`, `/match/${match?.id}`);
+      const otherId = isChallenger ? challenge.challenged_id : challenge.challenger_id;
+      const [{ data: mePlayer }, { data: themPlayer }] = await Promise.all([
+        supabase.from('players').select('full_name').eq('id', callerPlayer.id).single(),
+        supabase.from('players').select('full_name').eq('id', otherId).single(),
+      ]);
+      const when = `${scheduledAt.toLocaleDateString()} at ${proposal.venue}`;
 
-      const { data: challengerPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenger_id).single();
+      // Both players get this one — it is the moment the match becomes real.
+      const { error: notificationError } = await supabase.from('notifications').insert([
+        {
+          player_id: otherId,
+          type: 'challenge_accepted',
+          title: '🎱 Match locked in',
+          body: `${mePlayer?.full_name} agreed to ${when}. Race to ${challenge.race_length}, ${challenge.discipline}.`,
+          reference_id: match?.id,
+          reference_type: 'match',
+        },
+        {
+          player_id: callerPlayer.id,
+          type: 'challenge_accepted',
+          title: '🎱 Match locked in',
+          body: `You're on with ${themPlayer?.full_name} — ${when}. Race to ${challenge.race_length}, ${challenge.discipline}.`,
+          reference_id: match?.id,
+          reference_type: 'match',
+        },
+      ]);
+      if (notificationError) throw notificationError;
+      await sendPush(supabase, otherId, '🎱 Match locked in', `${mePlayer?.full_name} agreed to ${when}.`, `/match/${match?.id}`);
+
       const { error: activityError } = await supabase.from('activity_feed').insert({
         event_type: 'challenge_accepted',
-        headline: `${challengedPlayer?.full_name} accepted ${challengerPlayer?.full_name}'s ${challenge.discipline} challenge!`,
-        detail: `Match at ${venue} on ${scheduledAt.toLocaleDateString()} · race to ${challenge.race_length}`,
-        actor_player_id: challenge.challenged_id,
+        headline: `${themPlayer?.full_name} vs ${mePlayer?.full_name} is on — ${when}.`,
+        detail: `${challenge.discipline} · race to ${challenge.race_length}`,
+        actor_player_id: callerPlayer.id,
       });
       if (activityError) throw activityError;
 

@@ -51,7 +51,10 @@ jobs:
           done
 
       - name: Assert the league rules actually behave correctly
-        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/migrations/01_rules_assert.sql
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/migrations/01_rules_assert.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/migrations/02_negotiation_assert.sql
 
       - name: Re-apply the newest migrations to prove they are idempotent
         # Production runs ahead of this repo, so a NEW migration must be safe to
@@ -71,4 +74,7 @@ jobs:
           done
 
       - name: Assert behaviour still holds after re-application
-        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/migrations/01_rules_assert.sql
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/migrations/01_rules_assert.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/migrations/02_negotiation_assert.sql

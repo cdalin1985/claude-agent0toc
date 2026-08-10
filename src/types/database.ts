@@ -304,6 +304,26 @@ export interface Database {
         };
         Update: Partial<Database['public']['Tables']['challenge_forfeiture_events']['Insert']>;
       };
+      challenge_proposals: {
+        Row: {
+          id: string;
+          challenge_id: string;
+          proposed_by_player_id: string;
+          venue: string;
+          scheduled_at: string;
+          message: string | null;
+          // At most one 'pending' row per challenge; its author is the player
+          // waiting, and the other player owes an accept or a counter.
+          status: 'pending' | 'accepted' | 'superseded';
+          created_at: string;
+          responded_at: string | null;
+        };
+        Insert: Omit<Database['public']['Tables']['challenge_proposals']['Row'], 'id' | 'created_at' | 'status' | 'responded_at'> & {
+          status?: 'pending' | 'accepted' | 'superseded';
+          responded_at?: string | null;
+        };
+        Update: Partial<Database['public']['Tables']['challenge_proposals']['Insert']>;
+      };
       league_settings: {
         Row: {
           id: string;
@@ -389,6 +409,7 @@ export type PlayerSeasonStats = Database['public']['Tables']['player_season_stat
 export type PlayerDisciplineStats = Database['public']['Tables']['player_discipline_stats']['Row'];
 export type TreasuryEntry = Database['public']['Tables']['treasury_ledger']['Row'];
 export type ChallengeForfeitureEvent = Database['public']['Tables']['challenge_forfeiture_events']['Row'];
+export type ChallengeProposal = Database['public']['Tables']['challenge_proposals']['Row'];
 export type TreasuryLedgerEffect = Database['public']['Views']['treasury_ledger_effects']['Row'];
 export type TreasurySummary = Database['public']['Views']['treasury_summary']['Row'];
 export type LeagueSettings = Database['public']['Tables']['league_settings']['Row'];

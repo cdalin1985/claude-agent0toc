@@ -266,7 +266,9 @@ test('every cancel-path write checks its error', () => {
 // --- README rule: the 10-day play window ------------------------------------
 
 test('the play window comes from league_settings, not a hardcoded 10', () => {
-  assert.match(respondToChallenge, /\.select\('venues, match_play_days'\)/);
+  // Read where it is used: proposing validates the venue, agreeing sets the
+  // deadline, so the two actions read different settings.
+  assert.match(respondToChallenge, /\.select\('match_play_days'\)/);
   assert.match(respondToChallenge, /const matchPlayDays = settings\?\.match_play_days \?\? 10;/);
   assert.doesNotMatch(respondToChallenge, /Date\.now\(\) \+ 10 \* 24 \* 3600 \* 1000/);
 });
