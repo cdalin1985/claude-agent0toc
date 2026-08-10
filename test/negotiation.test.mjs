@@ -9,6 +9,7 @@ const read = (...parts) => readFileSync(join(root, ...parts), 'utf8');
 const migration = read('supabase', 'migrations', '20260807140000_challenge_scheduling_proposals.sql');
 const respondToChallenge = read('supabase', 'functions', 'respond-to-challenge', 'index.ts');
 const challengesPage = read('src', 'pages', 'ChallengesPage.tsx');
+const notificationsPage = read('src', 'pages', 'NotificationsPage.tsx');
 const databaseTypes = read('src', 'types', 'database.ts');
 const sqlAssert = read('supabase', 'tests', 'migrations', '02_negotiation_assert.sql');
 const workflow = read('.github', 'workflows', 'migration-replay-check.yml');
@@ -149,8 +150,28 @@ test('the reply is two taps: that works, or suggest another', () => {
   assert.match(challengesPage, /Suggest a different time/);
   assert.match(challengesPage, /action: 'accept_proposal'/);
   assert.match(challengesPage, /action: 'propose'/);
-  // The old one-shot accept must be gone from the client.
-  assert.doesNotMatch(challengesPage, /action: 'accept'[^_]/);
+});
+
+test('NO page anywhere still locks a time in with the one-shot accept', () => {
+  // NotificationsPage carries its own inline respond flow. Scoping this check
+  // to ChallengesPage alone is exactly how that one got missed: the challenged
+  // player could answer from their notifications and skip the negotiation
+  // entirely, and because 'accept' is aliased to 'propose' it would have
+  // silently created a proposal while the UI claimed the match was scheduled.
+  for (const [name, source] of Object.entries({ challengesPage, notificationsPage })) {
+    assert.doesNotMatch(source, /action: 'accept'(?!_)/, `${name} still uses the one-shot accept`);
+  }
+  assert.match(notificationsPage, /action: 'propose'/);
+  assert.match(notificationsPage, /Nothing is locked in until one of you agrees\./);
+});
+
+test('the notifications respond flow surfaces errors and clears its loading state', () => {
+  assert.match(notificationsPage, /if \(!res\.ok && !json\.error\) return \{ error: 'Something went wrong\. Please try again\.' \};/);
+  for (const fn of ['handlePropose', 'handleDecline']) {
+    const body = notificationsPage.match(new RegExp(`const ${fn} = async[\\s\\S]*?\\n {2}\\};`));
+    assert.ok(body, `expected ${fn}`);
+    assert.match(body[0], /finally \{\s*\n\s*setLoading\(false\);/, `${fn} must clear loading in a finally`);
+  }
 });
 
 test('a challenge still being scheduled is visible to both players', () => {
