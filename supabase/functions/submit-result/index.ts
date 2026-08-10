@@ -24,8 +24,25 @@ function vapidDetails(): { subject: string; publicKey: string; privateKey: strin
 
 // Never throws — push must not break match submission. But every exit path
 // logs, because a swallowed failure is indistinguishable from a delivery.
-async function sendPush(supabase: any, playerId: string, title: string, body: string, url: string): Promise<void> {
+// Two gates before sending: push_enabled is the master switch, and the
+// per-category preference is asked via player_accepts_notification — the SAME
+// function the notifications insert trigger uses, so a muted category cannot be
+// silent in the app and still buzz the phone. Every failure path sends anyway:
+// silence must not be the consequence of a lookup problem.
+async function playerWantsPush(supabase: any, playerId: string, notificationType?: string): Promise<boolean> {
+  const { data: prefs, error: prefsError } = await supabase.from('player_preferences').select('push_enabled').eq('player_id', playerId).maybeSingle();
+  if (prefsError) { console.error(`[push] could not read preferences for player ${playerId}, sending anyway: ${prefsError.message}`); return true; }
+  if (prefs && prefs.push_enabled === false) { console.info(`[push] player ${playerId} has push switched off — skipped.`); return false; }
+  if (!notificationType) return true;
+  const { data: accepts, error: acceptsError } = await supabase.rpc('player_accepts_notification', { p_player_id: playerId, p_type: notificationType });
+  if (acceptsError) { console.error(`[push] preference check failed for player ${playerId}, sending anyway: ${acceptsError.message}`); return true; }
+  if (accepts === false) { console.info(`[push] player ${playerId} has ${notificationType} muted — skipped.`); return false; }
+  return true;
+}
+
+async function sendPush(supabase: any, playerId: string, title: string, body: string, url: string, notificationType?: string): Promise<void> {
   try {
+    if (!(await playerWantsPush(supabase, playerId, notificationType))) return;
     const { data: row, error } = await supabase.from('push_subscriptions').select('subscription').eq('player_id', playerId).maybeSingle();
     if (error) { console.error(`[push] could not read subscription for player ${playerId}: ${error.message}`); return; }
     if (!row?.subscription) { console.info(`[push] player ${playerId} has no push subscription — skipped.`); return; }
@@ -287,6 +304,59 @@ async function checkRank1Compliance(supabase: ReturnType<typeof createClient>) {
   }
 }
 
+/**
+ * Updates one of the "stats split by something" tables — by discipline, or by
+ * venue. They carry the same columns and the same rules, so they share one
+ * implementation: two copies of this would drift the first time someone fixed a
+ * streak bug in only one of them.
+ *
+ * participants is [playerId, isWinner, isChallenger] per player.
+ */
+async function updateSplitStats(
+  supabase: ReturnType<typeof createClient>,
+  table: 'player_discipline_stats' | 'player_venue_stats',
+  keyColumn: 'discipline' | 'venue',
+  keyValue: string,
+  participants: [string, boolean, boolean][],
+  raceLength: number,
+): Promise<void> {
+  const seeds = await Promise.all(
+    participants.map(([pid]) =>
+      supabase.from(table).upsert({ player_id: pid, [keyColumn]: keyValue }, { onConflict: `player_id,${keyColumn}`, ignoreDuplicates: true }),
+    ),
+  );
+  for (const seed of seeds) {
+    if (seed.error) throw seed.error;
+  }
+
+  const rows = await Promise.all(
+    participants.map(([pid]) => supabase.from(table).select('*').eq('player_id', pid).eq(keyColumn, keyValue).single()),
+  );
+
+  const updates = participants
+    .map(([pid, isWinner, isChallenger], i) => {
+      const s = rows[i].data;
+      if (!s) return null;
+      const newStreak = isWinner ? (s.current_streak >= 0 ? s.current_streak + 1 : 1) : 0;
+      return supabase.from(table).update({
+        matches_played: s.matches_played + 1,
+        wins: isWinner ? s.wins + 1 : s.wins,
+        losses: isWinner ? s.losses : s.losses + 1,
+        current_streak: newStreak,
+        best_streak: isWinner ? Math.max(s.best_streak, newStreak) : s.best_streak,
+        challenger_wins: isWinner && isChallenger ? s.challenger_wins + 1 : s.challenger_wins,
+        defender_wins: isWinner && !isChallenger ? s.defender_wins + 1 : s.defender_wins,
+        total_race_length: s.total_race_length + raceLength,
+        updated_at: new Date().toISOString(),
+      }).eq('player_id', pid).eq(keyColumn, keyValue);
+    })
+    .filter((p): p is NonNullable<typeof p> => p !== null);
+
+  for (const result of await Promise.all(updates)) {
+    if (result.error) throw result.error;
+  }
+}
+
 async function confirmResult(
   supabase: ReturnType<typeof createClient>,
   matchId: string,
@@ -294,7 +364,7 @@ async function confirmResult(
   loserId: string,
   p1Score: number,
   p2Score: number,
-  match: { discipline: string; race_length: number; player1_id: string; player2_id: string; challenge_id: string },
+  match: { discipline: string; venue: string | null; race_length: number; player1_id: string; player2_id: string; challenge_id: string },
 ) {
   const { error: matchError } = await supabase.from('matches').update({ status: 'confirmed', winner_id: winnerId, loser_id: loserId, player1_score: p1Score, player2_score: p2Score, completed_at: new Date().toISOString() }).eq('id', matchId);
   if (matchError) throw matchError;
@@ -365,28 +435,14 @@ async function confirmResult(
   // which is exactly the case the README puts a cooldown on.
   await createPostMatchCooldowns(supabase, loserId, rankChange ? winnerId : null);
 
-  const disc = match.discipline;
-  const disciplineSeeds = await Promise.all([winnerId, loserId].map((pid) => supabase.from('player_discipline_stats').upsert({ player_id: pid, discipline: disc }, { onConflict: 'player_id,discipline', ignoreDuplicates: true })));
-  for (const seed of disciplineSeeds) {
-    if (seed.error) throw seed.error;
-  }
+  const participants = [[winnerId, true, winnerIsChallenger], [loserId, false, !winnerIsChallenger]] as [string, boolean, boolean][];
 
-  const disciplineParticipants = [[winnerId, true, winnerIsChallenger], [loserId, false, !winnerIsChallenger]] as [string, boolean, boolean][];
-  const disciplineStatsRows = await Promise.all(
-    disciplineParticipants.map(([pid]) =>
-      supabase.from('player_discipline_stats').select('*').eq('player_id', pid).eq('discipline', disc).single(),
-    ),
-  );
-  const disciplineUpdates = disciplineParticipants
-    .map(([pid, isWinner, isChallenger], i) => {
-      const ds = disciplineStatsRows[i].data;
-      if (!ds) return null;
-      const newStreak = isWinner ? (ds.current_streak >= 0 ? ds.current_streak + 1 : 1) : 0;
-      return supabase.from('player_discipline_stats').update({ matches_played: ds.matches_played + 1, wins: isWinner ? ds.wins + 1 : ds.wins, losses: isWinner ? ds.losses : ds.losses + 1, current_streak: newStreak, best_streak: isWinner ? Math.max(ds.best_streak, newStreak) : ds.best_streak, challenger_wins: isWinner && isChallenger ? ds.challenger_wins + 1 : ds.challenger_wins, defender_wins: isWinner && !isChallenger ? ds.defender_wins + 1 : ds.defender_wins, total_race_length: ds.total_race_length + match.race_length, updated_at: new Date().toISOString() }).eq('player_id', pid).eq('discipline', disc);
-    })
-    .filter((p): p is NonNullable<typeof p> => p !== null);
-  for (const result of await Promise.all(disciplineUpdates)) {
-    if (result.error) throw result.error;
+  await updateSplitStats(supabase, 'player_discipline_stats', 'discipline', match.discipline, participants, match.race_length);
+
+  // Required: stats "itemized by venue and discipline". Venue is nullable on
+  // older rows, so skip rather than write a stats bucket named "null".
+  if (match.venue) {
+    await updateSplitStats(supabase, 'player_venue_stats', 'venue', match.venue, participants, match.race_length);
   }
 
   const [wp, lp] = await Promise.all([
@@ -400,8 +456,8 @@ async function confirmResult(
   ]);
   if (notificationError) throw notificationError;
   await Promise.all([
-    sendPush(supabase, winnerId, '🏆 Match confirmed — Victory!', `Final: ${p1Score}–${p2Score}`, `/match/${matchId}`),
-    sendPush(supabase, loserId, '📊 Match confirmed', `Final: ${p1Score}–${p2Score}`, `/match/${matchId}`),
+    sendPush(supabase, winnerId, '🏆 Match confirmed — Victory!', `Final: ${p1Score}–${p2Score}`, `/match/${matchId}`, 'result_confirmed'),
+    sendPush(supabase, loserId, '📊 Match confirmed', `Final: ${p1Score}–${p2Score}`, `/match/${matchId}`, 'result_confirmed'),
   ]);
   const { error: activityError } = await supabase.from('activity_feed').insert({ event_type: 'match_confirmed', headline: `${wp.data?.full_name} def. ${lp.data?.full_name} · ${p1Score}–${p2Score}`, actor_player_id: winnerId });
   if (activityError) throw activityError;
@@ -544,7 +600,7 @@ serve(async (req) => {
       const otherId = isP1 ? match.player2_id : match.player1_id;
       const { data: callerPlayer } = await supabase.from('players').select('full_name').eq('id', caller.id).single();
       await supabase.from('notifications').insert({ player_id: otherId, type: 'result_submitted', title: '📊 Opponent submitted result', body: `${callerPlayer?.full_name} submitted the match result. Please submit yours to confirm.`, reference_id: match_id, reference_type: 'match' });
-      await sendPush(supabase, otherId, '📊 Opponent submitted result', `${callerPlayer?.full_name} submitted. Tap to confirm.`, `/match/${match_id}`);
+      await sendPush(supabase, otherId, '📊 Opponent submitted result', `${callerPlayer?.full_name} submitted. Tap to confirm.`, `/match/${match_id}`, 'result_submitted');
     }
 
     return new Response(JSON.stringify({ success: true }), { headers: { ...cors, 'Content-Type': 'application/json' } });

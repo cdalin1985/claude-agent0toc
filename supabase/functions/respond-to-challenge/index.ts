@@ -234,7 +234,7 @@ serve(async (req) => {
         },
       ]);
       if (notificationError) throw notificationError;
-      await sendPush(supabase, otherId, '🎱 Match locked in', `${mePlayer?.full_name} agreed to ${when}.`, `/match/${match?.id}`);
+      await sendPush(supabase, otherId, '🎱 Match locked in', `${mePlayer?.full_name} agreed to ${when}.`, `/match/${match?.id}`, 'challenge_accepted');
 
       const { error: activityError } = await supabase.from('activity_feed').insert({
         event_type: 'challenge_accepted',
@@ -380,7 +380,7 @@ serve(async (req) => {
         reference_type: 'challenge',
       });
       if (washNotifyError) throw washNotifyError;
-      await sendPush(supabase, otherPlayerId, '🤝 Challenge washed', `${callerPlayer.full_name} called your ${challenge.discipline} challenge a wash.`, '/challenges');
+      await sendPush(supabase, otherPlayerId, '🤝 Challenge washed', `${callerPlayer.full_name} called your ${challenge.discipline} challenge a wash.`, '/challenges', 'challenge_cancelled');
 
     } else if (action === 'cancel') {
       // Challenger cancels their own pending challenge

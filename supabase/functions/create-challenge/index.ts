@@ -27,8 +27,25 @@ function vapidDetails(): { subject: string; publicKey: string; privateKey: strin
 
 // Never throws — push must not break challenge creation. But every exit path
 // logs, because a swallowed failure is indistinguishable from a delivery.
-async function sendPush(supabase: any, playerId: string, title: string, body: string, url: string): Promise<void> {
+// Two gates before sending: push_enabled is the master switch, and the
+// per-category preference is asked via player_accepts_notification — the SAME
+// function the notifications insert trigger uses, so a muted category cannot be
+// silent in the app and still buzz the phone. Every failure path sends anyway:
+// silence must not be the consequence of a lookup problem.
+async function playerWantsPush(supabase: any, playerId: string, notificationType?: string): Promise<boolean> {
+  const { data: prefs, error: prefsError } = await supabase.from('player_preferences').select('push_enabled').eq('player_id', playerId).maybeSingle();
+  if (prefsError) { console.error(`[push] could not read preferences for player ${playerId}, sending anyway: ${prefsError.message}`); return true; }
+  if (prefs && prefs.push_enabled === false) { console.info(`[push] player ${playerId} has push switched off — skipped.`); return false; }
+  if (!notificationType) return true;
+  const { data: accepts, error: acceptsError } = await supabase.rpc('player_accepts_notification', { p_player_id: playerId, p_type: notificationType });
+  if (acceptsError) { console.error(`[push] preference check failed for player ${playerId}, sending anyway: ${acceptsError.message}`); return true; }
+  if (accepts === false) { console.info(`[push] player ${playerId} has ${notificationType} muted — skipped.`); return false; }
+  return true;
+}
+
+async function sendPush(supabase: any, playerId: string, title: string, body: string, url: string, notificationType?: string): Promise<void> {
   try {
+    if (!(await playerWantsPush(supabase, playerId, notificationType))) return;
     const { data: row, error } = await supabase.from('push_subscriptions').select('subscription').eq('player_id', playerId).maybeSingle();
     if (error) { console.error(`[push] could not read subscription for player ${playerId}: ${error.message}`); return; }
     if (!row?.subscription) { console.info(`[push] player ${playerId} has no push subscription — skipped.`); return; }
@@ -233,7 +250,7 @@ serve(async (req) => {
       reference_id: challenge.id,
       reference_type: 'challenge',
     });
-    await sendPush(supabase, challenged_player_id, `${challengerPlayer?.full_name} challenged you!`, `${discipline} - Race to ${race_length}. Tap to respond.`, '/challenges');
+    await sendPush(supabase, challenged_player_id, `${challengerPlayer?.full_name} challenged you!`, `${discipline} - Race to ${race_length}. Tap to respond.`, '/challenges', 'challenge_received');
 
     await supabase.from('activity_feed').insert({
       event_type: 'challenge_issued',
