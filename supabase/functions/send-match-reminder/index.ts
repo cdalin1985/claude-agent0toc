@@ -66,7 +66,7 @@ serve(async (req) => {
       ? `/match/${notif.reference_id}`
       : '/matches';
 
-    await sendPush(supabase, notif.player_id, notif.title ?? 'Match reminder', notif.body ?? '', pushUrl);
+    await sendPush(supabase, notif.player_id, notif.title ?? 'Match reminder', notif.body ?? '', pushUrl, notif.type);
 
     return new Response(JSON.stringify({ sent: true }), {
       headers: { ...cors, 'Content-Type': 'application/json' },
