@@ -73,6 +73,25 @@ jobs:
             exit 1
           fi
 
+          # GitHub-hosted runners have no IPv6, and Supabase's DIRECT database
+          # host (db.<ref>.supabase.co) is IPv6-only, so psql can never reach it
+          # from here. It fails with "Network is unreachable", which reads like an
+          # outage and is really a config problem.
+          #
+          # This is also why the drift check has been red every day since June: it
+          # was never connecting, so it reported nothing. A check that cannot
+          # connect is worse than no check, because it looks like coverage.
+          #
+          # Fix: point PROD_DB_URL at the SESSION-mode pooler, which has an IPv4
+          # address:
+          #   postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres
+          # Session mode (5432), not transaction mode (6543) -- migrations run DDL.
+          # Dashboard -> Project Settings -> Database -> Connection string -> Session pooler.
+          if [[ "$PROD_DB_URL" == *"db."*".supabase.co"* ]]; then
+            echo "::error::PROD_DB_URL points at the direct database host (db.<ref>.supabase.co), which is IPv6-only and unreachable from GitHub runners. Replace it with the session-mode pooler string on aws-0-<region>.pooler.supabase.com:5432 — see the comment in this workflow."
+            exit 1
+          fi
+
           applied=$(psql "$PROD_DB_URL" -v ON_ERROR_STOP=1 -At -c \
             "SELECT version FROM supabase_migrations.schema_migrations;")
 
