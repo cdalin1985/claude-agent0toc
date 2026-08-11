@@ -74,7 +74,15 @@ echo "    $count migrations applied"
 
 echo "==> runtime assertions"
 for t in supabase/tests/migrations/[0-9][0-9]_*_assert.sql; do
-  $PSQL -d "$DB" -f "$t" 2>&1 | grep -E 'NOTICE|ERROR' || true
+  # ON_ERROR_STOP makes a failed assertion a non-zero exit; 'set -e' then
+  # aborts the run. Piping to grep would hide that behind grep's status, so the
+  # exit code is captured explicitly.
+  if ! out=$($PSQL -d "$DB" -f "$t" 2>&1); then
+    echo "$out"
+    echo "==> FAILED: $t" >&2
+    exit 1
+  fi
+  echo "$out" | grep -E 'NOTICE|ERROR' || true
 done
 
 echo "==> re-applying the newest migrations (they must be idempotent)"
@@ -88,7 +96,15 @@ done
 
 echo "==> runtime assertions again, after re-application"
 for t in supabase/tests/migrations/[0-9][0-9]_*_assert.sql; do
-  $PSQL -d "$DB" -f "$t" 2>&1 | grep -E 'NOTICE|ERROR' || true
+  # ON_ERROR_STOP makes a failed assertion a non-zero exit; 'set -e' then
+  # aborts the run. Piping to grep would hide that behind grep's status, so the
+  # exit code is captured explicitly.
+  if ! out=$($PSQL -d "$DB" -f "$t" 2>&1); then
+    echo "$out"
+    echo "==> FAILED: $t" >&2
+    exit 1
+  fi
+  echo "$out" | grep -E 'NOTICE|ERROR' || true
 done
 
 echo "==> OK"
