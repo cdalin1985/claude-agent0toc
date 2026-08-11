@@ -12,6 +12,7 @@ import { Avatar } from '../components/Avatar';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 import type { PlayerPreferences } from '../types/database';
+import { isMissingSchemaObject, onlyExistingColumns } from '../lib/schemaGaps';
 
 const DISCIPLINES = ['8 Ball', '9 Ball', '10 Ball'] as const;
 
@@ -104,7 +105,12 @@ export default function SettingsPage() {
   const [profileError,  setProfileError]  = useState('');
   const [profileSaved,  setProfileSaved]  = useState(false);
   const [prefs,         setPrefs]         = useState<PlayerPreferences | null>(null);
+  // null = still loading, false = the table is not there yet, true = usable.
+  const [prefsSupported, setPrefsSupported] = useState<boolean | null>(null);
   const [prefsError,    setPrefsError]    = useState('');
+  // The row exactly as the database returned it — the only trustworthy record of
+  // which profile columns actually exist.
+  const [playerRow,     setPlayerRow]     = useState<Record<string, unknown> | null>(null);
   const [saving,        setSaving]        = useState(false);
   const [signingOut,    setSigningOut]    = useState(false);
   const [avatarSaving,  setAvatarSaving]  = useState(false);
@@ -116,11 +122,15 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!playerId) return;
+    // select('*') rather than naming the new columns: naming one the database
+    // does not have yet 400s the whole request and takes bio and preferred
+    // discipline down with it, which is exactly what broke live on 2026-08-10.
     supabase.from('players')
-      .select('bio, preferred_discipline, nickname, tagline, accent_color, home_venue, years_playing, cue_brand')
+      .select('*')
       .eq('id', playerId).single()
       .then(({ data }) => {
         if (data) {
+          setPlayerRow(data as Record<string, unknown>);
           setBio(data.bio ?? '');
           setPreferredDisc((data.preferred_discipline as typeof DISCIPLINES[number] | null) ?? '');
           setNickname(data.nickname ?? '');
@@ -138,7 +148,16 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!playerId) return;
     supabase.from('player_preferences').select('*').eq('player_id', playerId).maybeSingle()
-      .then(({ data }) => { if (data) setPrefs(data); });
+      .then(({ data, error }) => {
+        if (error) {
+          // Hide the section rather than spinning forever on a table that is
+          // not there yet.
+          setPrefsSupported(!isMissingSchemaObject(error) ? true : false);
+          return;
+        }
+        setPrefsSupported(true);
+        if (data) setPrefs(data);
+      });
   }, [playerId]);
 
   /**
@@ -181,7 +200,9 @@ export default function SettingsPage() {
       return;
     }
     setSaving(true);
-    const { error } = await supabase.from('players').update({
+    // Narrowed to columns the loaded row actually has, so a database that is
+    // behind the app saves what it can instead of rejecting everything.
+    const { error } = await supabase.from('players').update(onlyExistingColumns({
       bio: bio.trim() || null,
       preferred_discipline: preferredDisc || null,
       nickname: nickname.trim() || null,
@@ -189,7 +210,7 @@ export default function SettingsPage() {
       home_venue: homeVenue || null,
       years_playing: years,
       cue_brand: cueBrand.trim() || null,
-    }).eq('id', player.id);
+    }, playerRow)).eq('id', player.id);
     setSaving(false);
 
     if (error) {
@@ -237,7 +258,9 @@ export default function SettingsPage() {
     const { error } = await supabase.from('players').update({ accent_color: hex }).eq('id', player.id);
     if (error) {
       setAccentColor(previous);
-      setProfileError(`Could not save that colour: ${error.message}`);
+      setProfileError(isMissingSchemaObject(error)
+        ? 'Accent colours are not switched on yet — check back after the next update.'
+        : `Could not save that colour: ${error.message}`);
     }
   };
 
@@ -668,7 +691,7 @@ export default function SettingsPage() {
       {/* Notifications — these are enforced server-side by a trigger on the
           notifications table, so switching one off stops it everywhere, not just
           in this app's UI. */}
-      {player && (
+      {player && prefsSupported !== false && (
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
           <GlassCard className="p-5 mb-4">
             <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-1">Notify Me About</h2>

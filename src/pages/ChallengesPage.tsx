@@ -15,6 +15,7 @@ import { CoachTip } from '../components/CoachTip';
 import { RankingRowSkeleton } from '../components/Skeleton';
 import { QueryError } from '../components/QueryError';
 import { formatDateTime } from '../utils/time';
+import { isMissingSchemaObject } from '../lib/schemaGaps';
 import type { Challenge, ChallengeProposal } from '../types/database';
 
 // Venues come from league_settings; a venue added in Admin appears here with
@@ -59,7 +60,13 @@ function usePendingProposals(challengeIds: string[]) {
         .select('*')
         .in('challenge_id', challengeIds)
         .eq('status', 'pending');
-      if (error) throw error;
+      // Before the proposals migration lands there is nothing to negotiate over.
+      // An empty map degrades the page to the pre-negotiation behaviour rather
+      // than erroring the whole Challenges screen.
+      if (error) {
+        if (isMissingSchemaObject(error)) return new Map();
+        throw error;
+      }
       return new Map((data ?? []).map((p) => [p.challenge_id, p as ChallengeProposal]));
     },
     enabled: challengeIds.length > 0,
