@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useRankings } from '../hooks/useRankings';
 import { useLeagueSettings, venuesFrom } from '../hooks/useLeagueSettings';
+import { isMissingSchemaObject } from '../lib/schemaGaps';
 import { Avatar } from '../components/Avatar';
 import { GlassCard } from '../components/GlassCard';
 import { InactivePlayerBanner } from '../components/InactivePlayerBanner';
@@ -72,14 +73,19 @@ export default function PlayerPage() {
     enabled: !!id,
   });
 
-  const { data: venueStats = [] } = useQuery<PlayerVenueStats[]>({
+  const { data: venueStatsRaw } = useQuery<PlayerVenueStats[] | null>({
     queryKey: ['player-venue-stats', id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('player_venue_stats')
         .select('*')
         .eq('player_id', id);
-      if (error) throw error;
+      // null means the table is not there yet, so the card is hidden rather than
+      // claiming this player has played nowhere.
+      if (error) {
+        if (isMissingSchemaObject(error)) return null;
+        throw error;
+      }
       return data ?? [];
     },
     enabled: !!id,
@@ -95,11 +101,19 @@ export default function PlayerPage() {
         .select('*')
         .eq('player_id', id)
         .maybeSingle();
-      if (error) throw error;
+      // No preferences table yet means no one has hidden anything, so show
+      // everything — the defaults below already do that for a null row.
+      if (error) {
+        if (isMissingSchemaObject(error)) return null;
+        throw error;
+      }
       return data;
     },
     enabled: !!id,
   });
+  const venueStatsAvailable = venueStatsRaw !== null && venueStatsRaw !== undefined;
+  // Memoized: venues derives from it, and a fresh [] each render would refetch.
+  const venueStats = useMemo(() => venueStatsRaw ?? [], [venueStatsRaw]);
   const showDetails = prefs?.show_profile_details ?? true;
   const showStats   = prefs?.show_stats_publicly ?? true;
   const isSelf      = myPlayer?.id === id;
@@ -329,7 +343,8 @@ export default function PlayerPage() {
         </GlassCard>
       </motion.div>
 
-      {/* Per-venue stats */}
+      {/* Per-venue stats. Hidden entirely until the table exists. */}
+      {venueStatsAvailable && (
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12, duration: 0.35 }}>
         <GlassCard className="p-4 mb-4">
           <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-3">By Venue</h2>
@@ -373,6 +388,7 @@ export default function PlayerPage() {
           )}
         </GlassCard>
       </motion.div>
+      )}
 
       </>)}
 
