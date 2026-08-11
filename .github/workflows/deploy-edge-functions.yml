@@ -1,0 +1,210 @@
+name: Deploy edge functions to production
+
+# Edge functions were the one part of this repo with NO path to production.
+# Migrations have migration-apply.yml; the frontend has Vercel; functions had
+# nothing but somebody remembering to run the CLI. They drifted accordingly:
+#
+#   - add-player       the entire admin invite flow (PR #19, 2026-05-19) sat
+#                      undeployed for almost three months. Inviting a player to
+#                      claim their profile did not work in production at all.
+#   - set-player-active PR #20 switched the admin writes to a service-role
+#                      client; the deployed copy still used the caller's JWT,
+#                      where RLS can refuse the write.
+#   - submit-result    the climber cooldown and venue stats.
+#   - four more        error-leakage fixes from PR #39, plus real HTTP status
+#                      codes in update-match-score (a 200 with an error body
+#                      leaves supabase.functions.invoke reporting success).
+#
+# None of it was visible: every function was ACTIVE and answering requests, just
+# running last quarter's code. Nothing in CI compared the two, so nothing failed.
+#
+# This deploys EVERY function on every run rather than only the ones that
+# changed. That is deliberate: the failure being fixed is drift, and only a full
+# convergence pass actually removes drift. Deploying an unchanged function is a
+# no-op that costs a few seconds.
+#
+# Ordering, same hazard as migrations: Vercel builds the moment main moves and
+# does NOT wait for this workflow, so on a push to main the new frontend races
+# the new functions. To avoid the race entirely:
+#
+#   1. Actions -> Deploy edge functions to production -> Run workflow -> pick
+#      the release branch. Deploy first.
+#   2. Then merge. The push-to-main run redeploys the same code and changes
+#      nothing.
+#
+# Requires SUPABASE_ACCESS_TOKEN (a personal access token from
+# https://supabase.com/dashboard/account/tokens). The job FAILS rather than
+# skips when it is absent — a deploy workflow that quietly does nothing is the
+# same class of bug as the drift it exists to prevent.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+      - '.github/workflows/deploy-edge-functions.yml'
+  workflow_dispatch:
+
+concurrency:
+  # Never let two runs deploy to the same project at once.
+  group: deploy-edge-functions-production
+  cancel-in-progress: false
+
+env:
+  # TOC only. Project ankvjywsnydpkepdvuvm is "toc1". TOF is a separate league
+  # in a separate project and must never be touched from this repo.
+  PROJECT_REF: ankvjywsnydpkepdvuvm
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require the access token
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "::error::SUPABASE_ACCESS_TOKEN is not set."
+            echo ""
+            echo "Create one at https://supabase.com/dashboard/account/tokens"
+            echo "then add it at Settings -> Secrets and variables -> Actions"
+            echo "as SUPABASE_ACCESS_TOKEN."
+            echo ""
+            echo "Failing rather than skipping: a deploy step that silently does"
+            echo "nothing is how the functions drifted for three months."
+            exit 1
+          fi
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Every function in supabase/functions/, with the gateway JWT setting it
+      # currently runs with in production. Deploying without this would flip
+      # create-challenge to verify_jwt=true (the CLI default) and break any
+      # client call that relies on the gateway letting it through — the function
+      # authenticates internally and returns 401 itself, so the gateway check is
+      # redundant there, but changing it is a behaviour change and this workflow
+      # exists to remove surprises, not add them.
+      #
+      # A function listed here that has no directory fails the run. A directory
+      # not listed here is reported and NOT deployed — silently skipping one is
+      # exactly the gap being closed.
+      - name: Deploy every function
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # name:verify_jwt
+          FUNCTIONS="
+          add-player:true
+          claim-player:true
+          create-challenge:false
+          manage-treasury:true
+          rank1-compliance:true
+          resolve-dispute:true
+          respond-to-challenge:true
+          send-match-reminder:true
+          send-push:true
+          set-player-active:true
+          submit-result:true
+          update-match-score:true
+          "
+
+          listed=""
+          for entry in $FUNCTIONS; do
+            name="${entry%%:*}"
+            listed="$listed $name"
+          done
+
+          # Anything on disk but not in the list above.
+          missing_from_list=""
+          for dir in supabase/functions/*/; do
+            name="$(basename "$dir")"
+            case "$name" in _*) continue ;; esac
+            case " $listed " in *" $name "*) ;; *) missing_from_list="$missing_from_list $name" ;; esac
+          done
+          if [ -n "$missing_from_list" ]; then
+            echo "::error::These function directories exist but are not in this workflow's list:$missing_from_list"
+            echo "Add them (with the right verify_jwt) or delete them. Not deploying a"
+            echo "function that exists is the failure this workflow was written to stop."
+            exit 1
+          fi
+
+          for entry in $FUNCTIONS; do
+            name="${entry%%:*}"
+            verify="${entry##*:}"
+
+            if [ ! -d "supabase/functions/$name" ]; then
+              echo "::error::supabase/functions/$name is listed here but does not exist."
+              exit 1
+            fi
+
+            if [ "$verify" = "false" ]; then
+              echo "==> $name (no JWT gate — authenticates internally)"
+              supabase functions deploy "$name" \
+                --project-ref "$PROJECT_REF" \
+                --no-verify-jwt
+            else
+              echo "==> $name"
+              supabase functions deploy "$name" \
+                --project-ref "$PROJECT_REF"
+            fi
+          done
+
+      # Deploying reports success on upload. This confirms the functions are
+      # actually serving afterwards: an authenticated endpoint answering 401 to
+      # an unauthenticated POST is alive AND still enforcing auth. A 404 or 5xx
+      # means the deploy left something broken.
+      - name: Verify every function is serving and still enforcing auth
+        env:
+          ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -uo pipefail
+          base="https://${PROJECT_REF}.supabase.co/functions/v1"
+          failed=0
+
+          for name in add-player claim-player manage-treasury rank1-compliance \
+                      resolve-dispute respond-to-challenge send-match-reminder \
+                      send-push set-player-active submit-result update-match-score; do
+            code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
+              -X POST "$base/$name" -H 'Content-Type: application/json' -d '{}')"
+            case "$code" in
+              401)
+                echo "  ok    $name  ($code)"
+                ;;
+              000)
+                echo "::error::$name did not respond (timeout or DNS failure)."
+                failed=1
+                ;;
+              404)
+                echo "::error::$name returned 404 — it is not deployed."
+                failed=1
+                ;;
+              2*)
+                echo "::error::$name returned $code to an UNAUTHENTICATED request. It should be 401."
+                failed=1
+                ;;
+              *)
+                echo "::error::$name returned $code, expected 401."
+                failed=1
+                ;;
+            esac
+          done
+
+          # create-challenge has no gateway JWT gate, so it authenticates in
+          # code. It must still refuse an anonymous caller.
+          code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
+            -X POST "$base/create-challenge" -H 'Content-Type: application/json' -d '{}')"
+          if [ "$code" = "401" ]; then
+            echo "  ok    create-challenge  ($code)"
+          else
+            echo "::error::create-challenge returned $code to an unauthenticated request, expected 401."
+            echo "It runs without a gateway JWT gate, so its own auth check is the only thing standing there."
+            failed=1
+          fi
+
+          exit "$failed"
