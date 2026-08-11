@@ -223,6 +223,37 @@ serve(async (req) => {
       if (disciplineStatsError) throw disciplineStatsError;
     }
 
+    // Per-venue stats, mirroring the discipline block above. Skipped when the
+    // match has no venue rather than writing a bucket named "null".
+    if (match.venue) {
+      await Promise.all([
+        supabase.from('player_venue_stats').upsert({ player_id: winner_id, venue: match.venue }, { onConflict: 'player_id,venue', ignoreDuplicates: true }),
+        supabase.from('player_venue_stats').upsert({ player_id: loser_id, venue: match.venue }, { onConflict: 'player_id,venue', ignoreDuplicates: true }),
+      ]);
+      for (const [pid, isWinner, isChallenger] of [[winner_id, true, winnerIsChallenger], [loser_id, false, !winnerIsChallenger]] as [string, boolean, boolean][]) {
+        const { data: vs } = await supabase
+          .from('player_venue_stats')
+          .select('*')
+          .eq('player_id', pid)
+          .eq('venue', match.venue)
+          .single();
+        if (!vs) continue;
+        const newStreak = isWinner ? (vs.current_streak >= 0 ? vs.current_streak + 1 : 1) : 0;
+        const { error: venueStatsError } = await supabase.from('player_venue_stats').update({
+          matches_played: vs.matches_played + 1,
+          wins: isWinner ? vs.wins + 1 : vs.wins,
+          losses: isWinner ? vs.losses : vs.losses + 1,
+          current_streak: newStreak,
+          best_streak: isWinner ? Math.max(vs.best_streak, newStreak) : vs.best_streak,
+          challenger_wins: isWinner && isChallenger ? vs.challenger_wins + 1 : vs.challenger_wins,
+          defender_wins: isWinner && !isChallenger ? vs.defender_wins + 1 : vs.defender_wins,
+          total_race_length: vs.total_race_length + match.race_length,
+          updated_at: new Date().toISOString(),
+        }).eq('player_id', pid).eq('venue', match.venue);
+        if (venueStatsError) throw venueStatsError;
+      }
+    }
+
     // Audit log
     await supabase.from('audit_events').insert({
       actor_profile_id: user.id,
