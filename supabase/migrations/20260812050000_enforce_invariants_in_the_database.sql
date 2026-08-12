@@ -131,6 +131,15 @@ CREATE TRIGGER reject_proposal_on_settled_challenge
   BEFORE INSERT ON public.challenge_proposals
   FOR EACH ROW EXECUTE FUNCTION public.reject_proposal_on_settled_challenge();
 
+-- A trigger function does not need EXECUTE granted to the inserting role --
+-- Postgres does not check that privilege when firing a trigger -- so closing it
+-- costs nothing and keeps the standing rule that no SECURITY DEFINER function
+-- is callable by a player. 04_definer_privileges_assert.sql enforces this, and
+-- caught this function the first time this migration ran in CI.
+REVOKE ALL ON FUNCTION public.reject_proposal_on_settled_challenge() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.reject_proposal_on_settled_challenge() FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.reject_proposal_on_settled_challenge() TO service_role;
+
 COMMENT ON FUNCTION public.reject_proposal_on_settled_challenge() IS
   'Refuses a scheduling proposal once its challenge has left pending/accepted. FOR SHARE pins the challenge row for the duration of the insert, so an accept committing concurrently cannot leave an orphan pending proposal behind.';
 
