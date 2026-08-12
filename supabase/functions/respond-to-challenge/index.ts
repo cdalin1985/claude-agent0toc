@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendPush } from '../_shared/sendPush.ts';
+import { formatLeagueDateTime } from '../_shared/leagueTime.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -102,7 +103,7 @@ serve(async (req) => {
         supabase.from('players').select('full_name').eq('id', callerPlayer.id).single(),
         supabase.from('players').select('full_name').eq('id', otherId).single(),
       ]);
-      const when = `${scheduledAt.toLocaleDateString()} at ${venue}`;
+      const when = `${formatLeagueDateTime(scheduledAt)} at ${venue}`;
       const countering = Boolean(liveProposal);
 
       const { error: notificationError } = await supabase.from('notifications').insert({
@@ -122,6 +123,11 @@ serve(async (req) => {
         countering ? '🗓️ New time suggested' : '✅ Challenge answered',
         `${mePlayer?.full_name} suggested ${when}.`,
         '/challenges',
+        // Without this the category is unknown, playerWantsPush skips the mute
+        // check, and a player who turned challenge notifications off has the
+        // in-app row dropped by apply_notification_preferences while their
+        // phone still buzzes -- the exact split sendPush.ts:23-32 forbids.
+        'challenge_accepted',
       );
 
       const { error: activityError } = await supabase.from('activity_feed').insert({
@@ -212,7 +218,7 @@ serve(async (req) => {
         supabase.from('players').select('full_name').eq('id', callerPlayer.id).single(),
         supabase.from('players').select('full_name').eq('id', otherId).single(),
       ]);
-      const when = `${scheduledAt.toLocaleDateString()} at ${proposal.venue}`;
+      const when = `${formatLeagueDateTime(scheduledAt)} at ${proposal.venue}`;
 
       // Both players get this one — it is the moment the match becomes real.
       const { error: notificationError } = await supabase.from('notifications').insert([

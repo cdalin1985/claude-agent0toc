@@ -1,0 +1,69 @@
+name: CI
+
+# The repo had SEVEN workflows and not one of them ran the test suite, the
+# typechecker or the linter. Grep for `npm test`, `tsc` or `eslint` across
+# .github/workflows/ before this file existed and you get zero hits.
+#
+# So `npm test` (153 tests), `tsc -b` and `eslint .` only ever ran on whoever's
+# laptop happened to run them. A PR could go green on every visible check while
+# breaking the build, and several did -- the checks that existed were about
+# migrations, RLS and deploys, and every one of them skips a PR that only
+# touches src/ or test/.
+#
+# This is the same shape as the edge-function drift: not a check that failed,
+# a check that was never there, which looks identical from the outside because
+# both show a clean PR.
+#
+# Deliberately NOT path-filtered. A path filter is how you end up believing a
+# green tick means the suite ran when it was skipped -- the failure mode this
+# whole file exists to remove. The suite takes well under a minute.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A second push to the same PR makes the first run irrelevant; don't pay for it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, lint, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` not `npm install`: it installs exactly what the lockfile says
+      # and fails if package.json and the lockfile disagree, which is the point
+      # of running this in CI at all.
+      - name: Install
+        run: npm ci
+
+      # Each step runs even if an earlier one failed, so one PR run reports
+      # every problem instead of making you fix them one push at a time.
+      - name: Typecheck
+        if: '!cancelled()'
+        run: npx tsc -b
+
+      - name: Lint
+        if: '!cancelled()'
+        run: npx eslint .
+
+      - name: Test
+        if: '!cancelled()'
+        run: npm test
+
+      # Build last: it is the slowest and the most likely to be a consequence
+      # of a failure the earlier steps already named more precisely.
+      - name: Build
+        if: '!cancelled()'
+        run: npm run build

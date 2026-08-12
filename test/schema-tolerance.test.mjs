@@ -38,8 +38,13 @@ test('an update can be narrowed to columns that actually exist', () => {
   // The loaded row is the reference, because it is the only trustworthy
   // statement of what the database has.
   assert.match(helper, /const allowed = new Set\(Object\.keys\(reference\)\);/);
-  // No reference means don't narrow — never silently drop a whole payload.
-  assert.match(helper, /if \(!reference\) return payload;/);
+  // No reference means write nothing. This used to return the whole payload on
+  // the reasoning "never silently drop a payload" — but the payload's fields are
+  // all initialised to '' and coerced to null, so on a failed or not-yet-resolved
+  // initial read that reasoning blanked seven profile columns in one tap and
+  // reported success. Dropping the write is the recoverable direction.
+  // Behaviour (not source text) is covered by test/schema-gaps.test.mjs.
+  assert.match(helper, /if \(!reference\) return \{\};/);
 });
 
 // --- The screens ------------------------------------------------------------
