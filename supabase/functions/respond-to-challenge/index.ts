@@ -9,6 +9,11 @@ const cors = {
 };
 const VALID_VENUES = ['Eagles 4040', 'Valley Hub'];
 
+// How many venue/time suggestions a single challenge may carry in total, across
+// both players. Three is the league's ruling (2026-08-12): enough for an offer,
+// a counter and a compromise, but not enough to negotiate indefinitely.
+const MAX_PROPOSAL_ROUNDS = 3;
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
@@ -48,10 +53,26 @@ serve(async (req) => {
       if (Number.isNaN(scheduledAt.getTime())) return new Response(JSON.stringify({ error: 'scheduled_at must be a valid date.' }), { status: 400, headers: cors });
       if (scheduledAt.getTime() < Date.now() - 5 * 60 * 1000) return new Response(JSON.stringify({ error: 'Match cannot be scheduled in the past.' }), { status: 400, headers: cors });
 
-      const { data: settings } = await supabase.from('league_settings').select('venues').single();
+      const { data: settings } = await supabase.from('league_settings').select('venues, match_play_days').single();
       const validVenues = Array.isArray(settings?.venues) && settings.venues.length > 0 ? settings.venues : VALID_VENUES;
       if (typeof venue !== 'string' || !validVenues.includes(venue)) {
         return new Response(JSON.stringify({ error: 'Venue is not in league settings.' }), { status: 400, headers: cors });
+      }
+
+      // Upper bound on how far out a match can be agreed.
+      //
+      // accept_proposal sets match_deadline = now + match_play_days, and
+      // expire_overdue_matches() rules anything past that a wash. Nothing used to
+      // cross-check the two, so agreeing a date beyond the window guaranteed the
+      // match was auto-cancelled BEFORE it was due to be played -- and the push
+      // blamed the players for not playing it. A proposal for 2031 was accepted
+      // with a 200.
+      const matchPlayDays = settings?.match_play_days ?? 10;
+      const latestPlayable = new Date(Date.now() + matchPlayDays * 24 * 3600 * 1000);
+      if (scheduledAt.getTime() > latestPlayable.getTime()) {
+        return new Response(JSON.stringify({
+          error: `A match has to be played within ${matchPlayDays} days. Pick a time before ${formatLeagueDateTime(latestPlayable)}.`,
+        }), { status: 400, headers: cors });
       }
 
       const { data: liveProposal, error: liveError } = await supabase
@@ -67,6 +88,22 @@ serve(async (req) => {
       // chance to answer.
       if (liveProposal && liveProposal.proposed_by_player_id === callerPlayer.id) {
         return new Response(JSON.stringify({ error: "You've already proposed a time — it's their turn to reply." }), { status: 409, headers: cors });
+      }
+
+      // Negotiation is capped at MAX_PROPOSAL_ROUNDS. Unbounded countering let a
+      // player who did not want to play keep a challenge alive indefinitely
+      // without ever accepting or declining. Checked BEFORE the supersede below,
+      // so a rejected counter never closes the live proposal on its way out.
+      const { count: roundsSoFar, error: countError } = await supabase
+        .from('challenge_proposals')
+        .select('id', { count: 'exact', head: true })
+        .eq('challenge_id', challenge_id);
+      if (countError) throw countError;
+
+      if ((roundsSoFar ?? 0) >= MAX_PROPOSAL_ROUNDS) {
+        return new Response(JSON.stringify({
+          error: `You've both had ${MAX_PROPOSAL_ROUNDS} goes at picking a time. Take the last suggestion, or call it a wash and start fresh.`,
+        }), { status: 409, headers: cors });
       }
 
       if (liveProposal) {
