@@ -219,3 +219,61 @@ jobs:
           fi
 
           exit "$failed"
+
+      # The deploy step above closes drift in ONE direction: source on disk that
+      # never reached production. This closes the other: a function running in
+      # production that has no source here at all.
+      #
+      # That direction is worse, because nothing in the repo can even hint at it.
+      # It was found on 2026-08-12: `generate-avatar` had been ACTIVE since
+      # January, was never committed to git, was referenced nowhere in the app,
+      # and ran with verify_jwt=false AND no internal auth check -- so any
+      # unauthenticated caller could bill a Gemini image generation to the
+      # league's API key and write to the public avatars bucket. Nobody could
+      # have reviewed it, because there was nothing to review.
+      #
+      # Deployed-set comes from the Management API rather than the CLI's table
+      # output, so this does not break when the CLI changes its formatting.
+      - name: Fail if production runs a function this repo does not have
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          deployed="$(curl -sS --fail-with-body --max-time 30 \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/${PROJECT_REF}/functions" \
+            | jq -r '.[].slug' | sort)"
+
+          if [ -z "$deployed" ]; then
+            echo "::error::The Management API returned no functions. Refusing to"
+            echo "report 'no drift' from an empty answer -- that is how a check"
+            echo "comes to pass without checking anything."
+            exit 1
+          fi
+
+          # Source of truth is what is on disk. A directory here means the code
+          # is reviewable; no directory means it is not, whatever the reason.
+          on_disk="$(for d in supabase/functions/*/; do
+            n="$(basename "$d")"
+            case "$n" in _*) continue ;; esac
+            echo "$n"
+          done | sort)"
+
+          unmanaged="$(comm -23 <(echo "$deployed") <(echo "$on_disk") || true)"
+
+          if [ -n "$unmanaged" ]; then
+            echo "::error::These functions are live in production but have no source in this repo:"
+            for n in $unmanaged; do
+              echo "  - $n    https://supabase.com/dashboard/project/${PROJECT_REF}/functions/$n/details"
+            done
+            echo ""
+            echo "Each one is code answering requests that nobody can review, and"
+            echo "that this workflow will never update. Either commit its source to"
+            echo "supabase/functions/<name>/ and add it to the FUNCTIONS list above,"
+            echo "or delete it in the dashboard."
+            exit 1
+          fi
+
+          echo "No unmanaged functions. Production and this repo hold the same set:"
+          echo "$on_disk" | sed 's/^/  /'
