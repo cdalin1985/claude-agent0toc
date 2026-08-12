@@ -13,10 +13,18 @@ name: Deploy edge functions to production
 #   - submit-result    the climber cooldown and venue stats.
 #   - four more        error-leakage fixes from PR #39, plus real HTTP status
 #                      codes in update-match-score. That last one was NOT
-#                      user-visible: every client call site checks
-#                      `!res.ok || json.error`, so a 200 carrying an error body
-#                      was still surfaced. Corrected here because the original
-#                      commit message claimed otherwise.
+#                      user-visible: update-match-score is called only from
+#                      MatchPage's callFn, which checks `!res.ok || json.error`
+#                      (MatchPage.tsx:296), so the 200-with-error-body was still
+#                      surfaced. Corrected here because the original commit
+#                      message claimed a silent success that does not happen.
+#
+#                      Do NOT generalise that into "every call site checks
+#                      res.ok" -- that is false, and believing it is how
+#                      ChallengePage.tsx:103 shipped testing only `json.error`.
+#                      A Supabase gateway 401 (`{"code":401,...}`) has no
+#                      `error` key, so it fell through to the "Challenge Sent!"
+#                      screen for a challenge that was never created.
 #
 # None of it was visible: every function was ACTIVE and answering requests, just
 # running last quarter's code. Nothing in CI compared the two, so nothing failed.
