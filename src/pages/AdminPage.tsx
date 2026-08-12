@@ -10,6 +10,7 @@ import { useAuthStore } from '../stores/authStore';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
+import { QueryError } from '../components/QueryError';
 import { formatDistanceToNow, formatDate } from '../utils/time';
 import type { Match, Player, AuditEvent, LeagueSettings, Challenge } from '../types/database';
 import { fetchTreasurySnapshot, formatCents, ledgerSignFor } from '../lib/treasury';
@@ -83,10 +84,16 @@ export default function AdminPage() {
 // ─── Disputes ────────────────────────────────────────────────────────────────
 
 function DisputesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
-  const { data: disputes = [] } = useQuery<Match[]>({
+  const {
+    data: disputes = [],
+    isError: disputesError,
+    refetch: refetchDisputes,
+    isFetching: disputesFetching,
+  } = useQuery<Match[]>({
     queryKey: ['admin-disputes'],
     queryFn: async () => {
-      const { data } = await supabase.from('matches').select('*').eq('status', 'disputed');
+      const { data, error } = await supabase.from('matches').select('*').eq('status', 'disputed');
+      if (error) throw error;
       return data ?? [];
     },
   });
@@ -94,7 +101,8 @@ function DisputesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const { data: players = [] } = useQuery<Pick<Player, 'id' | 'full_name'>[]>({
     queryKey: ['players-lookup'],
     queryFn: async () => {
-      const { data } = await supabase.from('players').select('id, full_name');
+      const { data, error } = await supabase.from('players').select('id, full_name');
+      if (error) throw error;
       return data ?? [];
     },
   });
@@ -125,6 +133,14 @@ function DisputesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     qc.invalidateQueries({ queryKey: ['admin-disputes'] });
     qc.invalidateQueries({ queryKey: ['rankings'] });
   };
+
+  // An empty list must never be shown as "all clear" unless the read succeeded.
+  // Before the queryFns threw, a failed load produced exactly this green tick
+  // while disputed matches -- which move rankings and the treasury -- sat
+  // unresolved and invisible to the admin.
+  if (disputesError) {
+    return <QueryError title="Couldn’t load disputes" onRetry={() => refetchDisputes()} retrying={disputesFetching} />;
+  }
 
   if (disputes.length === 0) {
     return (
@@ -189,19 +205,26 @@ function DisputesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
 // ─── Active Challenges ────────────────────────────────────────────────────────
 
 function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
-  const { data: challenges = [] } = useQuery<ChallengeRow[]>({
+  const {
+    data: challenges = [],
+    isError: challengesError,
+    refetch: refetchChallenges,
+    isFetching: challengesFetching,
+  } = useQuery<ChallengeRow[]>({
     queryKey: ['admin-active-challenges'],
     queryFn: async () => {
-      const { data: chals } = await supabase
+      const { data: chals, error } = await supabase
         .from('challenges')
         .select('*')
         .in('status', ['pending', 'accepted', 'scheduled', 'in_progress', 'forfeited'])
         .order('created_at', { ascending: false });
+      if (error) throw error;
       if (!chals?.length) return [];
-      const { data: matches } = await supabase
+      const { data: matches, error: matchesError } = await supabase
         .from('matches')
         .select('id, challenge_id')
         .in('challenge_id', chals.map((c) => c.id));
+      if (matchesError) throw matchesError;
       return chals.map((c) => ({
         ...c,
         match_id: matches?.find((m) => m.challenge_id === c.id)?.id ?? null,
@@ -212,10 +235,11 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const { data: forfeitEvents = [] } = useQuery<{ challenge_id: string }[]>({
     queryKey: ['admin-active-forfeiture-events'],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('challenge_forfeiture_events')
         .select('challenge_id')
         .is('reversed_at', null);
+      if (error) throw error;
       return data ?? [];
     },
   });
@@ -224,7 +248,8 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const { data: players = [] } = useQuery<Pick<Player, 'id' | 'full_name'>[]>({
     queryKey: ['players-lookup'],
     queryFn: async () => {
-      const { data } = await supabase.from('players').select('id, full_name');
+      const { data, error } = await supabase.from('players').select('id, full_name');
+      if (error) throw error;
       return data ?? [];
     },
   });
@@ -327,6 +352,10 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const STATUS_BADGE: Record<string, string> = {
     pending: 'pending', accepted: 'win', scheduled: 'info', in_progress: 'loss', forfeited: 'loss',
   };
+
+  if (challengesError) {
+    return <QueryError title="Couldn’t load challenges" onRetry={() => refetchChallenges()} retrying={challengesFetching} />;
+  }
 
   if (challenges.length === 0) {
     return (
@@ -443,7 +472,7 @@ function MatchesAdminTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const { data: matches = [] } = useQuery<Match[]>({
     queryKey: ['admin-active-matches'],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('matches')
         .select('*')
         // 'confirming' is included so a match stranded mid-confirmation is visible
@@ -451,6 +480,7 @@ function MatchesAdminTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
         // admin surface and only recoverable with direct SQL.
         .in('status', ['scheduled', 'in_progress', 'submitted', 'confirming'])
         .order('created_at', { ascending: false });
+      if (error) throw error;
       return data ?? [];
     },
   });
@@ -458,7 +488,8 @@ function MatchesAdminTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const { data: players = [] } = useQuery<Pick<Player, 'id' | 'full_name'>[]>({
     queryKey: ['players-lookup'],
     queryFn: async () => {
-      const { data } = await supabase.from('players').select('id, full_name');
+      const { data, error } = await supabase.from('players').select('id, full_name');
+      if (error) throw error;
       return data ?? [];
     },
   });
@@ -571,13 +602,22 @@ function MatchesAdminTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
 // ─── Rankings Editor ──────────────────────────────────────────────────────────
 
 function RankingsTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
-  const { data: rawRankings = [] } = useQuery<RankRow[]>({
+  const {
+    data: rawRankings = [],
+    isError: rankingsError,
+    refetch: refetchRankings,
+    isFetching: rankingsFetching,
+  } = useQuery<RankRow[]>({
     queryKey: ['admin-rankings'],
     queryFn: async () => {
-      const [{ data: ranks }, { data: pls }] = await Promise.all([
+      const [{ data: ranks, error: ranksError }, { data: pls, error: plsError }] = await Promise.all([
         supabase.from('rankings').select('id, player_id, position').order('position'),
         supabase.from('players').select('id, full_name').eq('is_active', true),
       ]);
+      // The rank order is the ladder. Rendering a partial or empty one as if it
+      // were real invites an admin to "fix" it and save a corrupted order.
+      if (ranksError) throw ranksError;
+      if (plsError) throw plsError;
       return (ranks ?? []).map((r) => ({
         ...r,
         full_name: (pls ?? []).find((p) => p.id === r.player_id)?.full_name ?? 'Unknown',
@@ -589,6 +629,12 @@ function RankingsTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved]   = useState(false);
   const displayedOrder = order.length > 0 ? order : rawRankings;
+
+  // Never offer an editable ladder built from a failed read: saving it would
+  // write that wrong order back over the real one.
+  if (rankingsError) {
+    return <QueryError title="Couldn’t load the ladder" onRetry={() => refetchRankings()} retrying={rankingsFetching} />;
+  }
 
   const moveUp = (idx: number) => {
     if (idx === 0) return;
@@ -691,7 +737,8 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const { data: players = [] } = useQuery<Player[]>({
     queryKey: ['admin-players'],
     queryFn: async () => {
-      const { data } = await supabase.from('players').select('*').order('full_name');
+      const { data, error } = await supabase.from('players').select('*').order('full_name');
+      if (error) throw error;
       return data ?? [];
     },
   });
@@ -702,10 +749,11 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     queryKey: ['admin-player-metrics', playerIds],
     enabled: playerIds.length > 0,
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('player_reference_metrics')
         .select('player_id, fargo_rating')
         .in('player_id', playerIds);
+      if (error) throw error;
       return data ?? [];
     },
   });
@@ -1214,7 +1262,8 @@ function SettingsTab() {
   const { data: settings } = useQuery<LeagueSettings>({
     queryKey: ['league-settings'],
     queryFn: async () => {
-      const { data } = await supabase.from('league_settings').select('*').single();
+      const { data, error } = await supabase.from('league_settings').select('*').single();
+      if (error) throw error;
       return data!;
     },
   });
@@ -1302,7 +1351,8 @@ function AuditTab() {
   const { data: events = [] } = useQuery<AuditEvent[]>({
     queryKey: ['audit-events'],
     queryFn: async () => {
-      const { data } = await supabase.from('audit_events').select('*').order('created_at', { ascending: false }).limit(30);
+      const { data, error } = await supabase.from('audit_events').select('*').order('created_at', { ascending: false }).limit(30);
+      if (error) throw error;
       return data ?? [];
     },
   });

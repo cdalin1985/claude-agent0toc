@@ -3,24 +3,25 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Layout } from './components/Layout';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { lazyWithRetry } from './lib/lazyWithRetry';
 
 // Lazy-loaded pages for code splitting
-const LoginPage        = React.lazy(() => import('./pages/LoginPage'));
-const ClaimPage        = React.lazy(() => import('./pages/ClaimPage'));
-const HomePage         = React.lazy(() => import('./pages/HomePage'));
-const RankingsPage     = React.lazy(() => import('./pages/RankingsPage'));
-const PlayerPage       = React.lazy(() => import('./pages/PlayerPage'));
-const ChallengePage    = React.lazy(() => import('./pages/ChallengePage'));
-const ChallengesPage   = React.lazy(() => import('./pages/ChallengesPage'));
-const MatchPage        = React.lazy(() => import('./pages/MatchPage'));
-const MatchesPage      = React.lazy(() => import('./pages/MatchesPage'));
-const NotificationsPage= React.lazy(() => import('./pages/NotificationsPage'));
-const SettingsPage     = React.lazy(() => import('./pages/SettingsPage'));
-const AdminPage        = React.lazy(() => import('./pages/AdminPage'));
-const AuthCallbackPage = React.lazy(() => import('./pages/AuthCallbackPage'));
-const TreasuryPage     = React.lazy(() => import('./pages/TreasuryPage'));
-const ActivityPage     = React.lazy(() => import('./pages/ActivityPage'));
-const RulesPage        = React.lazy(() => import('./pages/RulesPage'));
+const LoginPage        = lazyWithRetry(() => import('./pages/LoginPage'));
+const ClaimPage        = lazyWithRetry(() => import('./pages/ClaimPage'));
+const HomePage         = lazyWithRetry(() => import('./pages/HomePage'));
+const RankingsPage     = lazyWithRetry(() => import('./pages/RankingsPage'));
+const PlayerPage       = lazyWithRetry(() => import('./pages/PlayerPage'));
+const ChallengePage    = lazyWithRetry(() => import('./pages/ChallengePage'));
+const ChallengesPage   = lazyWithRetry(() => import('./pages/ChallengesPage'));
+const MatchPage        = lazyWithRetry(() => import('./pages/MatchPage'));
+const MatchesPage      = lazyWithRetry(() => import('./pages/MatchesPage'));
+const NotificationsPage= lazyWithRetry(() => import('./pages/NotificationsPage'));
+const SettingsPage     = lazyWithRetry(() => import('./pages/SettingsPage'));
+const AdminPage        = lazyWithRetry(() => import('./pages/AdminPage'));
+const AuthCallbackPage = lazyWithRetry(() => import('./pages/AuthCallbackPage'));
+const TreasuryPage     = lazyWithRetry(() => import('./pages/TreasuryPage'));
+const ActivityPage     = lazyWithRetry(() => import('./pages/ActivityPage'));
+const RulesPage        = lazyWithRetry(() => import('./pages/RulesPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,8 +33,22 @@ const queryClient = new QueryClient({
   },
 });
 
+// The fallback used to be an empty black div, so every route transition on slow
+// wifi was featureless blackness with no way to tell loading from broken.
+const RouteFallback: React.FC = () => (
+  <div className="min-h-screen bg-[#0D0D0D] px-4 pt-6" aria-busy="true" aria-live="polite">
+    <span className="sr-only">Loading…</span>
+    <div className="skeleton h-8 w-2/5 rounded-lg mb-5" />
+    <div className="space-y-3">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="skeleton h-16 rounded-xl" />
+      ))}
+    </div>
+  </div>
+);
+
 const Suspense: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <React.Suspense fallback={<div className="min-h-screen bg-[#0D0D0D]" />}>
+  <React.Suspense fallback={<RouteFallback />}>
     {children}
   </React.Suspense>
 );
