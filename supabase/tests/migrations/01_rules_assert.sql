@@ -14,6 +14,7 @@ DECLARE
   p_mid    uuid;  -- #2
   p_low    uuid;  -- #3
   p_other  uuid;  -- #4
+  p_spare  uuid;  -- #5
   c_over   uuid;
   c_played uuid;
   c_nomatch uuid;
@@ -35,9 +36,16 @@ BEGIN
   INSERT INTO players (full_name) VALUES ('Mid Player')  RETURNING id INTO p_mid;
   INSERT INTO players (full_name) VALUES ('Low Player')  RETURNING id INTO p_low;
   INSERT INTO players (full_name) VALUES ('Other Player') RETURNING id INTO p_other;
+  -- Fifth player so the three expire_overdue_matches fixtures below can each
+  -- have a distinct challenged player. They used to reuse p_other twice, which
+  -- create-challenge would never have allowed (it refuses a challenge against a
+  -- player who already has a live one) and which the partial unique indexes
+  -- added in 20260812050000 now reject outright.
+  INSERT INTO players (full_name) VALUES ('Spare Player') RETURNING id INTO p_spare;
 
   INSERT INTO rankings (player_id, position)
-  VALUES (p_top, base + 1), (p_mid, base + 2), (p_low, base + 3), (p_other, base + 4);
+  VALUES (p_top, base + 1), (p_mid, base + 2), (p_low, base + 3), (p_other, base + 4),
+         (p_spare, base + 5);
 
   UPDATE league_settings SET cooldown_hours = 24, match_play_days = 10;
 
@@ -90,7 +98,7 @@ BEGIN
 
   -- (c) past deadline, no match row at all (accept died mid-way) -> ruled a wash
   INSERT INTO challenges (challenger_id, challenged_id, discipline, race_length, status, expires_at, match_deadline)
-  VALUES (p_mid, p_other, '10 Ball', 7, 'scheduled', now() + interval '30 days', now() - interval '2 days')
+  VALUES (p_mid, p_spare, '10 Ball', 7, 'scheduled', now() + interval '30 days', now() - interval '2 days')
   RETURNING id INTO c_nomatch;
 
   n := public.expire_overdue_matches();

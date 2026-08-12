@@ -53,8 +53,21 @@ jobs:
       - name: Assert the league rules actually behave correctly
         run: |
           set -euo pipefail
-          psql -v ON_ERROR_STOP=1 -f supabase/tests/migrations/01_rules_assert.sql
-          psql -v ON_ERROR_STOP=1 -f supabase/tests/migrations/02_negotiation_assert.sql
+          # Every assert file, by glob. Naming two explicitly meant that
+          # 03_preferences, 04_definer_privileges and 05_treasury_visibility
+          # existed, passed locally, and were never run by the PR gate -- so the
+          # only genuinely behavioural coverage in the repo was the part CI
+          # skipped. A new NN_*_assert.sql is now picked up automatically.
+          shopt -s nullglob
+          asserts=(supabase/tests/migrations/[0-9][0-9]_*_assert.sql)
+          if [ ${#asserts[@]} -eq 0 ]; then
+            echo "::error::No assert files matched. Refusing to report success from an empty set."
+            exit 1
+          fi
+          for f in "${asserts[@]}"; do
+            echo "--> $(basename "$f")"
+            psql -v ON_ERROR_STOP=1 -f "$f"
+          done
 
       - name: Re-apply the newest migrations to prove they are idempotent
         # Production runs ahead of this repo, so a NEW migration must be safe to
@@ -68,7 +81,11 @@ jobs:
         # tolerate being re-run.
         run: |
           set -euo pipefail
-          for f in $(ls supabase/migrations/20260807*.sql | sort); do
+          # Everything dated 2026-08-07 or later, rather than a literal 20260807
+          # glob -- that glob silently stopped covering anything added in a later
+          # month, so a new migration got the idempotency check only if it
+          # happened to land in the same month as the one this was written in.
+          for f in $(ls supabase/migrations/*.sql | sort | awk -F/ '$NF >= "20260807"'); do
             echo "--> re-apply $(basename "$f")"
             psql -v ON_ERROR_STOP=1 -q -f "$f"
           done
@@ -76,5 +93,18 @@ jobs:
       - name: Assert behaviour still holds after re-application
         run: |
           set -euo pipefail
-          psql -v ON_ERROR_STOP=1 -f supabase/tests/migrations/01_rules_assert.sql
-          psql -v ON_ERROR_STOP=1 -f supabase/tests/migrations/02_negotiation_assert.sql
+          # Every assert file, by glob. Naming two explicitly meant that
+          # 03_preferences, 04_definer_privileges and 05_treasury_visibility
+          # existed, passed locally, and were never run by the PR gate -- so the
+          # only genuinely behavioural coverage in the repo was the part CI
+          # skipped. A new NN_*_assert.sql is now picked up automatically.
+          shopt -s nullglob
+          asserts=(supabase/tests/migrations/[0-9][0-9]_*_assert.sql)
+          if [ ${#asserts[@]} -eq 0 ]; then
+            echo "::error::No assert files matched. Refusing to report success from an empty set."
+            exit 1
+          fi
+          for f in "${asserts[@]}"; do
+            echo "--> $(basename "$f")"
+            psql -v ON_ERROR_STOP=1 -f "$f"
+          done

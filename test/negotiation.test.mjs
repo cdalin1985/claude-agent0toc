@@ -11,7 +11,8 @@ const respondToChallenge = read('supabase', 'functions', 'respond-to-challenge',
 const challengesPage = read('src', 'pages', 'ChallengesPage.tsx');
 const notificationsPage = read('src', 'pages', 'NotificationsPage.tsx');
 const databaseTypes = read('src', 'types', 'database.ts');
-const sqlAssert = read('supabase', 'tests', 'migrations', '02_negotiation_assert.sql');
+const SQL_ASSERT_FILE = '02_negotiation_assert.sql';
+const sqlAssert = read('supabase', 'tests', 'migrations', SQL_ASSERT_FILE);
 const workflow = read('.github', 'workflows', 'migration-replay-check.yml');
 
 // --- Data model -------------------------------------------------------------
@@ -210,8 +211,14 @@ test('the negotiation invariants are proven at runtime, not just asserted in sou
   assert.match(sqlAssert, /EXCEPTION WHEN unique_violation THEN NULL/);
   assert.match(sqlAssert, /a negotiating challenge past its deadline was not expired/);
   assert.match(sqlAssert, /players can write proposals directly, bypassing turn order/);
-  // And CI runs it.
-  assert.match(workflow, /02_negotiation_assert\.sql/);
+  // And CI runs it. The workflow used to name each assert file explicitly, so
+  // this asserted the literal '02_negotiation_assert.sql'. That named-list was
+  // itself the bug -- 03, 04 and 05 existed and the PR gate never ran them --
+  // so it is now a glob, and what matters is that the glob would pick this file
+  // up. Matching the pattern instead of the filename keeps the guarantee
+  // ("CI runs this") without re-pinning the thing that was wrong.
+  assert.match(workflow, /\[0-9\]\[0-9\]_\*_assert\.sql/);
+  assert.match(SQL_ASSERT_FILE, /^[0-9][0-9]_.*_assert\.sql$/);
 });
 
 test('nothing added in this package reintroduces mojibake or a BOM', () => {
