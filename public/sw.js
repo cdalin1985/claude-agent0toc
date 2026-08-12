@@ -1,8 +1,13 @@
 // Bump CACHE_VERSION whenever caching behavior changes; old caches are
 // cleaned up on activate.
-const CACHE_VERSION = 'toc-v2';
+const CACHE_VERSION = 'toc-v3';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const ASSET_CACHE = `${CACHE_VERSION}-assets`;
+
+// How long a navigation waits for the network before the cached shell is shown.
+// A blackholing access point does not reject, it hangs, so this is the only
+// thing that turns "app never opens" into "app opens on last known state".
+const NAV_TIMEOUT_MS = 3000;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -36,15 +41,39 @@ self.addEventListener('fetch', (event) => {
   // SPA navigations: network-first so users always get fresh HTML, falling
   // back to the cached shell when offline so the app still opens at the bar.
   if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((res) => {
+    event.respondWith((async () => {
+      const cached = await caches.match('/');
+
+      const network = fetch(request).then((res) => {
+        // Only a good response may become the offline shell. Without this check
+        // one bad navigation during a deploy installed "502 Bad Gateway" as the
+        // shell, and every later offline launch showed that error page instead
+        // of the app until a successful navigation happened to replace it.
+        if (res.ok) {
           const copy = res.clone();
           caches.open(SHELL_CACHE).then((cache) => cache.put('/', copy)).catch(() => {});
-          return res;
-        })
-        .catch(() => caches.match('/'))
-    );
+        }
+        return res;
+      });
+
+      // Nothing cached yet -- we have to wait for the network however long it takes.
+      if (!cached) {
+        try {
+          return await network;
+        } catch {
+          return Response.error();
+        }
+      }
+
+      // Bar wifi that accepts the association and then blackholes traffic does
+      // not REJECT -- it hangs to the OS timeout. The old `.catch()` fallback
+      // only ran on a rejection, so a perfectly good cached shell sat unused
+      // while the player stared at nothing. Race the network against a short
+      // timer and show the app instead.
+      const timeout = new Promise((resolve) => setTimeout(() => resolve(null), NAV_TIMEOUT_MS));
+      const winner = await Promise.race([network.catch(() => null), timeout]);
+      return winner ?? cached;
+    })());
     return;
   }
 
