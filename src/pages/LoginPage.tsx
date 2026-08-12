@@ -8,6 +8,10 @@ import { Button } from '../components/Button';
 
 type Step = 'email' | 'code';
 
+// Supabase rate-limits OTP sends at 60s. Matching it here means the button says
+// so instead of the server refusing and the player seeing nothing happen.
+const RESEND_COOLDOWN_SECONDS = 60;
+
 // Auto-focus the email field only on desktop. On phones it pops the keyboard
 // the moment the page loads, covering the title and disorienting first-time visitors.
 const SHOULD_AUTO_FOCUS_EMAIL =
@@ -21,6 +25,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
   const [resent, setResent]   = useState(false);
+  const [resending, setResending] = useState(false);
+  const [cooldown, setCooldown]   = useState(0);
   const codeRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -58,13 +64,37 @@ export default function LoginPage() {
     else     { navigate('/', { replace: true }); }
   };
 
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const id = setInterval(() => setCooldown((s) => (s <= 1 ? 0 : s - 1)), 1000);
+    return () => clearInterval(id);
+  }, [cooldown]);
+
+  // Every player passes through this screen to get in, so a silent failure here
+  // blocks onboarding for the whole league.
+  //
+  // This used to discard the error entirely and had no loading state or
+  // disabled guard. Supabase rate-limits OTP, so a second tap inside 60s
+  // returns "you can only request this after N seconds" and the player saw
+  // absolutely nothing change -- so they tapped again. Worse, each successful
+  // resend invalidates the previous code, so a player who tapped twice and then
+  // typed the code from the first email got "Invalid or expired code" and had
+  // no way to understand why.
   const handleResend = async () => {
+    if (resending || cooldown > 0) return;
+    setResending(true);
     setError('');
     setCode('');
     const { error: err } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
     });
-    if (!err) setResent(true);
+    setResending(false);
+    if (err) {
+      setError(err.message || 'Could not send a new code. Please try again in a minute.');
+      return;
+    }
+    setResent(true);
+    setCooldown(RESEND_COOLDOWN_SECONDS);
   };
 
   const handleCodeChange = (val: string) => {
@@ -255,15 +285,18 @@ export default function LoginPage() {
               </Button>
 
               <div className="text-center">
-                {resent ? (
-                  <p className="text-[#22C55E] text-sm font-[Barlow]">Code resent!</p>
+                {resent && cooldown > 0 ? (
+                  <p className="text-[#22C55E] text-sm font-[Barlow]">
+                    New code sent — use the newest email. You can ask again in {cooldown}s.
+                  </p>
                 ) : (
                   <button
                     type="button"
                     onClick={handleResend}
-                    className="text-[#9CA3AF] text-sm font-[Barlow] underline underline-offset-2 hover:text-[#E8E2D6] transition-colors"
+                    disabled={resending || cooldown > 0}
+                    className="text-[#9CA3AF] text-sm font-[Barlow] underline underline-offset-2 hover:text-[#E8E2D6] transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
                   >
-                    Resend code
+                    {resending ? 'Sending…' : cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend code'}
                   </button>
                 )}
               </div>

@@ -309,7 +309,13 @@ export default function MatchPage() {
   };
 
   const handleAddPoint = async (winnerId: string) => {
-    if (!amInMatch || submitting) return;
+    // `undoing` matters as much as `submitting`. update-match-score writes
+    // ABSOLUTE scores with no expected-previous guard, so concurrent writes are
+    // last-write-wins: a scorekeeper who taps Undo, sees nothing happen on slow
+    // wifi, and taps a player's side to fix it by hand can have the add-point
+    // land second and silently re-apply the point the undo removed. The score
+    // decides the match, the ranking move and the ledger entry.
+    if (!amInMatch || submitting || undoing) return;
     const snapshot: LastScoreAction = {
       prevPlayer1Score: match.player1_score,
       prevPlayer2Score: match.player2_score,
@@ -427,7 +433,9 @@ export default function MatchPage() {
         p1Pos={p1Pos}
         p2Pos={p2Pos}
         canScore={canScore}
-        submitting={submitting}
+        // One in-flight flag covering every score mutation, so the buttons are
+        // not live during an undo.
+        submitting={submitting || undoing}
         onAddPoint={handleAddPoint}
       />
 

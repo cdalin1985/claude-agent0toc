@@ -115,23 +115,45 @@ function DisputesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const [p2Score, setP2Score]     = useState('');
   const [notes, setNotes]         = useState('');
   const [loading, setLoading]     = useState(false);
+  const [resolveError, setResolveError] = useState('');
 
   const handleResolve = async (matchId: string) => {
     const s1 = parseInt(p1Score, 10);
     const s2 = parseInt(p2Score, 10);
     if (!winnerId || isNaN(s1) || isNaN(s2) || s1 < 0 || s2 < 0) return;
     setLoading(true);
+    setResolveError('');
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setLoading(false); return; }
-    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-dispute`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({ match_id: matchId, winner_id: winnerId, final_score_player1: s1, final_score_player2: s2, notes }),
-    });
-    setLoading(false);
-    setResolving(null);
-    qc.invalidateQueries({ queryKey: ['admin-disputes'] });
-    qc.invalidateQueries({ queryKey: ['rankings'] });
+    if (!session) {
+      setLoading(false);
+      setResolveError('Your sign-in expired. Please sign in again.');
+      return;
+    }
+    // This used to sit outside any try, and discarded the response entirely.
+    // A rejected fetch meant setLoading(false) never ran -- the Resolve button
+    // spun forever and the modal was stuck -- and a 403/500 closed the modal as
+    // though it had worked while the dispute stayed open. Resolving a dispute
+    // sets a winner and moves rankings, so "looked like it worked" is the one
+    // outcome that must not be possible.
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-dispute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ match_id: matchId, winner_id: winnerId, final_score_player1: s1, final_score_player2: s2, notes }),
+      });
+      const json = await res.json().catch(() => ({})) as { error?: string };
+      if (!res.ok || json.error) {
+        setResolveError(json.error ?? `Could not resolve that dispute (HTTP ${res.status}).`);
+        return;
+      }
+      setResolving(null);
+      qc.invalidateQueries({ queryKey: ['admin-disputes'] });
+      qc.invalidateQueries({ queryKey: ['rankings'] });
+    } catch {
+      setResolveError('Network error — the dispute was not resolved. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // An empty list must never be shown as "all clear" unless the read succeeded.
@@ -186,6 +208,9 @@ function DisputesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
               </div>
               <textarea placeholder="Admin notes…" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
                 className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[#C62828] resize-none" />
+              {resolveError && (
+                <p className="text-[#EF4444] text-xs font-[Barlow]">{resolveError}</p>
+              )}
               <div className="flex gap-2">
                 <Button variant="ghost" size="sm" onClick={() => setResolving(null)}>Cancel</Button>
                 <Button variant="primary" size="sm" loading={loading} disabled={!winnerId} onClick={() => handleResolve(m.id)}>Resolve</Button>

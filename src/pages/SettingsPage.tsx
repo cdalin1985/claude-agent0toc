@@ -183,8 +183,10 @@ export default function SettingsPage() {
   const handleSaveName = async () => {
     if (!profile || !displayName.trim()) return;
     setSaving(true);
-    await supabase.from('profiles').update({ display_name: displayName.trim() }).eq('id', profile.id);
+    setProfileError('');
+    const { error } = await supabase.from('profiles').update({ display_name: displayName.trim() }).eq('id', profile.id);
     setSaving(false);
+    if (error) setProfileError(`Couldn't save your display name: ${error.message}`);
   };
 
   const handleSaveProfile = async () => {
@@ -268,7 +270,8 @@ export default function SettingsPage() {
     if (!player) return;
     setAvatarSaving(true);
     setAvatarError('');
-    await supabase.from('players').update({ avatar_url: icon }).eq('id', player.id);
+    const { error: saveErr } = await supabase.from('players').update({ avatar_url: icon }).eq('id', player.id);
+    if (saveErr) { setAvatarError(`Could not save that icon: ${saveErr.message}`); setAvatarSaving(false); return; }
     // Refresh player in store
     const { data } = await supabase.from('players').select('*').eq('id', player.id).single();
     if (data) setPlayer(data);
@@ -286,7 +289,11 @@ export default function SettingsPage() {
     const { error: uploadErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
     if (uploadErr) { setAvatarError(uploadErr.message); setAvatarSaving(false); return; }
     const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
-    await supabase.from('players').update({ avatar_url: publicUrl }).eq('id', player.id);
+    // The upload above is error-checked but this write was not, so a failure
+    // here closed the picker, the re-read below put the OLD avatar back, and
+    // the player watched their new photo silently revert with no explanation.
+    const { error: saveErr } = await supabase.from('players').update({ avatar_url: publicUrl }).eq('id', player.id);
+    if (saveErr) { setAvatarError(`Uploaded, but could not save it: ${saveErr.message}`); setAvatarSaving(false); return; }
     const { data } = await supabase.from('players').select('*').eq('id', player.id).single();
     if (data) setPlayer(data);
     setAvatarSaving(false);
@@ -296,7 +303,9 @@ export default function SettingsPage() {
   const handleRemoveAvatar = async () => {
     if (!player) return;
     setAvatarSaving(true);
-    await supabase.from('players').update({ avatar_url: null }).eq('id', player.id);
+    setAvatarError('');
+    const { error } = await supabase.from('players').update({ avatar_url: null }).eq('id', player.id);
+    if (error) { setAvatarError(`Could not remove that photo: ${error.message}`); setAvatarSaving(false); return; }
     const { data } = await supabase.from('players').select('*').eq('id', player.id).single();
     if (data) setPlayer(data);
     setAvatarSaving(false);
