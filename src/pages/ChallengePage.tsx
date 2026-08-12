@@ -99,8 +99,16 @@ export default function ChallengePage() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ challenged_player_id: id, discipline, race_length: race }),
       });
-      const json = await res.json() as { challenge_id?: string; error?: string };
-      if (json.error) { setError(json.error); return; }
+      // A failing function can return a non-JSON body; don't let that throw.
+      const json = await res.json().catch(() => ({})) as { challenge_id?: string; error?: string };
+      // res.ok matters as much as json.error: a Supabase gateway 401 is
+      // {"code":401,"message":"Invalid JWT"} with no `error` key at all, and
+      // testing json.error alone would fall through to the "Challenge Sent!"
+      // screen for a challenge that was never created.
+      if (!res.ok || json.error) {
+        setError(json.error ?? 'Could not send that challenge. Please try again.');
+        return;
+      }
       setSent(true);
     } catch {
       setError('Network error — please try again.');

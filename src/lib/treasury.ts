@@ -25,6 +25,14 @@ export async function fetchTreasurySnapshot(limit?: number): Promise<TreasurySna
     typeof limit === 'number' ? ledgerQuery.limit(limit) : ledgerQuery,
   ]);
 
+  // Throw rather than fall back to zeros. Swallowing these made a failed read
+  // indistinguishable from an empty treasury, so react-query never entered an
+  // error state and the page told the league it held $0.00 and had never
+  // recorded a transaction. For a ledger, a wrong number stated confidently is
+  // worse than an error.
+  if (summaryResult.error) throw summaryResult.error;
+  if (entriesResult.error) throw entriesResult.error;
+
   return {
     summary: (summaryResult.data as TreasurySummary | null) ?? EMPTY_SUMMARY,
     entries: (entriesResult.data as TreasuryLedgerEffect[] | null) ?? [],

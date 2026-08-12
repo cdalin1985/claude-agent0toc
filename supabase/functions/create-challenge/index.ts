@@ -2,6 +2,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import webpush from 'npm:web-push';
+import { formatLeagueDateTime } from '../_shared/leagueTime.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -209,7 +210,7 @@ serve(async (req) => {
     // before challenging up again" — and separately grants top-10 players the
     // right to challenge down 5 spots. Blocking a downward challenge would take
     // away a challenge the rulebook gives you.
-    if (myCooldown && theirPos < myPos) return new Response(JSON.stringify({ error: `You are in a post-match cooldown and cannot challenge up until ${new Date(myCooldown.expires_at).toLocaleString()}. You can still challenge down.` }), { status: 409, headers: corsHeaders });
+    if (myCooldown && theirPos < myPos) return new Response(JSON.stringify({ error: `You are in a post-match cooldown and cannot challenge up until ${formatLeagueDateTime(myCooldown.expires_at)}. You can still challenge down.` }), { status: 409, headers: corsHeaders });
 
     const expiresAt = new Date(Date.now() + challengeExpiryDays * 24 * 3600 * 1000).toISOString();
     const { data: challenge, error: insertErr } = await supabase.from('challenges').insert({ challenger_id: challenger.id, challenged_id: challenged_player_id, discipline, race_length, status: 'pending', expires_at: expiresAt }).select().single();

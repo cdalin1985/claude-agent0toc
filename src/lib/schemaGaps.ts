@@ -48,7 +48,15 @@ export function onlyExistingColumns<T extends Record<string, unknown>>(
   payload: T,
   reference: Record<string, unknown> | null | undefined,
 ): Partial<T> {
-  if (!reference) return payload;
+  // A missing reference means "I could not establish what columns exist" --
+  // which is the opposite of "send everything". Returning the full payload here
+  // meant that when the initial player read failed (bad wifi, token refresh
+  // race) or had simply not resolved yet, Save Profile wrote every field --
+  // each initialised to '' and coerced to null -- and blanked bio, nickname,
+  // tagline, home_venue, years_playing, cue_brand and preferred_discipline in
+  // one tap, then reported success. Refusing to write is the safe direction:
+  // the worst case becomes a save that did nothing, not a profile that is gone.
+  if (!reference) return {};
   const allowed = new Set(Object.keys(reference));
   const narrowed: Partial<T> = {};
   for (const [key, value] of Object.entries(payload)) {

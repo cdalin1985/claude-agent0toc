@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { GlassCard } from '../components/GlassCard';
+import { QueryError } from '../components/QueryError';
 import { Badge } from '../components/Badge';
 import { formatDate } from '../utils/time';
 import { fetchTreasurySnapshot, formatCents, ledgerSignFor } from '../lib/treasury';
@@ -11,13 +12,37 @@ import { fetchTreasurySnapshot, formatCents, ledgerSignFor } from '../lib/treasu
 export default function TreasuryPage() {
   const navigate = useNavigate();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['treasury'],
     queryFn: () => fetchTreasurySnapshot(),
   });
 
   const summary = data?.summary;
   const entries = data?.entries ?? [];
+
+  // Never fall through to the zeroed summary on a failed read: "$0.00 Balance"
+  // and "No treasury entries yet" is a claim about the league's money, and
+  // stating it because the network failed is worse than showing nothing.
+  if (isError) {
+    return (
+      <div className="min-h-screen px-4 pt-4 pb-8">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-1 text-[#9CA3AF] p-2 -ml-2 mb-4"
+        >
+          <ChevronLeft size={18} /> Back
+        </button>
+        <h1 className="font-[Bebas_Neue] text-5xl tracking-wide text-[#E8E2D6] mb-1">
+          League Treasury
+        </h1>
+        <QueryError
+          message="Couldn't load the treasury. Check your signal and try again."
+          onRetry={() => refetch()}
+          retrying={isRefetching}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen px-4 pt-4 pb-8">
