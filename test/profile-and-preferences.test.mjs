@@ -167,9 +167,16 @@ test('a missing preferences row shows the profile rather than blanking it', () =
 });
 
 test('every toggle is reachable, labelled, and reverts visibly on failure', () => {
-  for (const key of ['notify_challenges', 'notify_reminders', 'notify_results', 'notify_activity', 'push_enabled', 'show_stats_publicly', 'show_profile_details']) {
+  for (const key of ['notify_challenges', 'notify_reminders', 'notify_results', 'push_enabled', 'show_stats_publicly', 'show_profile_details']) {
     assert.match(settingsPage, new RegExp(`setPreference\\('${key}'`), `${key} has no control`);
   }
+  // notify_activity is deliberately NOT in that list. No edge function sends a
+  // push of type 'activity', so the switch did nothing whichever way it was
+  // set. This assertion used to require the control to exist, which is how a
+  // dead toggle passed a test suite for months: "reachable" was checked,
+  // "connected to anything" was not. Requiring its absence keeps it out until
+  // something actually sends activity pushes.
+  assert.doesNotMatch(settingsPage, /setPreference\('notify_activity'/);
   // Optimistic, then rolled back with a reason — a switch that silently springs
   // back is the worst version of this.
   assert.match(settingsPage, /const previous = prefs;/);
@@ -203,9 +210,11 @@ test('every accent swatch is one the database will actually accept', () => {
   assert.doesNotMatch(settingsPage, /type="color"/);
 });
 
-test('the toggle row is one component rather than eight copies', () => {
+test('the toggle row is one component rather than a copy per switch', () => {
   assert.match(settingsPage, /function ToggleRow\(/);
-  assert.ok((settingsPage.match(/<ToggleRow/g) ?? []).length >= 7);
+  // Six, since the dead "League Activity" row was removed. The number is not
+  // the point — one component is.
+  assert.ok((settingsPage.match(/<ToggleRow/g) ?? []).length >= 6);
 });
 
 // --- Types and encoding ------------------------------------------------------

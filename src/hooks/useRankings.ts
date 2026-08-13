@@ -7,7 +7,14 @@ export function useRankings() {
     queryKey: ['rankings'],
     queryFn: async () => {
       const [playersRes, rankingsRes, metricsRes, statsRes] = await Promise.all([
-        supabase.from('players').select('*').eq('is_active', true),
+        // players_public, not players. The ladder payload is where the profile
+        // detail columns actually reach other members — every active player's
+        // row, refetched every 30 seconds — so it is where the "Profile
+        // Details" toggle has to be enforced. Redacting in the component (which
+        // is what PlayerPage did) hid the values from the page while still
+        // sending them to the browser. Same columns, same types; the view nulls
+        // what the owner asked to keep back, and nothing for the owner.
+        supabase.from('players_public').select('*').eq('is_active', true),
         supabase.from('rankings').select('*').order('position'),
         supabase.from('player_reference_metrics').select('*'),
         supabase.from('player_season_stats').select('*'),

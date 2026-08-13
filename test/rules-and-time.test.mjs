@@ -219,7 +219,12 @@ test('a failed forfeit is reported rather than closing the panel as if it worked
 });
 
 test('a failed league-settings save is reported rather than showing Saved', () => {
-  assert.match(adminPage, /setSaveError\(`Could not save: \$\{error\.message\}`\)/);
+  // Was pinned to the literal `Could not save: ${error.message}`. Pasting the
+  // raw message in unconditionally is what produced "Could not save: Failed to
+  // fetch" — a sentence that blames the save for a dropped request. The
+  // reporting requirement is unchanged; the message now goes through the
+  // filter that drops browser and Postgres internals.
+  assert.match(adminPage, /setSaveError\(failureMessage\("Could not save", error\.message\)\)/);
   assert.match(adminPage, /\{saveError && \(/);
 });
 

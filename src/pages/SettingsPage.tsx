@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { LogOut, User, Volume2, VolumeX, Shield, Bell, BellOff, FileText, Camera, X, Swords, Clock, Trophy } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { failureMessage } from '../lib/humanError';
 import { useAuthStore } from '../stores/authStore';
 import { useUIStore } from '../stores/uiStore';
 import { useRankings } from '../hooks/useRankings';
@@ -176,7 +177,7 @@ export default function SettingsPage() {
       .eq('player_id', player.id);
     if (error) {
       setPrefs(previous);
-      setPrefsError(`Couldn't save that setting: ${error.message}`);
+      setPrefsError(failureMessage("Couldn't save that setting", error.message));
     }
   };
 
@@ -186,7 +187,7 @@ export default function SettingsPage() {
     setProfileError('');
     const { error } = await supabase.from('profiles').update({ display_name: displayName.trim() }).eq('id', profile.id);
     setSaving(false);
-    if (error) setProfileError(`Couldn't save your display name: ${error.message}`);
+    if (error) setProfileError(failureMessage("Couldn't save your display name", error.message));
   };
 
   const handleSaveProfile = async () => {
@@ -216,7 +217,7 @@ export default function SettingsPage() {
     setSaving(false);
 
     if (error) {
-      setProfileError(`Couldn't save your profile: ${error.message}`);
+      setProfileError(failureMessage("Couldn't save your profile", error.message));
       return;
     }
     setProfileSaved(true);
@@ -231,10 +232,13 @@ export default function SettingsPage() {
     const ext  = file.name.split('.').pop() ?? 'jpg';
     const path = `${profile.id}/banner.${ext}`;
     const { error: uploadErr } = await supabase.storage.from('banners').upload(path, file, { upsert: true });
-    if (uploadErr) { setBannerError(uploadErr.message); setBannerSaving(false); return; }
+    // Storage errors are the least member-readable in the app: a refused upload
+    // arrives as "new row violates row-level security policy", which names a
+    // mechanism nobody outside this repo has heard of.
+    if (uploadErr) { setBannerError(failureMessage('Could not upload that banner', uploadErr.message)); setBannerSaving(false); return; }
     const { data: { publicUrl } } = supabase.storage.from('banners').getPublicUrl(path);
     const { error: saveErr } = await supabase.from('players').update({ banner_url: publicUrl }).eq('id', player.id);
-    if (saveErr) { setBannerError(`Uploaded, but could not save it: ${saveErr.message}`); setBannerSaving(false); return; }
+    if (saveErr) { setBannerError(failureMessage("Uploaded, but could not save it", saveErr.message)); setBannerSaving(false); return; }
     const { data } = await supabase.from('players').select('*').eq('id', player.id).single();
     if (data) setPlayer(data);
     setBannerSaving(false);
@@ -245,7 +249,7 @@ export default function SettingsPage() {
     setBannerSaving(true);
     setBannerError('');
     const { error } = await supabase.from('players').update({ banner_url: null }).eq('id', player.id);
-    if (error) { setBannerError(`Could not remove that banner: ${error.message}`); setBannerSaving(false); return; }
+    if (error) { setBannerError(failureMessage("Could not remove that banner", error.message)); setBannerSaving(false); return; }
     const { data } = await supabase.from('players').select('*').eq('id', player.id).single();
     if (data) setPlayer(data);
     setBannerSaving(false);
@@ -262,7 +266,7 @@ export default function SettingsPage() {
       setAccentColor(previous);
       setProfileError(isMissingSchemaObject(error)
         ? 'Accent colours are not switched on yet — check back after the next update.'
-        : `Could not save that colour: ${error.message}`);
+        : failureMessage("Could not save that colour", error.message));
     }
   };
 
@@ -271,7 +275,7 @@ export default function SettingsPage() {
     setAvatarSaving(true);
     setAvatarError('');
     const { error: saveErr } = await supabase.from('players').update({ avatar_url: icon }).eq('id', player.id);
-    if (saveErr) { setAvatarError(`Could not save that icon: ${saveErr.message}`); setAvatarSaving(false); return; }
+    if (saveErr) { setAvatarError(failureMessage("Could not save that icon", saveErr.message)); setAvatarSaving(false); return; }
     // Refresh player in store
     const { data } = await supabase.from('players').select('*').eq('id', player.id).single();
     if (data) setPlayer(data);
@@ -287,13 +291,13 @@ export default function SettingsPage() {
     const ext  = file.name.split('.').pop() ?? 'jpg';
     const path = `${profile.id}/avatar.${ext}`;
     const { error: uploadErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
-    if (uploadErr) { setAvatarError(uploadErr.message); setAvatarSaving(false); return; }
+    if (uploadErr) { setAvatarError(failureMessage('Could not upload that photo', uploadErr.message)); setAvatarSaving(false); return; }
     const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
     // The upload above is error-checked but this write was not, so a failure
     // here closed the picker, the re-read below put the OLD avatar back, and
     // the player watched their new photo silently revert with no explanation.
     const { error: saveErr } = await supabase.from('players').update({ avatar_url: publicUrl }).eq('id', player.id);
-    if (saveErr) { setAvatarError(`Uploaded, but could not save it: ${saveErr.message}`); setAvatarSaving(false); return; }
+    if (saveErr) { setAvatarError(failureMessage("Uploaded, but could not save it", saveErr.message)); setAvatarSaving(false); return; }
     const { data } = await supabase.from('players').select('*').eq('id', player.id).single();
     if (data) setPlayer(data);
     setAvatarSaving(false);
@@ -305,7 +309,7 @@ export default function SettingsPage() {
     setAvatarSaving(true);
     setAvatarError('');
     const { error } = await supabase.from('players').update({ avatar_url: null }).eq('id', player.id);
-    if (error) { setAvatarError(`Could not remove that photo: ${error.message}`); setAvatarSaving(false); return; }
+    if (error) { setAvatarError(failureMessage("Could not remove that photo", error.message)); setAvatarSaving(false); return; }
     const { data } = await supabase.from('players').select('*').eq('id', player.id).single();
     if (data) setPlayer(data);
     setAvatarSaving(false);
@@ -737,13 +741,14 @@ export default function SettingsPage() {
                   checked={prefs.notify_results}
                   onChange={(v) => setPreference('notify_results', v)}
                 />
-                <ToggleRow
-                  icon={<Bell size={18} />}
-                  title="League Activity"
-                  description="Rank changes and new members"
-                  checked={prefs.notify_activity}
-                  onChange={(v) => setPreference('notify_activity', v)}
-                />
+                {/* "League Activity" was here. Nothing ever sends a push of
+                    that type — no edge function emits one, so the preference
+                    was read by nobody. A switch that changes nothing whichever
+                    way you set it teaches members that this screen is
+                    decorative, which makes the switches that DO work harder to
+                    trust. The column and its branch in should_notify() are
+                    left in place, so putting the row back is a one-line change
+                    the day something actually sends activity pushes. */}
                 <ToggleRow
                   icon={<BellOff size={18} />}
                   title="Send to My Phone"
