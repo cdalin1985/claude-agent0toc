@@ -61,36 +61,35 @@ jobs:
             psql -h localhost -p 55432 -U postgres -v ON_ERROR_STOP=1 -d rehearsal -f "$t"
           done
 
-      - name: Apply anything production is missing, in filename order
+      # GitHub-hosted runners have no IPv6 and Supabase's direct host
+      # (db.<ref>.supabase.co) is IPv6-only, so psql could never reach it. This
+      # used to be a hard error telling a human to go fix the secret; nobody did,
+      # and a migration that stops a player renaming themselves on the ladder sat
+      # unapplied for a day as a result. The script repairs the string at runtime
+      # instead, proving each candidate pooler host with a real connection. It
+      # exports PROD_DB_URL, masked, for the steps below.
+      - name: Resolve a connection string this runner can reach
         env:
           PROD_DB_URL: ${{ secrets.PROD_DB_URL }}
-          DRY_RUN: ${{ inputs.dry_run }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          # TOC only. Project ankvjywsnydpkepdvuvm is "toc1". TOF is a separate
+          # league in a separate project and must never be written from here.
+          PROJECT_REF: ankvjywsnydpkepdvuvm
         run: |
-          set -euo pipefail
-
-          if [ -z "${PROD_DB_URL:-}" ]; then
+          set -uo pipefail
+          bash .github/scripts/resolve-prod-db-url.sh
+          code=$?
+          if [ "$code" -eq 2 ]; then
             echo "::error::PROD_DB_URL secret is not set. Add it in repo settings; this workflow cannot apply migrations without it."
             exit 1
           fi
+          exit "$code"
 
-          # GitHub-hosted runners have no IPv6, and Supabase's DIRECT database
-          # host (db.<ref>.supabase.co) is IPv6-only, so psql can never reach it
-          # from here. It fails with "Network is unreachable", which reads like an
-          # outage and is really a config problem.
-          #
-          # This is also why the drift check has been red every day since June: it
-          # was never connecting, so it reported nothing. A check that cannot
-          # connect is worse than no check, because it looks like coverage.
-          #
-          # Fix: point PROD_DB_URL at the SESSION-mode pooler, which has an IPv4
-          # address:
-          #   postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres
-          # Session mode (5432), not transaction mode (6543) -- migrations run DDL.
-          # Dashboard -> Project Settings -> Database -> Connection string -> Session pooler.
-          if [[ "$PROD_DB_URL" == *"db."*".supabase.co"* ]]; then
-            echo "::error::PROD_DB_URL points at the direct database host (db.<ref>.supabase.co), which is IPv6-only and unreachable from GitHub runners. Replace it with the session-mode pooler string on aws-0-<region>.pooler.supabase.com:5432 — see the comment in this workflow."
-            exit 1
-          fi
+      - name: Apply anything production is missing, in filename order
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
 
           applied=$(psql "$PROD_DB_URL" -v ON_ERROR_STOP=1 -At -c \
             "SELECT version FROM supabase_migrations.schema_migrations;")
