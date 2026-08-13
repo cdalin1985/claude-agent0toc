@@ -405,6 +405,13 @@ export interface Database {
       };
     };
     Views: {
+      // players with the profile-detail columns nulled for members who turned
+      // "Profile Details" off, and never for the owner. Identical shape to the
+      // table — every redactable column is already nullable — so read paths can
+      // switch to it without changing a single type.
+      players_public: {
+        Row: Database['public']['Tables']['players']['Row'];
+      };
       treasury_ledger_effects: {
         Row: Database['public']['Tables']['treasury_ledger']['Row'] & {
           effect_cents: number;

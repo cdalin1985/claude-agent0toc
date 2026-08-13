@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { failureMessage } from '../lib/humanError';
 import { useAuthStore } from '../stores/authStore';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
@@ -320,7 +321,7 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     // withdrawal — see countsAgainstWeeklyLimit in the create-challenge function.
     const { error } = await supabase.from('challenges').update({ status: 'cancelled', cancel_reason: 'wash' }).eq('id', c.id);
     if (error) {
-      setActionError(`Could not cancel that challenge: ${error.message}`);
+      setActionError(failureMessage("Could not cancel that challenge", error.message));
       setLoading(false);
       return;
     }
@@ -360,7 +361,7 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
       const { error } = await supabase.from('challenges').update({ status: 'forfeited' }).eq('id', c.id);
       if (error) {
         // The match result landed; only the challenge row is out of step.
-        setActionError(`The result was recorded but the challenge did not close: ${error.message}`);
+        setActionError(failureMessage("The result was recorded but the challenge did not close", error.message));
         return;
       }
     } catch {
@@ -1332,7 +1333,7 @@ function SettingsTab() {
       // These values drive every rule check in the app. Reporting success on a
       // failed write would leave the admin believing the league runs on numbers
       // it does not.
-      setSaveError(`Could not save: ${error.message}`);
+      setSaveError(failureMessage("Could not save", error.message));
       return;
     }
     setEdits({});

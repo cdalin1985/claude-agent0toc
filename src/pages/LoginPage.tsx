@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, KeyRound, AlertCircle, ArrowLeft, HelpCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { humanError } from '../lib/humanError';
 import { EKGLine } from '../components/EKGLine';
 import { Button } from '../components/Button';
 
@@ -44,7 +45,11 @@ export default function LoginPage() {
       email: email.trim().toLowerCase(),
     });
     setLoading(false);
-    if (err) { setError(err.message); }
+    // Supabase's own messages here are usually readable ("Email rate limit
+    // exceeded"), but a network failure surfaces as the browser's "Failed to
+    // fetch", which tells a member nothing and reads like their email was
+    // rejected. Keep the useful ones, replace the useless one.
+    if (err) { setError(humanError(err.message, "We couldn't reach the league to send your code. Check your connection and try again.")); }
     else     { setStep('code'); setResent(false); }
   };
 
@@ -90,7 +95,7 @@ export default function LoginPage() {
     });
     setResending(false);
     if (err) {
-      setError(err.message || 'Could not send a new code. Please try again in a minute.');
+      setError(humanError(err.message, 'Could not send a new code. Please try again in a minute.'));
       return;
     }
     setResent(true);
