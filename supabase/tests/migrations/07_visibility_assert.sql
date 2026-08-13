@@ -47,11 +47,21 @@ BEGIN
     SET show_stats_publicly  = EXCLUDED.show_stats_publicly,
         show_profile_details = EXCLUDED.show_profile_details;
 
-  INSERT INTO player_discipline_stats (player_id, discipline, wins, losses)
-  VALUES (p_hider, '8ball', 3, 1), (p_open, '8ball', 2, 2);
+  -- matches_played, challenger_wins and defender_wins are filled in rather than
+  -- left at their defaults. 03_preferences_assert.sql checks invariants across
+  -- the WHOLE of player_venue_stats -- matches_played > 0, wins + losses =
+  -- matches_played, challenger_wins + defender_wins = wins -- so a fixture that
+  -- claims three wins and zero matches played fails a later assert file rather
+  -- than this one. It also happens to be nonsense data on its own terms.
+  INSERT INTO player_discipline_stats
+    (player_id, discipline, wins, losses, matches_played, challenger_wins, defender_wins)
+  VALUES (p_hider, '8ball', 3, 1, 4, 2, 1),
+         (p_open,  '8ball', 2, 2, 4, 1, 1);
 
-  INSERT INTO player_venue_stats (player_id, venue, wins, losses)
-  VALUES (p_hider, 'Eagles', 3, 1), (p_open, 'Eagles', 2, 2);
+  INSERT INTO player_venue_stats
+    (player_id, venue, wins, losses, matches_played, challenger_wins, defender_wins)
+  VALUES (p_hider, 'Eagles', 3, 1, 4, 2, 1),
+         (p_open,  'Eagles', 2, 2, 4, 1, 1);
 
   -- ------------------------------------------------ home_venue is bounded ---
   -- The UI is a dropdown, so this is only reachable by a direct PATCH. That is
