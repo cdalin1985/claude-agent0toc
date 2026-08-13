@@ -214,7 +214,30 @@ serve(async (req) => {
 
     const expiresAt = new Date(Date.now() + challengeExpiryDays * 24 * 3600 * 1000).toISOString();
     const { data: challenge, error: insertErr } = await supabase.from('challenges').insert({ challenger_id: challenger.id, challenged_id: challenged_player_id, discipline, race_length, status: 'pending', expires_at: expiresAt }).select().single();
-    if (insertErr) throw insertErr;
+    // The two reads above are the fast path, not the guard. They use
+    // maybeSingle(), which ERRORS once a player already has two live challenges
+    // -- the exact state they exist to prevent -- and their errors are
+    // discarded, so they fail open. The partial unique indexes added in
+    // 20260812050000 are what actually enforces this.
+    //
+    // Which means a player CAN reach the insert and be refused by the database:
+    // two taps on slow wifi, both reads seeing nothing, one insert winning.
+    // Without this branch the loser fell through to the generic catch and was
+    // told "Something went wrong on our end. Please try again." -- an
+    // invitation to retry something that will now fail every time, because they
+    // really do have an active challenge. The rule is not the problem; the
+    // sentence describing it was.
+    if (insertErr) {
+      if (insertErr.code === '23505') {
+        const theirs = insertErr.message?.includes('idx_challenges_one_active_per_challenged');
+        return new Response(JSON.stringify({
+          error: theirs
+            ? 'That player already has an active challenge they must resolve first.'
+            : 'You already have an active outgoing challenge.',
+        }), { status: 409, headers: corsHeaders });
+      }
+      throw insertErr;
+    }
 
     const [{ data: challengerStats }, { data: challengedStats }] = await Promise.all([
       supabase.from('player_season_stats').select('challenges_issued').eq('player_id', challenger.id).single(),
