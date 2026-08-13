@@ -21,8 +21,17 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
+      # write, not read: the action's last step posts its findings as review
+      # comments, and creating those needs write. With read it can look at the
+      # diff and then fail to say anything about it -- a review that runs, goes
+      # green, and produces nothing. That has not been the visible failure so
+      # far (the run has been dying on its first turn since 2026-08-07), but it
+      # is the failure that would have replaced it.
+      pull-requests: write
       issues: read
+      # So the reviewer can see whether CI passed on the PR it is reviewing.
+      # claude.yml already grants this for the same reason.
+      actions: read
       id-token: write
 
     steps:
