@@ -15,20 +15,61 @@ import { OfflineBanner } from './OfflineBanner';
 import { PWAInstallBanner } from './PWAInstallBanner';
 import { AdminThemeSwitcher } from './admin/AdminThemeSwitcher';
 import { useQuery } from '@tanstack/react-query';
+import { AlertCircle, RefreshCw } from 'lucide-react';
+import { routeForIdentity } from '../lib/routeForIdentity';
 
 // Screens that show bottom nav
 const NAV_ROUTES = ['/', '/rankings', '/matches', '/notifications', '/settings', '/challenges'];
 const showsNav = (path: string) =>
   NAV_ROUTES.some((r) => (r === '/' ? path === '/' : path.startsWith(r)));
 
+// Shown when we are signed in but could not find out who that is, and have no
+// earlier answer to fall back on. The alternative this replaces was routing to
+// the Claim screen, which told a claimed member to pick a name that was not
+// there. Saying "we could not reach the league" is both true and actionable;
+// "claim your profile" was neither.
+const IdentityUnavailable: React.FC<{ onRetry: () => void; retrying: boolean }> = ({ onRetry, retrying }) => (
+  <div className="min-h-[70svh] flex flex-col items-center justify-center px-6 text-center">
+    <AlertCircle size={40} className="text-[#C62828] mb-4" />
+    <h1 className="font-[Bebas_Neue] text-3xl tracking-wide text-[#E8E2D6]">
+      Couldn't load your profile
+    </h1>
+    <p className="text-[#A1A1AA] font-[Barlow] text-base mt-3 max-w-sm leading-relaxed">
+      You're signed in — the app just couldn't reach the league to look you up.
+      That's almost always a brief network problem, not anything wrong with your
+      account. Your spot on the ladder is untouched.
+    </p>
+    <button
+      type="button"
+      onClick={onRetry}
+      disabled={retrying}
+      className="mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[#C62828] text-[#E8E2D6] font-[Barlow] font-semibold hover:bg-[#B71C1C] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+    >
+      <RefreshCw size={16} className={retrying ? 'animate-spin' : undefined} />
+      {retrying ? 'Trying again…' : 'Try again'}
+    </button>
+    <button
+      type="button"
+      onClick={() => supabase.auth.signOut()}
+      className="mt-4 text-[#71717A] hover:text-[#A1A1AA] text-sm font-[Barlow] underline underline-offset-2 transition-colors"
+    >
+      Sign out
+    </button>
+  </div>
+);
+
 export const Layout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const { session, player, isLoading, setSession, setProfile, setPlayer, setIsLoading, reset } = useAuthStore();
+  const {
+    session, player, identityStatus, isLoading,
+    setSession, setProfile, setPlayer, setIdentityStatus, setIsLoading, reset,
+  } = useAuthStore();
   const { isOffline, setIsOffline } = useUIStore();
   const [appReady, setAppReady] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
   // Bootstrap auth state
   useEffect(() => {
@@ -45,7 +86,7 @@ export const Layout: React.FC = () => {
         if (cancelled) return;
         setSession(session);
         if (session) {
-          await fetchProfileAndPlayer(session.user.id).catch(() => {});
+          await fetchProfileAndPlayer(session.user.id).catch(() => setIdentityStatus('failed'));
         }
       } catch {
         // Network error or timeout — unblock the app and let route guards redirect
@@ -62,7 +103,7 @@ export const Layout: React.FC = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session) {
-        fetchProfileAndPlayer(session.user.id);
+        fetchProfileAndPlayer(session.user.id).catch(() => setIdentityStatus('failed'));
       } else {
         reset();
       }
@@ -75,28 +116,67 @@ export const Layout: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // This read decides who the app thinks you are, so it has to distinguish
+  // "you have no player row" from "we could not find out".
+  //
+  // It previously used .single() and threw both answers away:
+  //
+  //   if (playerRes.data) setPlayer(playerRes.data as any);
+  //
+  // so one dropped request left `player` null, and the guard below read that as
+  // "unclaimed" and redirected a member who had claimed their profile weeks ago
+  // to the Claim screen. Their name is not on that list — they already took it —
+  // so there was nothing to tap. The app had simply forgotten them, and the only
+  // way out was a reload that happened to succeed.
+  //
+  // .maybeSingle() is what makes the distinction possible: it returns
+  // { data: null, error: null } for no rows, and reserves `error` for actual
+  // failures. players.profile_id is UNIQUE (20260321032528_toc_schema.sql:20),
+  // so the multiple-rows case maybeSingle() errors on cannot arise here.
   const fetchProfileAndPlayer = async (userId: string) => {
     const [profileRes, playerRes] = await Promise.all([
-      supabase.from('profiles').select('*').eq('id', userId).single(),
-      supabase.from('players').select('*').eq('profile_id', userId).single(),
+      supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
+      supabase.from('players').select('*').eq('profile_id', userId).maybeSingle(),
     ]);
+
+    // Either failing means we do not know who this is. Both reads go to the same
+    // database over the same connection, so in practice they fail together; and
+    // continuing without `profile` would silently drop an admin's role and show
+    // them a member's app, which is its own quiet lie.
+    const failure = playerRes.error ?? profileRes.error;
+    if (failure) {
+      console.error(`[auth] identity read failed for ${userId}: ${failure.message}`);
+      setIdentityStatus('failed');
+      return;
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (profileRes.data) setProfile(profileRes.data as any);
+    setProfile((profileRes.data ?? null) as any);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (playerRes.data) setPlayer(playerRes.data as any);
+    setPlayer((playerRes.data ?? null) as any);
+    setIdentityStatus('resolved');
   };
 
-  // Route guards
+  const retryIdentity = async () => {
+    if (!session || retrying) return;
+    setRetrying(true);
+    setIdentityStatus('unknown');
+    await fetchProfileAndPlayer(session.user.id).catch(() => setIdentityStatus('failed'));
+    setRetrying(false);
+  };
+
+  // Route guards. The decision itself lives in routeForIdentity so it can be
+  // tested directly; this effect only applies it.
   useEffect(() => {
     if (isLoading) return;
-    const path = location.pathname;
-    const publicPaths = ['/login', '/auth/callback'];
-    if (publicPaths.includes(path)) return;
-
-    if (!session) { navigate('/login', { replace: true }); return; }
-    if (!player && path !== '/claim') { navigate('/claim', { replace: true }); return; }
-    if (player && path === '/claim') { navigate('/', { replace: true }); return; }
-  }, [session, player, isLoading, location.pathname, navigate]);
+    const destination = routeForIdentity({
+      path: location.pathname,
+      hasSession: !!session,
+      hasPlayer: !!player,
+      identityStatus,
+    });
+    if (destination) navigate(destination, { replace: true });
+  }, [session, player, identityStatus, isLoading, location.pathname, navigate]);
 
   // Realtime subscriptions
   useEffect(() => {
@@ -147,6 +227,11 @@ export const Layout: React.FC = () => {
     refetchInterval: 30000,
   });
 
+  // Only take over the screen when there is nothing to fall back on. If an
+  // earlier read already told us who this is, a later failure changes nothing
+  // about their identity — carrying on with what we have beats blocking them.
+  const identityUnavailable = !!session && identityStatus === 'failed' && !player;
+
   const showNav = showsNav(location.pathname) && !!session && !!player;
   const showFAB = showNav && ['/', '/rankings', '/matches'].some((r) => location.pathname === r || location.pathname.startsWith(r));
 
@@ -179,7 +264,9 @@ export const Layout: React.FC = () => {
             className="min-h-full"
           >
             <AdminThemeSwitcher />
-            <Outlet />
+            {identityUnavailable
+              ? <IdentityUnavailable onRetry={retryIdentity} retrying={retrying} />
+              : <Outlet />}
           </motion.div>
         </AnimatePresence>
       </main>
