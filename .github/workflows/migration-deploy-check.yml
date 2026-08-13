@@ -23,14 +23,37 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compare repo migrations against production schema_migrations
+      # This check reported nothing at all from June to August: the secret held
+      # the IPv6-only direct host, psql could not connect, and the step had no
+      # `set -e`, so an empty result set made every migration look missing. A
+      # check that cannot connect is worse than no check, because it looks like
+      # coverage. The script repairs the string at runtime and exports it masked.
+      - name: Resolve a connection string this runner can reach
+        id: db
         env:
           PROD_DB_URL: ${{ secrets.PROD_DB_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          # TOC only. Project ankvjywsnydpkepdvuvm is "toc1". TOF is a separate
+          # league in a separate project and must never be read from here.
+          PROJECT_REF: ankvjywsnydpkepdvuvm
         run: |
-          if [ -z "$PROD_DB_URL" ]; then
+          set -uo pipefail
+          bash .github/scripts/resolve-prod-db-url.sh
+          code=$?
+          if [ "$code" -eq 2 ]; then
             echo "::warning::PROD_DB_URL secret is not set; skipping deploy-drift check. Add it in repo settings to enable this gate."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+          exit "$code"
+
+      - name: Compare repo migrations against production schema_migrations
+        if: steps.db.outputs.configured == 'true'
+        run: |
+          # Fail loudly on a failed query rather than treating an empty answer as
+          # "production has no migrations", which is what made this check lie.
+          set -euo pipefail
 
           local_versions=$(ls supabase/migrations | grep -oE '^[0-9]+' | sort -u)
           remote_versions=$(psql "$PROD_DB_URL" -v ON_ERROR_STOP=1 -At -c \

@@ -1,0 +1,152 @@
+name: Retire an edge function
+
+# Deletes a deployed edge function that has no source in this repo.
+#
+# This exists because "delete it in the dashboard" is a step that does not
+# happen. generate-avatar ran in production from January to August 2026 with
+# verify_jwt disabled and no internal auth check, so an unauthenticated POST
+# reached the handler body: anyone holding the URL could bill a Gemini image
+# call and write into the public avatars bucket. It was flagged, the fix was
+# understood, and it stayed live because it needed someone to click through a
+# dashboard. A workflow removes that dependency.
+#
+# The token never leaves GitHub. Nothing here reads or prints it.
+#
+# Two guards make this hard to misfire:
+#   1. `confirm` must repeat the slug exactly.
+#   2. A slug that HAS a directory in supabase/functions/ is refused. Deleting
+#      one of those is always a mistake -- deploy-edge-functions.yml would
+#      simply put it back on the next push, so the only thing achieved is an
+#      outage in between.
+on:
+  workflow_dispatch:
+    inputs:
+      slug:
+        description: 'Function slug to delete from production'
+        required: true
+        type: string
+      confirm:
+        description: 'Type the slug again to confirm'
+        required: true
+        type: string
+
+concurrency:
+  group: retire-edge-function
+  cancel-in-progress: false
+
+env:
+  # TOC only. Project ankvjywsnydpkepdvuvm is "toc1". TOF is a separate league
+  # in a separate Supabase project and must never be touched from this repo.
+  PROJECT_REF: ankvjywsnydpkepdvuvm
+
+jobs:
+  retire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Refuse anything but a deliberate, unmanaged slug
+        env:
+          SLUG: ${{ inputs.slug }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+
+          if [ "$SLUG" != "$CONFIRM" ]; then
+            echo "::error::Confirmation does not match the slug. Nothing was deleted."
+            exit 1
+          fi
+
+          case "$SLUG" in
+            ''|*[!a-z0-9-]*)
+              echo "::error::'$SLUG' is not a valid function slug (lowercase letters, digits and hyphens)."
+              exit 1 ;;
+          esac
+
+          if [ -d "supabase/functions/$SLUG" ]; then
+            echo "::error::supabase/functions/$SLUG exists in this repo, so this function is deployed from source on every push. Deleting it here would only cause an outage until the next deploy. Remove the directory first if you mean to retire it."
+            exit 1
+          fi
+
+          echo "$SLUG has no source in this repo. Safe to retire."
+
+      - name: Show what is about to be deleted
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SLUG: ${{ inputs.slug }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
+            echo "::error::SUPABASE_ACCESS_TOKEN is not set; this workflow cannot reach the Management API."
+            exit 1
+          fi
+
+          # Look at the target before removing it. If it is already gone, say so
+          # and stop rather than reporting a successful delete of nothing.
+          before="$(curl -sS --max-time 30 \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/${PROJECT_REF}/functions" \
+            | jq -r '.[].slug' | sort)"
+
+          if [ -z "$before" ]; then
+            echo "::error::The Management API returned no functions at all. Refusing to act on an empty answer."
+            exit 1
+          fi
+
+          if ! grep -qx "$SLUG" <<< "$before"; then
+            echo "::error::'$SLUG' is not deployed to ${PROJECT_REF}. Deployed: $(echo $before)"
+            exit 1
+          fi
+
+          curl -sS --max-time 30 \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/${PROJECT_REF}/functions/${SLUG}" \
+            | jq '{slug, name, status, version, verify_jwt, created_at, updated_at}'
+
+      - name: Delete it
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SLUG: ${{ inputs.slug }}
+        run: |
+          set -euo pipefail
+
+          code="$(curl -sS --max-time 30 -o /tmp/delete-body -w '%{http_code}' \
+            -X DELETE \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/${PROJECT_REF}/functions/${SLUG}")"
+
+          echo "HTTP $code"
+          cat /tmp/delete-body || true
+          echo ""
+
+          case "$code" in
+            2*) ;;
+            *) echo "::error::Delete failed with HTTP $code."; exit 1 ;;
+          esac
+
+      - name: Prove it is gone
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SLUG: ${{ inputs.slug }}
+        run: |
+          set -euo pipefail
+
+          after="$(curl -sS --max-time 30 \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/${PROJECT_REF}/functions" \
+            | jq -r '.[].slug' | sort)"
+
+          if [ -z "$after" ]; then
+            echo "::error::The Management API returned no functions. Cannot confirm the delete from an empty answer."
+            exit 1
+          fi
+
+          if grep -qx "$SLUG" <<< "$after"; then
+            echo "::error::'$SLUG' is still listed after the delete returned success."
+            exit 1
+          fi
+
+          echo "::notice::'$SLUG' is no longer deployed to ${PROJECT_REF}."
+          echo "Still deployed:"
+          echo "$after" | sed 's/^/  - /'
