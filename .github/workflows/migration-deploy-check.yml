@@ -37,9 +37,15 @@ jobs:
           # league in a separate project and must never be read from here.
           PROJECT_REF: ankvjywsnydpkepdvuvm
         run: |
+          # GitHub runs this as `bash -e {0}`, and `set -uo pipefail` does not
+          # clear the -e it was invoked with. Without `set +e` an unset secret
+          # (exit 2) would fail this check outright instead of warning and
+          # skipping, which is the one behaviour its test explicitly pins.
           set -uo pipefail
+          set +e
           bash .github/scripts/resolve-prod-db-url.sh
           code=$?
+          set -e
           if [ "$code" -eq 2 ]; then
             echo "::warning::PROD_DB_URL secret is not set; skipping deploy-drift check. Add it in repo settings to enable this gate."
             echo "configured=false" >> "$GITHUB_OUTPUT"

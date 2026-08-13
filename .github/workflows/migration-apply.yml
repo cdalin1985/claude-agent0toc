@@ -76,9 +76,15 @@ jobs:
           # league in a separate project and must never be written from here.
           PROJECT_REF: ankvjywsnydpkepdvuvm
         run: |
+          # GitHub runs this as `bash -e {0}`, and `set -uo pipefail` does not
+          # clear the -e it was invoked with. Without `set +e` the script's
+          # non-zero exit kills the step before $? is ever read, so the
+          # distinction between exit codes below is unreachable.
           set -uo pipefail
+          set +e
           bash .github/scripts/resolve-prod-db-url.sh
           code=$?
+          set -e
           if [ "$code" -eq 2 ]; then
             echo "::error::PROD_DB_URL secret is not set. Add it in repo settings; this workflow cannot apply migrations without it."
             exit 1
