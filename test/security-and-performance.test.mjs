@@ -16,6 +16,7 @@ const submitResult = read('supabase/functions/submit-result/index.ts');
 const matchesPage = read('src/pages/MatchesPage.tsx');
 const challengesPage = read('src/pages/ChallengesPage.tsx');
 const deployDriftWorkflow = read('.github/workflows/migration-deploy-check.yml');
+const driftScript = read('.github/scripts/compare-migrations.sh');
 
 // --- Security: RLS self-escalation guards (PR #28) ---
 
@@ -48,9 +49,28 @@ test('a CI gate diffs production schema_migrations against repo migration filena
   assert.match(deployDriftWorkflow, /schedule:\s*\n\s*- cron:/);
   assert.match(deployDriftWorkflow, /secrets\.PROD_DB_URL/);
   assert.match(deployDriftWorkflow, /SELECT version FROM supabase_migrations\.schema_migrations/);
-  assert.match(deployDriftWorkflow, /Migrations merged to main but NOT applied to production/);
   // No PROD_DB_URL secret configured must warn and exit 0, not fail every run.
   assert.match(deployDriftWorkflow, /skipping deploy-drift check/);
+
+  // The comparison itself moved out of the workflow and into a script so it
+  // could be run against fixtures; the workflow must still invoke it, with the
+  // allowlist, or the gate is decorative.
+  assert.match(deployDriftWorkflow, /compare-migrations\.sh/);
+  assert.match(deployDriftWorkflow, /known-production-only-migrations\.txt/);
+  assert.match(driftScript, /Migrations merged to main but NOT applied to production/);
+});
+
+test('the drift check looks in BOTH directions', () => {
+  // One-directional was the bug. It only ever asked "is every repo migration in
+  // production", never "is every production migration in the repo", so 28
+  // versions applied straight to the database were invisible for three months
+  // and the schema stopped being reproducible from this repo.
+  //
+  // test/migration-drift.test.mjs executes this script against fixtures and is
+  // the real coverage. This pins the direction itself so the reverse half
+  // cannot be quietly deleted.
+  assert.match(driftScript, /Production has migrations with NO file in this repo/);
+  assert.match(driftScript, /orphans/);
 });
 
 test('send-push rejects unauthenticated callers', () => {
