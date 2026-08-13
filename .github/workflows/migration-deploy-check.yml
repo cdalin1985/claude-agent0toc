@@ -61,27 +61,16 @@ jobs:
           # "production has no migrations", which is what made this check lie.
           set -euo pipefail
 
-          local_versions=$(ls supabase/migrations | grep -oE '^[0-9]+' | sort -u)
-          remote_versions=$(psql "$PROD_DB_URL" -v ON_ERROR_STOP=1 -At -c \
-            "SELECT version FROM supabase_migrations.schema_migrations ORDER BY version;")
+          psql "$PROD_DB_URL" -v ON_ERROR_STOP=1 -At -c \
+            "SELECT version FROM supabase_migrations.schema_migrations ORDER BY version;" \
+            > /tmp/remote-versions.txt
 
-          # Migrations merged in the last 30 minutes are expected to lag a
-          # manual deploy step; only flag drift older than that.
-          cutoff=$(date -u -d '30 minutes ago' +%Y%m%d%H%M%S)
-
-          missing=""
-          for v in $local_versions; do
-            if ! grep -qx "$v" <<< "$remote_versions"; then
-              if [ "$v" -lt "$cutoff" ]; then
-                missing="$missing $v"
-              fi
-            fi
-          done
-
-          if [ -n "$missing" ]; then
-            echo "::error::Migrations merged to main but NOT applied to production:$missing"
-            echo "Run 'supabase db push' (or apply via the Supabase dashboard/MCP) against production, then re-run this check."
-            exit 1
-          fi
-
-          echo "No deploy drift: all repo migrations are present in production."
+          # The comparison itself lives in a script so it can be run against
+          # fixtures -- see test/migration-drift.test.mjs. It checks both
+          # directions: repo-not-in-production (a merged migration that was
+          # never deployed) and production-not-in-repo (SQL applied straight to
+          # the database, which went unnoticed for three months).
+          bash .github/scripts/compare-migrations.sh \
+            supabase/migrations \
+            /tmp/remote-versions.txt \
+            .github/known-production-only-migrations.txt

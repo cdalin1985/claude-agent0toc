@@ -1,0 +1,76 @@
+# Production migration versions that have no file in supabase/migrations/, and
+# why each one is expected to be missing.
+#
+# The deploy-drift check reads this file. Anything recorded in production that
+# is neither a repo migration nor listed here fails the check -- that is the
+# whole point: it is how a migration applied to production by hand, without a
+# file, gets noticed the next day instead of three months later.
+#
+# Background. On 2026-08-13 production had 69 recorded migrations against 41
+# files here. The drift check only ever looked one way (repo -> production), so
+# a migration applied straight to the database was invisible to it forever. The
+# gap was found only because a rehearsal failed on a column -- players.
+# activated_at -- that production had and no file created.
+#
+# DO NOT add a line here to silence a failure. A new entry means "this exists in
+# production and deliberately has no file", which is almost never true for
+# anything written after 2026-08-13. The correct fix for a new orphan is a
+# migration file, applied through .github/workflows/migration-apply.yml.
+#
+# Format: <version> <name> -- one per line, # for comments.
+
+# --------------------------------------------------------------------------
+# Group 1: re-applications. Same content as a file that IS in this repo, run a
+# second time under a fresh timestamp. Supabase records the new version, so
+# they show up as orphans; there is nothing to write down because the file
+# already exists.
+# --------------------------------------------------------------------------
+20260612143003 add_match_initiator
+20260612145355 lock_down_process_inactive_demotions
+20260625135508 fix_self_escalation_rls
+20260625135515 add_performance_indexes
+20260625135523 remove_race_length_max_cap
+20260811042839 profile_banner_accent
+20260811042946 match_reminders
+20260811043054 challenge_scheduling_proposals
+20260811043150 venue_stats_profile_and_preferences
+20260811043452 lock_down_new_security_definer_functions
+20260811044449 treasury_visible_to_members
+
+# --------------------------------------------------------------------------
+# Group 2: content now carried by
+# 20260813200000_align_repo_to_production.sql.
+#
+# These are the migrations from PR #25 ("Backfill production Supabase
+# migrations") plus the two advisor fixes and the avatars-listing drop. They
+# were applied to production by hand in May-July 2026; PR #25 was closed
+# unmerged on 2026-06-19, so the files were never recorded. Their end state is
+# reproduced in one alignment migration rather than as invented history --
+# several of these never existed as files at all, and fabricating a sequence
+# would assert a chain of events that did not happen.
+# --------------------------------------------------------------------------
+20260521064123 fix_security_and_performance_advisors_v2
+20260521064142 fix_supabase_performance_v2
+20260521070416 add_activated_at_to_players
+20260521070425 track_player_activation
+20260521070534 track_player_inactivity
+20260521070549 automate_inactive_demotion
+20260707034049 drop_avatars_bucket_listing_policy
+
+# --------------------------------------------------------------------------
+# Group 3: superseded. The repo reaches the same end state by a different
+# route -- usually one file where production ran several, or a later migration
+# that rewrote the same objects. Verified object-by-object against production
+# on 2026-08-13: functions, triggers, views, columns, indexes, constraints,
+# policies and column-level grants all match.
+# --------------------------------------------------------------------------
+20260531135652 align_repo_production_schema
+20260625135634 fix_self_escalation_via_column_privileges
+20260625135740 guard_privilege_escalation_with_trigger
+20260625135825 guard_privilege_escalation_fix_field_ref
+20260707034030 security_hardening_notifications_functions
+20260811043023 enforce_match_window
+20260811043233 post_match_cooldown_helper
+20260811043337 decline_forfeit_climber_cooldown
+20260811043407 reverse_decline_unwinds_both_cooldowns
+20260811044630 treasury_grants_explicit
