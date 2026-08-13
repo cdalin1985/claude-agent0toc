@@ -95,6 +95,15 @@ test('both database workflows resolve the URL instead of reimplementing the guar
     assert.match(source, /bash \.github\/scripts\/resolve-prod-db-url\.sh/, `${wf} does not call the resolver`);
     assert.match(source, /secrets\.PROD_DB_URL/, `${wf} does not pass the secret`);
     assert.match(source, /PROJECT_REF: ankvjywsnydpkepdvuvm/, `${wf} does not pin the TOC project`);
+    // GitHub invokes run: blocks as `bash -e {0}`, and `set -uo pipefail` does
+    // NOT clear that -e. Without `set +e` around the call, a non-zero exit
+    // kills the step before $? is read, so the exit-2 branch below it can
+    // never run and an unset secret becomes a hard failure.
+    assert.match(
+      source,
+      /set \+e\s*\n\s*bash \.github\/scripts\/resolve-prod-db-url\.sh\s*\n\s*code=\$\?\s*\n\s*set -e/,
+      `${wf} reads the resolver's exit code under an inherited set -e`,
+    );
   }
 });
 
