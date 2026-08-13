@@ -121,8 +121,14 @@ SELECT
   CASE WHEN vis.visible THEN p.bio           END AS bio,
   p.preferred_discipline,
   p.avatar_url,
-  p.activated_at,
-  p.inactivated_at,
+  -- Exactly the columns the migration set creates and src/types/database.ts
+  -- declares, which is not the same as the columns production has: it also
+  -- carries activated_at and inactivated_at, which NO migration creates and
+  -- nothing in src/ or supabase/functions/ reads. They were added by hand at
+  -- some point and the repo never learned about them. Listing them here would
+  -- make this file fail to build from the migration set alone -- which is how
+  -- the rehearsal caught them. Left out rather than adopted; whether to drop
+  -- them from production is a separate decision and not one to make silently.
   CASE WHEN vis.visible THEN p.banner_url    END AS banner_url,
   CASE WHEN vis.visible THEN p.accent_color  END AS accent_color,
   CASE WHEN vis.visible THEN p.nickname      END AS nickname,
