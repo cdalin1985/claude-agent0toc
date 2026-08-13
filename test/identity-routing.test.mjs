@@ -101,3 +101,22 @@ test('signing out clears the identity state', () => {
   // routed on the previous one's identity.
   assert.match(store, /reset: \(\) => set\(\{[^}]*identityStatus: 'unknown'/s);
 });
+
+// --- create-challenge's answer when the database refuses the insert ---------
+
+test('losing the one-active-challenge race is explained, not called a server error', async () => {
+  const source = readFileSync(join(process.cwd(), 'supabase/functions/create-challenge/index.ts'), 'utf8');
+  // 23505 is unique_violation. The two maybeSingle() reads above the insert
+  // fail open (maybeSingle errors on >1 row, and the errors are discarded), so
+  // the indexes are the real guard and a player can genuinely reach them.
+  assert.match(source, /insertErr\.code === '23505'/);
+  // Told the rule, with the right side of it, and a 409 rather than a 500 --
+  // "try again" on a 500 is an invitation to retry something that cannot work.
+  assert.match(source, /idx_challenges_one_active_per_challenged/);
+  assert.match(source, /You already have an active outgoing challenge\./);
+  assert.match(source, /That player already has an active challenge they must resolve first\./);
+  assert.match(source, /if \(insertErr\.code === '23505'\)[\s\S]*?status: 409/);
+  // Anything that is not that must still reach the catch, which logs the real
+  // Postgres error and returns something a member can act on.
+  assert.match(source, /\}\s*\n\s*throw insertErr;\s*\n\s*\}/);
+});
