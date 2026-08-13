@@ -16,8 +16,13 @@ DO $$
 DECLARE
   u_hider uuid := '00000000-0000-4000-8000-0000000000a1';
   u_other uuid := '00000000-0000-4000-8000-0000000000a2';
-  p_hider uuid;
-  p_open  uuid;
+  -- Fixed, not generated. The replay workflow runs every assert file twice --
+  -- once on the fresh build, once after re-applying the newest migrations to
+  -- prove they are idempotent -- so a plain INSERT here fails the second pass
+  -- on players_profile_id_key. Fixed ids plus ON CONFLICT make the seed
+  -- re-runnable and reset the fixture to a known state each time.
+  p_hider uuid := '00000000-0000-4000-8000-0000000000a3';
+  p_open  uuid := '00000000-0000-4000-8000-0000000000a4';
   bounded boolean;
   failures text[] := '{}';
 BEGIN
@@ -33,13 +38,20 @@ BEGIN
     (u_other, 'other@example.test', 'Visibility Other')
   ON CONFLICT (id) DO NOTHING;
 
-  INSERT INTO players (full_name, profile_id, nickname, tagline, bio, home_venue, years_playing, cue_brand, accent_color, banner_url)
-  VALUES ('Visibility Hider', u_hider, 'Hush', 'Says nothing', 'A bio', 'Eagles', 12, 'Predator', '#D4AF37', 'https://example.test/b.png')
-  RETURNING id INTO p_hider;
+  INSERT INTO players (id, full_name, profile_id, nickname, tagline, bio, home_venue, years_playing, cue_brand, accent_color, banner_url)
+  VALUES (p_hider, 'Visibility Hider', u_hider, 'Hush', 'Says nothing', 'A bio', 'Eagles', 12, 'Predator', '#D4AF37', 'https://example.test/b.png')
+  ON CONFLICT (id) DO UPDATE
+    SET nickname = EXCLUDED.nickname, tagline = EXCLUDED.tagline, bio = EXCLUDED.bio,
+        home_venue = EXCLUDED.home_venue, years_playing = EXCLUDED.years_playing,
+        cue_brand = EXCLUDED.cue_brand, accent_color = EXCLUDED.accent_color,
+        banner_url = EXCLUDED.banner_url;
 
-  INSERT INTO players (full_name, nickname, tagline, bio, home_venue, years_playing, cue_brand)
-  VALUES ('Visibility Open', 'Loud', 'Says plenty', 'Another bio', 'Valley Hub', 8, 'McDermott')
-  RETURNING id INTO p_open;
+  INSERT INTO players (id, full_name, nickname, tagline, bio, home_venue, years_playing, cue_brand)
+  VALUES (p_open, 'Visibility Open', 'Loud', 'Says plenty', 'Another bio', 'Valley Hub', 8, 'McDermott')
+  ON CONFLICT (id) DO UPDATE
+    SET nickname = EXCLUDED.nickname, tagline = EXCLUDED.tagline, bio = EXCLUDED.bio,
+        home_venue = EXCLUDED.home_venue, years_playing = EXCLUDED.years_playing,
+        cue_brand = EXCLUDED.cue_brand;
 
   INSERT INTO player_preferences (player_id, show_stats_publicly, show_profile_details)
   VALUES (p_hider, FALSE, FALSE), (p_open, TRUE, TRUE)
@@ -56,12 +68,22 @@ BEGIN
   INSERT INTO player_discipline_stats
     (player_id, discipline, wins, losses, matches_played, challenger_wins, defender_wins)
   VALUES (p_hider, '8ball', 3, 1, 4, 2, 1),
-         (p_open,  '8ball', 2, 2, 4, 1, 1);
+         (p_open,  '8ball', 2, 2, 4, 1, 1)
+  ON CONFLICT (player_id, discipline) DO UPDATE
+    SET wins = EXCLUDED.wins, losses = EXCLUDED.losses,
+        matches_played = EXCLUDED.matches_played,
+        challenger_wins = EXCLUDED.challenger_wins,
+        defender_wins = EXCLUDED.defender_wins;
 
   INSERT INTO player_venue_stats
     (player_id, venue, wins, losses, matches_played, challenger_wins, defender_wins)
   VALUES (p_hider, 'Eagles', 3, 1, 4, 2, 1),
-         (p_open,  'Eagles', 2, 2, 4, 1, 1);
+         (p_open,  'Eagles', 2, 2, 4, 1, 1)
+  ON CONFLICT (player_id, venue) DO UPDATE
+    SET wins = EXCLUDED.wins, losses = EXCLUDED.losses,
+        matches_played = EXCLUDED.matches_played,
+        challenger_wins = EXCLUDED.challenger_wins,
+        defender_wins = EXCLUDED.defender_wins;
 
   -- ------------------------------------------------ home_venue is bounded ---
   -- The UI is a dropdown, so this is only reachable by a direct PATCH. That is
