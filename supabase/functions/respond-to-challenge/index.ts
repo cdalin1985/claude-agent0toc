@@ -24,8 +24,31 @@ serve(async (req) => {
 
     const { challenge_id, action, venue, scheduled_at, response_message } = await req.json();
 
+    // Sweep before reading, so the row below carries a status that reflects the
+    // clock. The cron job (challenge-expiry-check, every 15 minutes) is what
+    // keeps stored state honest for everyone else; this call is what makes the
+    // window zero for the player actually trying to act. Idempotent and already
+    // granted to authenticated -- create-challenge does the same thing.
+    await supabase.rpc('expire_stale_challenges');
+
     const { data: challenge } = await supabase.from('challenges').select('*').eq('id', challenge_id).single();
     if (!challenge) return new Response(JSON.stringify({ error: 'Challenge not found.' }), { status: 404, headers: cors });
+
+    // An expired challenge is finished. Nothing may advance it.
+    //
+    // 'decline' is the one that matters most here: declining applies a forfeit
+    // loss through apply_challenge_decline_forfeit. Letting someone decline a
+    // challenge that already expired would penalise them for a challenge the
+    // rules say carries no penalty -- the exact inversion of the league ruling
+    // that expiry costs nobody anything.
+    //
+    // 'cancel' stays open: that is the challenger clearing away their own dead
+    // challenge, which harms no one and leaves the ladder unchanged.
+    if (challenge.status === 'expired' && action !== 'cancel') {
+      return new Response(JSON.stringify({
+        error: `This challenge expired on ${formatLeagueDateTime(challenge.expires_at)}. Nobody is penalised for an expired challenge — ask them for a fresh one.`,
+      }), { status: 409, headers: cors });
+    }
 
     const { data: callerPlayer } = await supabase.from('players').select('id, full_name').eq('profile_id', user.id).single();
     if (!callerPlayer) return new Response(JSON.stringify({ error: 'Player profile not found.' }), { status: 404, headers: cors });
