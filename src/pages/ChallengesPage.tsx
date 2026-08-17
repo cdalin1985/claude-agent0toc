@@ -21,7 +21,7 @@ import type { Challenge, ChallengeProposal } from '../types/database';
 // Venues come from league_settings; a venue added in Admin appears here with
 // no code change.
 type Venue = string;
-type ChallengeWithHoursLeft = Challenge & { hours_left: number };
+type ChallengeWithHoursLeft = Challenge & { hours_left: number; is_expired: boolean };
 
 function usePlayerChallenges(playerId: string | undefined) {
   return useQuery<ChallengeWithHoursLeft[]>({
@@ -38,6 +38,11 @@ function usePlayerChallenges(playerId: string | undefined) {
       return (data ?? []).map((challenge) => ({
         ...challenge,
         hours_left: Math.max(0, Math.ceil((new Date(challenge.expires_at).getTime() - now) / 3600000)),
+        // hours_left floors at 0, so on its own it cannot tell "expires within
+        // the hour" apart from "expired three days ago" -- which is how this
+        // screen came to show "Expiring soon" on challenges that were already
+        // dead. Carry the distinction explicitly.
+        is_expired: new Date(challenge.expires_at).getTime() <= now,
       }));
     },
     enabled: !!playerId,
@@ -518,7 +523,7 @@ export default function ChallengesPage() {
                           ⏰ Must be played by {new Date(c.match_deadline).toLocaleDateString()}
                         </div>
                       )}
-                      {c.status === 'pending' && hoursLeft > 0 && (
+                      {c.status === 'pending' && !c.is_expired && hoursLeft > 0 && (
                         <div className={`text-xs font-[Barlow] mt-1 ${hoursLeft <= 24 ? 'text-[#EF4444]' : hoursLeft <= 72 ? 'text-[#F59E0B]' : 'text-[#6B7280]'}`}>
                           {hoursLeft <= 24 ? '⚠️' : '⏰'}{' '}
                           Expires in{' '}
@@ -527,13 +532,22 @@ export default function ChallengesPage() {
                             : `${hoursLeft}h`}
                         </div>
                       )}
-                      {c.status === 'pending' && hoursLeft === 0 && (
-                        <div className="text-[#EF4444] text-xs font-[Barlow] mt-1">⚠️ Expiring soon</div>
+                      {/* Past its window. Muted grey, not the red alarm colour:
+                          this is finished, not urgent, and there is nothing the
+                          member can or should do about it. */}
+                      {c.status === 'pending' && c.is_expired && (
+                        <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">Expired — no penalty to either player</div>
                       )}
                     </div>
 
                     <div className="flex flex-col gap-2 shrink-0">
-                      {tab === 'incoming' && c.status === 'pending' && (
+                      {/* Not offered once the window has closed: every action
+                          behind this button (accept, decline, propose) is
+                          refused by respond-to-challenge, and a Decline the
+                          server rejects is better never shown than shown and
+                          bounced. Cancel, below, deliberately stays available
+                          to the challenger. */}
+                      {tab === 'incoming' && c.status === 'pending' && !c.is_expired && (
                         <Button variant="primary" size="sm" onClick={() => setResponding(c)}>
                           Respond
                         </Button>
