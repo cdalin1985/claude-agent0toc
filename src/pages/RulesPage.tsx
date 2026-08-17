@@ -110,7 +110,7 @@ export default function RulesPage() {
         <Section icon="🏁" title="Playing the Match">
           <Rule>Races are to a minimum of <strong>{minRace}</strong>. Longer races by mutual agreement.</Rule>
           <Rule>Approved venues: <strong>{venues.join(' and ')}</strong>.</Rule>
-          <Rule>The <strong>challenger keeps the live score</strong> in the app during play (one scoreboard, no double entry).</Rule>
+          <Rule>Whoever taps <strong>Start Match</strong> first keeps the live score for both of you — one scoreboard, no double entry. The app shows the other player who has it.</Rule>
           <Rule>When it's over, <strong>both players submit the final result</strong> from their own phones. If the submissions match, it confirms automatically.</Rule>
           <Rule>If the submissions don't match, the match is flagged and a league admin will sort it out.</Rule>
         </Section>
