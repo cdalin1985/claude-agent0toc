@@ -156,7 +156,11 @@ async function recordMatchFeePayments(
   const shortMatch = matchId.slice(0, 8);
   const rows = payers.map((payer) => ({
     entry_type: 'credit',
-    amount_cents: 500,
+    // The constant, not a literal. metadata.amount_cents already used
+    // MATCH_FEE_CENTS, so raising the fee would have moved the metadata and
+    // left every ledger row still charging $5 -- a discrepancy inside the same
+    // row, in the table the league audits.
+    amount_cents: MATCH_FEE_CENTS,
     description: `Match fee · ${payer.player_name} · ${PAYMENT_METHOD_LABELS[payer.payment_method]} · match ${shortMatch}`,
     created_by: actorProfileId,
     source_type: 'match_fee',

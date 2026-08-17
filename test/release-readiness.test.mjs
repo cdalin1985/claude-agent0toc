@@ -55,7 +55,12 @@ test('decline is implemented as a forfeit and admin reversal is available', () =
 test('match confirmation records idempotent match fee credits', () => {
   assert.match(submitResult, /recordMatchFeePayments/);
   assert.match(submitResult, /source_type: 'match_fee'/);
-  assert.match(submitResult, /amount_cents: 500/);
+  // Pins the fee to its constant rather than to the literal 500. The literal
+  // was what let amount_cents and metadata.amount_cents drift apart inside the
+  // same ledger row: metadata already read MATCH_FEE_CENTS, so raising the fee
+  // would have changed one and not the other.
+  assert.match(submitResult, /const MATCH_FEE_CENTS = 500;/);
+  assert.match(submitResult, /amount_cents: MATCH_FEE_CENTS,/);
 });
 
 test('match fees are recorded even when submissions transition to disputed', () => {
