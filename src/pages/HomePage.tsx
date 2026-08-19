@@ -232,7 +232,7 @@ export default function HomePage() {
                   <p>You can challenge any player ranked within <span className="text-[#E8E2D6]">5 spots</span> above you.</p>
                   <p>Win to move up the ladder. Defend your rank or drop.</p>
                   <p>Head to <span className="text-[#EF4444] font-semibold">The List</span> to find your first opponent.</p>
-                  <button onClick={() => navigate('/rules')} className="text-[#EF4444] underline underline-offset-2">
+                  <button onClick={() => navigate('/rules')} className="inline-block py-1.5 text-[#EF4444] underline underline-offset-2">
                     Read the full league rules
                   </button>
                 </div>
@@ -461,7 +461,7 @@ export default function HomePage() {
               <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6]">
                 Alerts <span className="text-[#EF4444]">({notifications.length})</span>
               </h2>
-              <button onClick={() => navigate('/notifications')} className="text-[#EF4444] text-xs font-[Barlow]">
+              <button onClick={() => navigate('/notifications')} className="py-1.5 -my-1.5 text-[#EF4444] text-xs font-[Barlow]">
                 View all →
               </button>
             </div>
@@ -508,7 +508,7 @@ export default function HomePage() {
               <TrendingUp size={18} className="text-[#9CA3AF]" />
               <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6]">League Activity</h2>
             </div>
-            <button onClick={() => navigate('/activity')} className="text-[#EF4444] text-xs font-[Barlow]">
+            <button onClick={() => navigate('/activity')} className="py-1.5 -my-1.5 text-[#EF4444] text-xs font-[Barlow]">
               View all →
             </button>
           </div>

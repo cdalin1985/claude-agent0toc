@@ -290,7 +290,7 @@ function RespondModal({
               <li>No match fee is owed.</li>
               <li>An admin can reverse this only if your rankings and stats have not changed yet.</li>
             </ul>
-            <a href="/rules" className="block text-xs font-[Barlow] text-[#EF4444] underline underline-offset-2">
+            <a href="/rules" className="block py-1.5 text-xs font-[Barlow] text-[#EF4444] underline underline-offset-2">
               Read the league rules
             </a>
             <div className="flex gap-2 pt-1">
