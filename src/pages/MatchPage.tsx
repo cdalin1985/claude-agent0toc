@@ -165,7 +165,7 @@ function TableSideScoreboard({
           disabled={disabled}
           onAddPoint={onAddPoint}
         />
-        <div className="flex items-center font-[Bebas_Neue] text-2xl text-[#6B7280] px-1">VS</div>
+        <div className="flex items-center font-[Bebas_Neue] text-2xl text-[#9CA3AF] px-1">VS</div>
         <ScoreboardSide
           playerId={match.player2_id}
           name={p2Name}
@@ -181,7 +181,7 @@ function TableSideScoreboard({
       </div>
 
       <div className="mt-5">
-        <div className="flex justify-between text-xs text-[#6B7280] font-[Barlow] mb-1">
+        <div className="flex justify-between text-xs text-[#9CA3AF] font-[Barlow] mb-1">
           <span>Race to {match.race_length}</span>
           <span>{totalGames} games played</span>
         </div>
@@ -421,7 +421,7 @@ export default function MatchPage() {
         <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-2">
           {match.discipline} · Race to {match.race_length}
         </div>
-        <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">
+        <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-1">
           {formatDateTime(match.scheduled_at)} @ {match.venue}
         </div>
       </div>
@@ -626,7 +626,7 @@ export default function MatchPage() {
                             <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">{p.name}</div>
                             <div className="text-[#9CA3AF] text-xs font-[Azeret_Mono]">{p.score} games</div>
                             {!isValidWinner && (
-                              <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">
+                              <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-1">
                                 Winner must reach {match.race_length}.
                               </div>
                             )}
@@ -682,7 +682,7 @@ export default function MatchPage() {
                           <Icon size={22} className="text-[#9CA3AF] shrink-0" />
                           <div className="flex-1 min-w-0">
                             <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">{method.label}</div>
-                            <div className="text-[#6B7280] text-xs font-[Barlow] mt-0.5">{helperText}</div>
+                            <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-0.5">{helperText}</div>
                             {link && (
                               <a
                                 href={link}
@@ -695,7 +695,7 @@ export default function MatchPage() {
                               </a>
                             )}
                           </div>
-                          {selected && <CheckCircle size={20} className="text-[#C62828]" />}
+                          {selected && <CheckCircle size={20} className="text-[#EF4444]" />}
                         </button>
                       );
                     })}

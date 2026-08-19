@@ -31,7 +31,7 @@ const showsNav = (path: string) =>
 // "claim your profile" was neither.
 const IdentityUnavailable: React.FC<{ onRetry: () => void; retrying: boolean }> = ({ onRetry, retrying }) => (
   <div className="min-h-[70svh] flex flex-col items-center justify-center px-6 text-center">
-    <AlertCircle size={40} className="text-[#C62828] mb-4" />
+    <AlertCircle size={40} className="text-[#EF4444] mb-4" />
     <h1 className="font-[Bebas_Neue] text-3xl tracking-wide text-[#E8E2D6]">
       Couldn't load your profile
     </h1>
@@ -52,7 +52,7 @@ const IdentityUnavailable: React.FC<{ onRetry: () => void; retrying: boolean }> 
     <button
       type="button"
       onClick={() => supabase.auth.signOut()}
-      className="mt-4 text-[#71717A] hover:text-[#A1A1AA] text-sm font-[Barlow] underline underline-offset-2 transition-colors"
+      className="mt-4 text-[#9CA3AF] hover:text-[#E8E2D6] text-sm font-[Barlow] underline underline-offset-2 transition-colors"
     >
       Sign out
     </button>

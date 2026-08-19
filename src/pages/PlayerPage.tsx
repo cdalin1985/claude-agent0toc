@@ -207,7 +207,7 @@ export default function PlayerPage() {
             )}
           </div>
           {metrics?.fargo_robustness && (
-            <div className="text-[#6B7280] text-xs font-[Azeret_Mono] mt-1">
+            <div className="text-[#9CA3AF] text-xs font-[Azeret_Mono] mt-1">
               Robustness: {metrics.fargo_robustness}
             </div>
           )}
@@ -241,7 +241,7 @@ export default function PlayerPage() {
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06, duration: 0.35 }}>
         <GlassCard className="p-4 mb-4">
           <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-1">Overall</h2>
-          <div className="text-[#6B7280] text-xs font-[Barlow] mb-3" title="Wins · Losses · Forfeits">
+          <div className="text-[#9CA3AF] text-xs font-[Barlow] mb-3" title="Wins · Losses · Forfeits">
             Record W-L-F:{' '}
             <span className="text-[#E8E2D6] font-[Azeret_Mono]">
               {stats?.wins ?? 0}-{stats?.losses ?? 0}-{stats?.forfeits ?? 0}
@@ -258,7 +258,7 @@ export default function PlayerPage() {
             ].map((s) => (
               <div key={s.label} className="text-center bg-[#252525]/60 rounded-xl p-3">
                 <div className="font-[Azeret_Mono] font-bold text-2xl" style={{ color: s.color }}>{s.value}</div>
-                <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">{s.label}</div>
+                <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-1">{s.label}</div>
               </div>
             ))}
           </div>
@@ -271,7 +271,7 @@ export default function PlayerPage() {
             ].map((s) => (
               <div key={s.label} className="text-center bg-[#252525]/60 rounded-xl p-3">
                 <div className="font-[Azeret_Mono] font-bold text-2xl" style={{ color: s.color }}>{s.value}</div>
-                <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">{s.label}</div>
+                <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-1">{s.label}</div>
               </div>
             ))}
           </div>
@@ -282,7 +282,7 @@ export default function PlayerPage() {
           own, or the toggle would look broken from the inside. */}
       {!showStats && !isSelf && (
         <GlassCard className="p-4 mb-4 text-center">
-          <p className="text-[#6B7280] text-sm font-[Barlow]">
+          <p className="text-[#9CA3AF] text-sm font-[Barlow]">
             {player.full_name} keeps their detailed stats private.
           </p>
         </GlassCard>
@@ -331,12 +331,12 @@ export default function PlayerPage() {
               ].map((s) => (
                 <div key={s.label} className="text-center bg-[#252525]/60 rounded-xl p-3">
                   <div className="font-[Azeret_Mono] font-bold text-2xl" style={{ color: s.color }}>{s.value}</div>
-                  <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">{s.label}</div>
+                  <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-1">{s.label}</div>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-[#6B7280] text-sm font-[Barlow] text-center py-4">
+            <p className="text-[#9CA3AF] text-sm font-[Barlow] text-center py-4">
               No {discTab} matches played yet.
             </p>
           )}
@@ -377,12 +377,12 @@ export default function PlayerPage() {
               ].map((s) => (
                 <div key={s.label} className="text-center bg-[#252525]/60 rounded-xl p-3">
                   <div className="font-[Azeret_Mono] font-bold text-2xl" style={{ color: s.color }}>{s.value}</div>
-                  <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">{s.label}</div>
+                  <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-1">{s.label}</div>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-[#6B7280] text-sm font-[Barlow] text-center py-4">
+            <p className="text-[#9CA3AF] text-sm font-[Barlow] text-center py-4">
               No matches played at {activeVenue ?? 'this venue'} yet.
             </p>
           )}
@@ -400,12 +400,12 @@ export default function PlayerPage() {
             <div className="flex items-center justify-center gap-6">
               <div className="text-center">
                 <div className="font-[Azeret_Mono] text-3xl font-bold text-[#22C55E]">{h2hWins}</div>
-                <div className="text-[#6B7280] text-xs font-[Barlow]">Your Wins</div>
+                <div className="text-[#9CA3AF] text-xs font-[Barlow]">Your Wins</div>
               </div>
-              <div className="text-[#6B7280] text-lg font-[Bebas_Neue]">VS</div>
+              <div className="text-[#9CA3AF] text-lg font-[Bebas_Neue]">VS</div>
               <div className="text-center">
                 <div className="font-[Azeret_Mono] text-3xl font-bold text-[#EF4444]">{h2hLosses}</div>
-                <div className="text-[#6B7280] text-xs font-[Barlow]">Their Wins</div>
+                <div className="text-[#9CA3AF] text-xs font-[Barlow]">Their Wins</div>
               </div>
             </div>
           </GlassCard>
@@ -421,7 +421,7 @@ export default function PlayerPage() {
               {Array.from({ length: 3 }).map((_, i) => <div key={i} className="skeleton h-12 rounded-lg" />)}
             </div>
           ) : matches.length === 0 ? (
-            <p className="text-[#6B7280] text-sm font-[Barlow] py-4 text-center">No matches yet.</p>
+            <p className="text-[#9CA3AF] text-sm font-[Barlow] py-4 text-center">No matches yet.</p>
           ) : (
             <>
               {/* Filters */}
@@ -457,7 +457,7 @@ export default function PlayerPage() {
                         <div className={`w-1 h-8 rounded-full ${won ? 'bg-[#22C55E]' : 'bg-[#EF4444]'}`} />
                         <div className="flex-1">
                           <div className="text-sm font-[Barlow] font-medium text-[#E8E2D6]">{m.discipline}</div>
-                          <div className="text-xs text-[#6B7280] font-[Barlow]">{formatDate(m.completed_at ?? m.scheduled_at)}</div>
+                          <div className="text-xs text-[#9CA3AF] font-[Barlow]">{formatDate(m.completed_at ?? m.scheduled_at)}</div>
                         </div>
                         <div className="font-[Azeret_Mono] font-bold text-lg text-[#E8E2D6]">
                           <span style={{ color: won ? '#22C55E' : '#EF4444' }}>{s1}</span>–{s2}

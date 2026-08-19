@@ -231,13 +231,13 @@ export default function HomePage() {
                 <div className="text-[#9CA3AF] text-xs font-[Barlow] space-y-1">
                   <p>You can challenge any player ranked within <span className="text-[#E8E2D6]">5 spots</span> above you.</p>
                   <p>Win to move up the ladder. Defend your rank or drop.</p>
-                  <p>Head to <span className="text-[#C62828] font-semibold">The List</span> to find your first opponent.</p>
-                  <button onClick={() => navigate('/rules')} className="text-[#C62828] underline underline-offset-2">
+                  <p>Head to <span className="text-[#EF4444] font-semibold">The List</span> to find your first opponent.</p>
+                  <button onClick={() => navigate('/rules')} className="text-[#EF4444] underline underline-offset-2">
                     Read the full league rules
                   </button>
                 </div>
               </div>
-              <button onClick={dismissWelcome} className="text-[#6B7280] shrink-0 -mt-0.5">
+              <button onClick={dismissWelcome} className="text-[#9CA3AF] shrink-0 -mt-0.5">
                 <X size={16} />
               </button>
             </div>
@@ -315,7 +315,7 @@ export default function HomePage() {
               </div>
               <div className="font-[Azeret_Mono] font-bold text-lg text-[#22C55E] shrink-0">
                 {m.player1_id === player.id ? m.player1_score : m.player2_score}
-                <span className="text-[#6B7280] mx-0.5">–</span>
+                <span className="text-[#9CA3AF] mx-0.5">–</span>
                 <span className="text-[#E8E2D6]">
                   {m.player1_id === player.id ? m.player2_score : m.player1_score}
                 </span>
@@ -408,7 +408,7 @@ export default function HomePage() {
                 <div className="font-[Azeret_Mono] font-bold text-lg" style={{ color: s.color }}>
                   {s.value}
                 </div>
-                <div className="text-[#6B7280] text-[10px] font-[Barlow] mt-0.5">{s.label}</div>
+                <div className="text-[#9CA3AF] text-[10px] font-[Barlow] mt-0.5">{s.label}</div>
               </div>
             ))}
           </div>
@@ -424,7 +424,7 @@ export default function HomePage() {
             onClick={() => navigate(`/challenge/${suggestedOpponent.player.id}`)}
           >
             <div className="flex items-center gap-3">
-              <Target size={20} className="text-[#C62828] shrink-0" />
+              <Target size={20} className="text-[#EF4444] shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">
                   Your best move: challenge {suggestedOpponent.player.full_name}
@@ -435,7 +435,7 @@ export default function HomePage() {
                   {suggestedOpponent.player.preferred_discipline ? ` · ${suggestedOpponent.player.preferred_discipline}` : ''}
                 </div>
               </div>
-              <div className="text-[#C62828] text-xs font-[Barlow] font-semibold shrink-0">Challenge →</div>
+              <div className="text-[#EF4444] text-xs font-[Barlow] font-semibold shrink-0">Challenge →</div>
             </div>
           </GlassCard>
         </motion.div>
@@ -459,9 +459,9 @@ export default function HomePage() {
           <GlassCard className="p-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6]">
-                Alerts <span className="text-[#C62828]">({notifications.length})</span>
+                Alerts <span className="text-[#EF4444]">({notifications.length})</span>
               </h2>
-              <button onClick={() => navigate('/notifications')} className="text-[#C62828] text-xs font-[Barlow]">
+              <button onClick={() => navigate('/notifications')} className="text-[#EF4444] text-xs font-[Barlow]">
                 View all →
               </button>
             </div>
@@ -488,14 +488,14 @@ export default function HomePage() {
               <TrendingUp size={16} className="text-[#9CA3AF]" />
               <span className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">Activity</span>
             </div>
-            <div className="text-[#6B7280] text-xs font-[Barlow]">Full league journal</div>
+            <div className="text-[#9CA3AF] text-xs font-[Barlow]">Full league journal</div>
           </GlassCard>
           <GlassCard className="p-4" hover onClick={() => navigate('/treasury')}>
             <div className="flex items-center gap-2 mb-1">
               <DollarSign size={16} className="text-[#9CA3AF]" />
               <span className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">Treasury</span>
             </div>
-            <div className="text-[#6B7280] text-xs font-[Barlow]">League funds</div>
+            <div className="text-[#9CA3AF] text-xs font-[Barlow]">League funds</div>
           </GlassCard>
         </div>
       </motion.div>
@@ -508,12 +508,12 @@ export default function HomePage() {
               <TrendingUp size={18} className="text-[#9CA3AF]" />
               <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6]">League Activity</h2>
             </div>
-            <button onClick={() => navigate('/activity')} className="text-[#C62828] text-xs font-[Barlow]">
+            <button onClick={() => navigate('/activity')} className="text-[#EF4444] text-xs font-[Barlow]">
               View all →
             </button>
           </div>
           {feed.length === 0 ? (
-            <p className="text-[#6B7280] text-sm font-[Barlow] py-4 text-center">
+            <p className="text-[#9CA3AF] text-sm font-[Barlow] py-4 text-center">
               No activity yet. Be the first to challenge someone!
             </p>
           ) : (
@@ -530,7 +530,7 @@ export default function HomePage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-[Barlow] text-[#E8E2D6] leading-snug">{item.headline}</div>
-                    <div className="text-[#6B7280] text-xs font-[Barlow] mt-0.5">
+                    <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-0.5">
                       {formatDistanceToNow(item.created_at)}
                     </div>
                   </div>

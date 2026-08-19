@@ -189,7 +189,7 @@ export default function LoginPage() {
                   Email Address
                 </label>
                 <div className="relative">
-                  <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280]" />
+                  <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
                   <input
                     id="login-email"
                     name="email"
@@ -328,7 +328,7 @@ export default function LoginPage() {
         <div className="mt-5 text-center">
           <a
             href="mailto:help@toc.monster?subject=TOC%20sign-in%20help"
-            className="inline-flex items-center gap-1.5 text-[#71717A] hover:text-[#A1A1AA] text-sm font-[Barlow] transition-colors"
+            className="inline-flex items-center gap-1.5 text-[#9CA3AF] hover:text-[#E8E2D6] text-sm font-[Barlow] transition-colors"
           >
             <HelpCircle size={14} /> Trouble signing in?
           </a>

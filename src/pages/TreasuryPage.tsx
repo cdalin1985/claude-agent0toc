@@ -56,7 +56,7 @@ export default function TreasuryPage() {
       <h1 className="font-[Bebas_Neue] text-5xl tracking-wide text-[#E8E2D6] mb-1">
         League Treasury
       </h1>
-      <p className="text-[#6B7280] text-sm font-[Barlow] mb-5">
+      <p className="text-[#9CA3AF] text-sm font-[Barlow] mb-5">
         Transparent record of all league funds
       </p>
 
@@ -71,14 +71,14 @@ export default function TreasuryPage() {
           <div className="font-[Azeret_Mono] font-bold text-base text-[#22C55E]">
             {formatCents(summary?.total_credit_cents ?? 0)}
           </div>
-          <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">Total In</div>
+          <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-1">Total In</div>
         </GlassCard>
         <GlassCard className="p-4 text-center">
           <TrendingDown size={18} className="text-[#EF4444] mx-auto mb-1" />
           <div className="font-[Azeret_Mono] font-bold text-base text-[#EF4444]">
             {formatCents(summary?.total_debit_cents ?? 0)}
           </div>
-          <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">Total Out</div>
+          <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-1">Total Out</div>
         </GlassCard>
         <GlassCard className="p-4 text-center">
           <DollarSign
@@ -91,7 +91,7 @@ export default function TreasuryPage() {
           >
             {formatCents(Math.abs(summary?.balance_cents ?? 0))}
           </div>
-          <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">Balance</div>
+          <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-1">Balance</div>
         </GlassCard>
       </motion.div>
 
@@ -111,7 +111,7 @@ export default function TreasuryPage() {
               ))}
             </div>
           ) : entries.length === 0 ? (
-            <p className="text-[#6B7280] text-sm font-[Barlow] text-center py-8">
+            <p className="text-[#9CA3AF] text-sm font-[Barlow] text-center py-8">
               No treasury entries yet.
             </p>
           ) : (
@@ -138,7 +138,7 @@ export default function TreasuryPage() {
                       <div className="text-sm font-[Barlow] text-[#E8E2D6] leading-tight">
                         {entry.description}
                       </div>
-                      <div className="text-xs text-[#6B7280] font-[Barlow] mt-0.5">
+                      <div className="text-xs text-[#9CA3AF] font-[Barlow] mt-0.5">
                         {formatDate(entry.created_at)}
                       </div>
                     </div>

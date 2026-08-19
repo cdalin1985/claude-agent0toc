@@ -181,7 +181,7 @@ function DisputesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
         <GlassCard key={m.id} className="p-4">
           <div className="flex items-center justify-between mb-2">
             <Badge variant="loss">DISPUTED</Badge>
-            <span className="text-[#6B7280] text-xs font-[Barlow]">{formatDate(m.created_at)}</span>
+            <span className="text-[#9CA3AF] text-xs font-[Barlow]">{formatDate(m.created_at)}</span>
           </div>
           <div className="text-[#E8E2D6] font-[Barlow] text-sm font-semibold mb-0.5">
             {getName(m.player1_id)} vs {getName(m.player2_id)}
@@ -400,7 +400,7 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
           <div className="flex items-center justify-between mb-2">
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             <Badge variant={STATUS_BADGE[c.status] as any}>{c.status.replace('_', ' ').toUpperCase()}</Badge>
-            <span className="text-[#6B7280] text-xs font-[Barlow]">{formatDate(c.created_at)}</span>
+            <span className="text-[#9CA3AF] text-xs font-[Barlow]">{formatDate(c.created_at)}</span>
           </div>
           <div className="font-[Barlow] font-semibold text-sm text-[#E8E2D6] mb-0.5">
             {getName(c.challenger_id)} → {getName(c.challenged_id)}
@@ -575,7 +575,7 @@ function MatchesAdminTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
           <div className="flex items-center justify-between mb-2">
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             <Badge variant={STATUS_BADGE[m.status] as any}>{m.status.replace('_', ' ').toUpperCase()}</Badge>
-            <span className="text-[#6B7280] text-xs font-[Barlow]">{formatDate(m.created_at)}</span>
+            <span className="text-[#9CA3AF] text-xs font-[Barlow]">{formatDate(m.created_at)}</span>
           </div>
           <div className="font-[Barlow] font-semibold text-sm text-[#E8E2D6] mb-0.5">
             {getName(m.player1_id)} vs {getName(m.player2_id)}
@@ -702,7 +702,7 @@ function RankingsTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   };
 
   if (displayedOrder.length === 0) {
-    return <div className="text-center py-12 text-[#6B7280] font-[Barlow]">Loading rankings…</div>;
+    return <div className="text-center py-12 text-[#9CA3AF] font-[Barlow]">Loading rankings…</div>;
   }
 
   return (
@@ -719,7 +719,7 @@ function RankingsTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
           const changed = original?.position !== i + 1;
           return (
             <GlassCard key={r.player_id} className={`p-3 flex items-center gap-3 ${changed ? 'border border-[#F59E0B]/30' : ''}`}>
-              <span className="font-[Azeret_Mono] font-bold text-lg text-[#C62828] w-7 text-center shrink-0">
+              <span className="font-[Azeret_Mono] font-bold text-lg text-[#EF4444] w-7 text-center shrink-0">
                 {i + 1}
               </span>
               <span className="font-[Barlow] font-semibold text-sm text-[#E8E2D6] flex-1 truncate">
@@ -943,7 +943,7 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
           <input type="email" inputMode="email" autoComplete="off" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="Email (optional — sends invite)"
             onKeyDown={(e) => e.key === 'Enter' && handleAddPlayer()}
             className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] mb-1" />
-          <p className="text-[#6B7280] text-xs font-[Barlow] mb-3">
+          <p className="text-[#9CA3AF] text-xs font-[Barlow] mb-3">
             Leave blank to add as unclaimed. With email, an invite is sent immediately.
           </p>
           {addError && <p className="text-[#EF4444] text-xs font-[Barlow] mb-2">{addError}</p>}
@@ -982,13 +982,13 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
           <GlassCard key={p.id} className="p-3">
             <div className="flex items-center gap-3">
               <div className="flex-1 min-w-0">
-                <div className={`font-[Barlow] font-semibold text-sm truncate ${p.is_active ? 'text-[#E8E2D6]' : 'text-[#6B7280] line-through'}`}>
+                <div className={`font-[Barlow] font-semibold text-sm truncate ${p.is_active ? 'text-[#E8E2D6]' : 'text-[#9CA3AF] line-through'}`}>
                   {p.full_name}
                   {typeof fr === 'number' && (
                     <span className="ml-2 text-[#9CA3AF] font-normal">FR {fr}</span>
                   )}
                 </div>
-                <div className="text-[#6B7280] text-xs font-[Barlow]">{p.profile_id ? 'Claimed' : 'Unclaimed'}</div>
+                <div className="text-[#9CA3AF] text-xs font-[Barlow]">{p.profile_id ? 'Claimed' : 'Unclaimed'}</div>
               </div>
               {!p.profile_id && !isInviting && (
                 <button
@@ -1078,7 +1078,7 @@ function TreasuryTab() {
           {formatCents(Math.abs(balance))}
         </div>
         {balance < 0 && <div className="text-[#EF4444] text-xs font-[Barlow] mt-1">In deficit</div>}
-        <div className="text-[#6B7280] text-xs font-[Barlow] mt-2">
+        <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-2">
           {formatCents(summary?.total_credit_cents ?? 0)} in · {formatCents(summary?.total_debit_cents ?? 0)} out · {summary?.entry_count ?? 0} entries
         </div>
       </GlassCard>
@@ -1115,7 +1115,7 @@ function TreasuryTab() {
             <GlassCard key={entry.id} className="p-3 flex items-center justify-between">
               <div className="min-w-0">
                 <div className="font-[Barlow] text-sm text-[#E8E2D6] truncate">{entry.description}</div>
-                <div className="text-[#6B7280] text-xs font-[Barlow]">{formatDate(entry.created_at)}</div>
+                <div className="text-[#9CA3AF] text-xs font-[Barlow]">{formatDate(entry.created_at)}</div>
               </div>
               <div className="font-[Azeret_Mono] font-bold shrink-0" style={{ color }}>
                 {sign}{formatCents(Math.abs(entry.effect_cents))}
@@ -1205,17 +1205,17 @@ function Rank1Tab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
                 <div className="grid grid-cols-3 gap-3">
                   <div className="text-center">
                     <div className="font-[Azeret_Mono] font-bold text-2xl text-[#E8E2D6]">{status.top5_matches}/{status.required_top5_matches ?? 2}</div>
-                    <div className="text-[#6B7280] text-xs font-[Barlow]">Top-5 matches</div>
+                    <div className="text-[#9CA3AF] text-xs font-[Barlow]">Top-5 matches</div>
                   </div>
                   <div className="text-center">
                     <div className="font-[Azeret_Mono] font-bold text-2xl text-[#E8E2D6]">{status.days_elapsed}</div>
-                    <div className="text-[#6B7280] text-xs font-[Barlow]">Days elapsed</div>
+                    <div className="text-[#9CA3AF] text-xs font-[Barlow]">Days elapsed</div>
                   </div>
                   <div className="text-center">
                     <div className="font-[Azeret_Mono] font-bold text-2xl" style={{ color: (status.days_remaining ?? 30) <= 2 ? '#EF4444' : '#E8E2D6' }}>
                       {status.days_remaining}
                     </div>
-                    <div className="text-[#6B7280] text-xs font-[Barlow]">Days left</div>
+                    <div className="text-[#9CA3AF] text-xs font-[Barlow]">Days left</div>
                   </div>
                 </div>
               )}
@@ -1267,7 +1267,7 @@ function SettingsField({ label, unit, value, onChange, min = 1 }: SettingsFieldP
     <div className="flex items-center justify-between py-3 border-b border-white/5 last:border-0">
       <div>
         <div className="font-[Barlow] text-sm text-[#E8E2D6]">{label}</div>
-        <div className="text-[#6B7280] text-xs font-[Barlow]">{unit}</div>
+        <div className="text-[#9CA3AF] text-xs font-[Barlow]">{unit}</div>
       </div>
       <input
         type="number"
@@ -1299,7 +1299,7 @@ function SettingsTab() {
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState('');
 
-  if (!settings) return <div className="text-center py-12 text-[#6B7280] font-[Barlow]">Loading settings…</div>;
+  if (!settings) return <div className="text-center py-12 text-[#9CA3AF] font-[Barlow]">Loading settings…</div>;
 
   const form: SettingsFormState = {
     min_race: edits.min_race ?? settings.min_race,
@@ -1383,7 +1383,7 @@ function AuditTab() {
     },
   });
 
-  if (events.length === 0) return <div className="text-center py-12 text-[#6B7280] font-[Barlow]">No audit events yet.</div>;
+  if (events.length === 0) return <div className="text-center py-12 text-[#9CA3AF] font-[Barlow]">No audit events yet.</div>;
 
   return (
     <div className="space-y-2">
@@ -1391,7 +1391,7 @@ function AuditTab() {
         <GlassCard key={e.id} className="p-3">
           <div className="flex items-center justify-between mb-1">
             <span className="font-[Barlow] font-semibold text-sm text-[#E8E2D6]">{e.action}</span>
-            <span className="text-[#6B7280] text-xs font-[Barlow]">{formatDistanceToNow(e.created_at)}</span>
+            <span className="text-[#9CA3AF] text-xs font-[Barlow]">{formatDistanceToNow(e.created_at)}</span>
           </div>
           {e.target_type && (
             <div className="text-[#9CA3AF] text-xs font-[Barlow]">{e.target_type}: {e.target_id?.slice(0, 8)}…</div>

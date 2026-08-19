@@ -31,7 +31,7 @@ export function CoachTip({ id, size = 16, className = '' }: CoachTipProps) {
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-        className="text-[#6B7280] hover:text-[#9CA3AF] transition-colors"
+        className="text-[#9CA3AF] hover:text-[#E8E2D6] transition-colors"
         aria-label={copy.title}
       >
         <HelpCircle size={size} />
@@ -40,7 +40,7 @@ export function CoachTip({ id, size = 16, className = '' }: CoachTipProps) {
         <div className="absolute z-50 top-full right-0 mt-2 w-56 p-3 rounded-xl bg-[#1A1A1A] border border-[#333] shadow-xl">
           <div className="flex items-start justify-between gap-2 mb-1">
             <div className="font-[Barlow] font-semibold text-xs text-[#E8E2D6]">{copy.title}</div>
-            <button onClick={() => setOpen(false)} className="text-[#6B7280] -mt-0.5 -mr-0.5 shrink-0"><X size={12} /></button>
+            <button onClick={() => setOpen(false)} className="text-[#9CA3AF] -mt-0.5 -mr-0.5 shrink-0"><X size={12} /></button>
           </div>
           <p className="text-[11px] font-[Barlow] text-[#9CA3AF] leading-snug">{copy.body}</p>
         </div>
