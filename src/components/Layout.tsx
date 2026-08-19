@@ -10,6 +10,7 @@ import { TopHeader } from './TopHeader';
 import { SideMenu } from './SideMenu';
 import { FloatingActionButton } from './FloatingActionButton';
 import { BottomNav } from './BottomNav';
+import { RouteAnnouncer } from './RouteAnnouncer';
 import { LoadingScreen } from './LoadingScreen';
 import { OfflineBanner } from './OfflineBanner';
 import { PWAInstallBanner } from './PWAInstallBanner';
@@ -237,6 +238,25 @@ export const Layout: React.FC = () => {
 
   return (
     <div className="relative min-h-screen bg-[var(--toc-theme-bg,#0D0D0D)] overflow-hidden">
+      {/*
+        WCAG 2.4.1. The header, the menu button and the whole bottom nav sit
+        ahead of the content in tab order, on every single route, so reaching
+        the ladder by keyboard meant tabbing past all of it every time.
+
+        Hidden until focused, which is the point: the first Tab on any page
+        offers the shortcut, and it stays out of the way for everyone else.
+        z-[100] because the sticky header would otherwise cover it, and a skip
+        link you cannot see is no better than no skip link.
+      */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:rounded-lg focus:bg-[#1A1A1A] focus:px-4 focus:py-2.5 focus:font-[Barlow] focus:text-sm focus:text-[#E8E2D6] focus:shadow-lg"
+      >
+        Skip to main content
+      </a>
+
+      <RouteAnnouncer />
+
       <LoadingScreen visible={!appReady} />
       <PWAInstallBanner />
       <AmbientBackground />
@@ -247,7 +267,12 @@ export const Layout: React.FC = () => {
 
       {/* Main content area */}
       <main
-        className="relative z-10"
+        id="main-content"
+        // Focusable only as a skip-link target: -1 keeps it out of the tab
+        // order but lets focus actually land here, so the next Tab continues
+        // inside the content instead of resuming at the top of the page.
+        tabIndex={-1}
+        className="relative z-10 focus:outline-none"
         style={{
           paddingBottom: showNav ? '80px' : 0,
           paddingTop: showNav ? '80px' : isOffline ? '36px' : 0,
