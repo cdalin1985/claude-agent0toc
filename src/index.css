@@ -174,3 +174,76 @@ body {
   /* Optimize buttons for landscape */
   button { padding: 6px 12px; }
 }
+
+/* ── Reduced motion ───────────────────────────────────────────── */
+/*
+ * WCAG 2.3.3. Until now this app honoured the OS "reduce motion" setting
+ * nowhere: 27 components animate through Framer Motion and there are a dozen
+ * CSS keyframes, every decorative one of them running `infinite`.
+ *
+ * The ambient set is the problem for anyone with vestibular sensitivity --
+ * drift1/2/3 translate and scale the background orbs forever, float-up carries
+ * particles 110px up the screen, ring-pulse scales 1 -> 1.75, and text-flicker
+ * strobes opacity. None of it carries information; all of it moves whether the
+ * player asked for motion or not, on a phone they open every day.
+ *
+ * Default is OFF, by blanket rule, rather than a list of the animations that
+ * exist today. A list would need someone to remember to extend it, and this
+ * repo has learned repeatedly what happens to controls that depend on somebody
+ * remembering. Motion added next month is covered the moment it is written.
+ *
+ * The allowlist below is the deliberate exception: for a busy indicator the
+ * motion IS the information, and a frozen spinner reads as a hung app. It is
+ * kept at full speed on purpose -- a spinner is small, localised, and not the
+ * parallax-style movement the setting exists to suppress.
+ *
+ * Framer Motion is handled separately and cannot be reached from CSS: see
+ * <MotionConfig reducedMotion="user"> in App.tsx.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Motion that is load-bearing, not decorative. */
+  .animate-spin {
+    animation: spin 1s linear infinite !important;
+  }
+}
+
+/* ── Focus visibility ─────────────────────────────────────────── */
+/*
+ * A guaranteed keyboard focus ring, measured rather than eyeballed.
+ *
+ * 31 controls across the app pair `focus:outline-none` with
+ * `focus:border-[#C62828]`, so focus was indicated by the field's border turning
+ * red. That is an indicator, but a weak one. Contrast, computed:
+ *
+ *   #C62828 vs #252525 (the field it sits on)   2.73:1   needs 3:1
+ *   #C62828 vs #333333 (the resting border)     2.25:1   needs 3:1
+ *
+ * Both below WCAG 2.4.11, and the second is the one that matters most: the
+ * change from resting to focused is what tells you where you are, and at 2.25:1
+ * it is easy to miss entirely with low vision or a red-green colour deficiency.
+ *
+ * Gold is the league's existing accent and clears 3:1 on every surface in the
+ * app by a wide margin -- 9.24 on the page, 8.28 on cards, 7.29 on inputs, 6.01
+ * against the resting border. No new colour is introduced.
+ *
+ * !important is deliberate. `.focus\:outline-none:focus` is a class selector and
+ * outranks a bare `:focus-visible`, so without it this rule loses to all 31
+ * call sites. The ring must not depend on each of them being individually
+ * corrected, or on the next one being written correctly.
+ *
+ * :focus-visible, not :focus -- the browser decides when a ring is warranted, so
+ * pointer clicks stay clean and keyboard navigation always shows position.
+ */
+:focus-visible {
+  outline: 2px solid #D4AF37 !important;
+  outline-offset: 2px;
+}

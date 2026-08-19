@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MotionConfig } from 'framer-motion';
 import { Layout } from './components/Layout';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { lazyWithRetry } from './lib/lazyWithRetry';
@@ -56,34 +57,48 @@ const Suspense: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <ErrorBoundary>
-          <Routes>
-            <Route element={<Layout />}>
-              {/* Public */}
-              <Route path="/login"         element={<Suspense><LoginPage /></Suspense>} />
-              <Route path="/auth/callback" element={<Suspense><AuthCallbackPage /></Suspense>} />
-              {/* Authenticated — unclaimed */}
-              <Route path="/claim"         element={<Suspense><ClaimPage /></Suspense>} />
-              {/* Authenticated — claimed */}
-              <Route path="/"              element={<Suspense><HomePage /></Suspense>} />
-              <Route path="/rankings"      element={<Suspense><RankingsPage /></Suspense>} />
-              <Route path="/player/:id"    element={<Suspense><PlayerPage /></Suspense>} />
-              <Route path="/challenge/:id" element={<Suspense><ChallengePage /></Suspense>} />
-              <Route path="/challenges"    element={<Suspense><ChallengesPage /></Suspense>} />
-              <Route path="/matches"       element={<Suspense><MatchesPage /></Suspense>} />
-              <Route path="/match/:id"     element={<Suspense><MatchPage /></Suspense>} />
-              <Route path="/notifications" element={<Suspense><NotificationsPage /></Suspense>} />
-              <Route path="/settings"      element={<Suspense><SettingsPage /></Suspense>} />
-              <Route path="/admin"         element={<Suspense><AdminPage /></Suspense>} />
-              <Route path="/treasury"      element={<Suspense><TreasuryPage /></Suspense>} />
-              <Route path="/activity"      element={<Suspense><ActivityPage /></Suspense>} />
-              <Route path="/rules"         element={<Suspense><RulesPage /></Suspense>} />
-              <Route path="*"              element={<Navigate to="/" replace />} />
-            </Route>
-          </Routes>
-        </ErrorBoundary>
-      </BrowserRouter>
+      {/*
+        Honours the OS "reduce motion" setting across every Framer Motion
+        component in the app -- 27 files -- from one place. "user" means: follow
+        the system preference, disabling transform and layout animation while
+        letting opacity fades through, since a cross-fade is not what triggers
+        vestibular symptoms.
+
+        This cannot be done in CSS. Framer Motion writes transforms straight to
+        the element via style, so the prefers-reduced-motion block in index.css
+        never sees them; that block covers the CSS keyframes, this covers the
+        rest. Both are needed, and neither is sufficient alone.
+      */}
+      <MotionConfig reducedMotion="user">
+        <BrowserRouter>
+          <ErrorBoundary>
+            <Routes>
+              <Route element={<Layout />}>
+                {/* Public */}
+                <Route path="/login"         element={<Suspense><LoginPage /></Suspense>} />
+                <Route path="/auth/callback" element={<Suspense><AuthCallbackPage /></Suspense>} />
+                {/* Authenticated — unclaimed */}
+                <Route path="/claim"         element={<Suspense><ClaimPage /></Suspense>} />
+                {/* Authenticated — claimed */}
+                <Route path="/"              element={<Suspense><HomePage /></Suspense>} />
+                <Route path="/rankings"      element={<Suspense><RankingsPage /></Suspense>} />
+                <Route path="/player/:id"    element={<Suspense><PlayerPage /></Suspense>} />
+                <Route path="/challenge/:id" element={<Suspense><ChallengePage /></Suspense>} />
+                <Route path="/challenges"    element={<Suspense><ChallengesPage /></Suspense>} />
+                <Route path="/matches"       element={<Suspense><MatchesPage /></Suspense>} />
+                <Route path="/match/:id"     element={<Suspense><MatchPage /></Suspense>} />
+                <Route path="/notifications" element={<Suspense><NotificationsPage /></Suspense>} />
+                <Route path="/settings"      element={<Suspense><SettingsPage /></Suspense>} />
+                <Route path="/admin"         element={<Suspense><AdminPage /></Suspense>} />
+                <Route path="/treasury"      element={<Suspense><TreasuryPage /></Suspense>} />
+                <Route path="/activity"      element={<Suspense><ActivityPage /></Suspense>} />
+                <Route path="/rules"         element={<Suspense><RulesPage /></Suspense>} />
+                <Route path="*"              element={<Navigate to="/" replace />} />
+              </Route>
+            </Routes>
+          </ErrorBoundary>
+        </BrowserRouter>
+      </MotionConfig>
     </QueryClientProvider>
   );
 }
