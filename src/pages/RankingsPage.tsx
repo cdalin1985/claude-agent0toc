@@ -85,13 +85,13 @@ function RankCard({
             {!rp.player.profile_id && <Badge variant="default" className="shrink-0 text-[10px]">Unclaimed</Badge>}
           </div>
           <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-[#6B7280] text-xs font-[Azeret_Mono]">
+            <span className="text-[#9CA3AF] text-xs font-[Azeret_Mono]">
               {rp.metrics?.fargo_rating ?? 'Unrated'}
               {rp.metrics?.fargo_rating ? ' FR' : ''}
             </span>
             {rp.stats && (
               <span
-                className="text-[#6B7280] text-xs font-[Azeret_Mono]"
+                className="text-[#9CA3AF] text-xs font-[Azeret_Mono]"
                 title="Wins · Losses · Forfeits"
               >
                 {rp.stats.wins}-{rp.stats.losses}-{rp.stats.forfeits}
@@ -110,7 +110,7 @@ function RankCard({
           <motion.button
             whileTap={{ scale: 0.92 }}
             onClick={(e) => { e.stopPropagation(); navigate(`/challenge/${rp.player.id}`); }}
-            className="shrink-0 flex items-center gap-1 px-3 py-2 rounded-lg bg-[#C62828]/20 border border-[#C62828]/40 text-[#EF5350] text-xs font-[Barlow] font-semibold hover:bg-[#C62828]/30 transition-colors min-h-[40px]"
+            className="shrink-0 flex items-center gap-1 px-3 py-2 rounded-lg bg-[#C62828]/20 border border-[#C62828]/40 text-[#EF4444] text-xs font-[Barlow] font-semibold hover:bg-[#C62828]/30 transition-colors min-h-[40px]"
           >
             <Swords size={12} />
             Challenge
@@ -163,7 +163,7 @@ export default function RankingsPage() {
 
       {/* Search */}
       <div className="relative mb-3">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280]" />
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
         <input
           type="text"
           value={search}
@@ -173,7 +173,7 @@ export default function RankingsPage() {
         />
         {search && (
           <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2">
-            <X size={14} className="text-[#6B7280]" />
+            <X size={14} className="text-[#9CA3AF]" />
           </button>
         )}
       </div>

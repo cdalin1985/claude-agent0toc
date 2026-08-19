@@ -59,7 +59,7 @@ function ToggleRow({
         <span className="text-[#9CA3AF] shrink-0">{icon}</span>
         <div className="min-w-0">
           <div className="font-[Barlow] font-medium text-[#E8E2D6] text-sm">{title}</div>
-          <div className="text-[#6B7280] text-xs font-[Barlow]">{description}</div>
+          <div className="text-[#9CA3AF] text-xs font-[Barlow]">{description}</div>
         </div>
       </div>
       <button
@@ -345,7 +345,7 @@ export default function SettingsPage() {
               <div>
                 <div className="font-[Bebas_Neue] text-2xl text-[#E8E2D6]">{player.full_name}</div>
                 <div className="text-[#9CA3AF] text-sm font-[Barlow]">{profile?.email}</div>
-                <div className="text-[#C62828] font-[Azeret_Mono] text-sm">
+                <div className="text-[#EF4444] font-[Azeret_Mono] text-sm">
                   Rank #{myRanking.ranking.position}
                 </div>
               </div>
@@ -361,7 +361,7 @@ export default function SettingsPage() {
               >
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-[#9CA3AF] text-sm font-[Barlow]">Choose an icon or upload a photo</span>
-                  <button onClick={() => setShowIconPicker(false)} className="text-[#6B7280]"><X size={16} /></button>
+                  <button onClick={() => setShowIconPicker(false)} className="text-[#9CA3AF]"><X size={16} /></button>
                 </div>
 
                 {/* Preset icons */}
@@ -444,7 +444,7 @@ export default function SettingsPage() {
                 placeholder="A few words about your game…"
                 className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] transition-colors resize-none"
               />
-              <div className="text-right text-xs text-[#6B7280] font-[Barlow] mt-1">
+              <div className="text-right text-xs text-[#9CA3AF] font-[Barlow] mt-1">
                 {bio.length}/200
               </div>
             </div>
@@ -495,7 +495,7 @@ export default function SettingsPage() {
                 placeholder="A line that shows on your profile"
                 className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] transition-colors"
               />
-              <div className="text-right text-xs text-[#6B7280] font-[Barlow] mt-1">{tagline.length}/80</div>
+              <div className="text-right text-xs text-[#9CA3AF] font-[Barlow] mt-1">{tagline.length}/80</div>
             </div>
 
             {/* Banner and accent both save on tap rather than waiting for Save
@@ -518,7 +518,7 @@ export default function SettingsPage() {
                       </button>
                     </>
                   ) : (
-                    <span className="text-[#6B7280] text-xs font-[Barlow]">No banner yet</span>
+                    <span className="text-[#9CA3AF] text-xs font-[Barlow]">No banner yet</span>
                   )}
                 </div>
                 <input
@@ -557,7 +557,7 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={() => handleSelectAccent(null)}
-                    className="text-[#6B7280] text-xs font-[Barlow] underline ml-2"
+                    className="text-[#9CA3AF] text-xs font-[Barlow] underline ml-2"
                   >
                     Clear
                   </button>
@@ -616,7 +616,7 @@ export default function SettingsPage() {
               Save Profile
             </Button>
 
-            <div className="text-xs text-[#6B7280] font-[Barlow] mt-3">
+            <div className="text-xs text-[#9CA3AF] font-[Barlow] mt-3">
               Email (read-only): {profile?.email}
             </div>
           </GlassCard>
@@ -633,7 +633,7 @@ export default function SettingsPage() {
               {soundEnabled ? <Volume2 size={18} className="text-[#9CA3AF]" /> : <VolumeX size={18} className="text-[#9CA3AF]" />}
               <div>
                 <div className="font-[Barlow] font-medium text-[#E8E2D6] text-sm">Sound Effects</div>
-                <div className="text-[#6B7280] text-xs font-[Barlow]">UI sounds and celebrations</div>
+                <div className="text-[#9CA3AF] text-xs font-[Barlow]">UI sounds and celebrations</div>
               </div>
             </div>
             <button
@@ -650,7 +650,7 @@ export default function SettingsPage() {
                 {pushSubscribed ? <Bell size={18} className="text-[#9CA3AF]" /> : <BellOff size={18} className="text-[#9CA3AF]" />}
                 <div>
                   <div className="font-[Barlow] font-medium text-[#E8E2D6] text-sm">Push Notifications</div>
-                  <div className="text-[#6B7280] text-xs font-[Barlow]">
+                  <div className="text-[#9CA3AF] text-xs font-[Barlow]">
                     {pushPermission === 'denied'
                       ? 'Blocked in browser settings'
                       : pushSubscribed
@@ -676,12 +676,12 @@ export default function SettingsPage() {
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}>
           <GlassCard className="p-5" hover onClick={() => navigate('/admin')}>
             <div className="flex items-center gap-3">
-              <Shield size={20} className="text-[#C62828]" />
+              <Shield size={20} className="text-[#EF4444]" />
               <div>
                 <div className="font-[Barlow] font-semibold text-[#E8E2D6]">Admin Dashboard</div>
                 <div className="text-[#9CA3AF] text-xs font-[Barlow]">Disputes, treasury, player management</div>
               </div>
-              <div className="ml-auto text-[#6B7280]">→</div>
+              <div className="ml-auto text-[#9CA3AF]">→</div>
             </div>
           </GlassCard>
         </motion.div>
@@ -696,7 +696,7 @@ export default function SettingsPage() {
               <div className="font-[Barlow] font-semibold text-[#E8E2D6]">League Rules</div>
               <div className="text-[#9CA3AF] text-xs font-[Barlow]">Challenges, cooldowns, forfeits, fees — how the ladder works</div>
             </div>
-            <div className="ml-auto text-[#6B7280]">→</div>
+            <div className="ml-auto text-[#9CA3AF]">→</div>
           </div>
         </GlassCard>
       </motion.div>
@@ -708,7 +708,7 @@ export default function SettingsPage() {
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
           <GlassCard className="p-5 mb-4">
             <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-1">Notify Me About</h2>
-            <p className="text-[#6B7280] text-xs font-[Barlow] mb-3">
+            <p className="text-[#9CA3AF] text-xs font-[Barlow] mb-3">
               Forfeits, disputes and anything affecting your rank or the treasury always come through.
             </p>
 
@@ -767,7 +767,7 @@ export default function SettingsPage() {
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}>
           <GlassCard className="p-5 mb-4">
             <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-1">What Others See</h2>
-            <p className="text-[#6B7280] text-xs font-[Barlow] mb-3">
+            <p className="text-[#9CA3AF] text-xs font-[Barlow] mb-3">
               Your name, rank and match history stay on the ladder either way — that's the league record.
             </p>
             <ToggleRow
@@ -794,7 +794,7 @@ export default function SettingsPage() {
           <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-3">About</h2>
           <div className="space-y-1 text-[#9CA3AF] text-sm font-[Barlow]">
             <div>Top of the Capital — Helena Pool League</div>
-            <div className="text-[#6B7280] text-xs">Version 1.0.0 · Built with ❤️ in Helena, MT</div>
+            <div className="text-[#9CA3AF] text-xs">Version 1.0.0 · Built with ❤️ in Helena, MT</div>
           </div>
         </GlassCard>
       </motion.div>

@@ -65,7 +65,7 @@ export const PWAInstallBanner: React.FC = () => {
             >
               <Download size={12} /> Install
             </button>
-            <button onClick={handleDismiss} className="text-[#6B7280] p-1 shrink-0 -mr-1">
+            <button onClick={handleDismiss} className="text-[#9CA3AF] p-1 shrink-0 -mr-1">
               <X size={16} />
             </button>
           </div>

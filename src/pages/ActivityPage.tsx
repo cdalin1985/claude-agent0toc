@@ -94,7 +94,7 @@ export default function ActivityPage() {
       <h1 className="font-[Bebas_Neue] text-5xl tracking-wide text-[#E8E2D6] mb-1">
         League Activity
       </h1>
-      <p className="text-[#6B7280] text-sm font-[Barlow] mb-4">
+      <p className="text-[#9CA3AF] text-sm font-[Barlow] mb-4">
         Live journal of every league event
       </p>
 
@@ -124,7 +124,7 @@ export default function ActivityPage() {
             ))}
           </div>
         ) : feed.length === 0 ? (
-          <p className="text-[#6B7280] text-sm font-[Barlow] text-center py-10">
+          <p className="text-[#9CA3AF] text-sm font-[Barlow] text-center py-10">
             No activity yet.
           </p>
         ) : (
@@ -150,7 +150,7 @@ export default function ActivityPage() {
                         {item.detail}
                       </div>
                     )}
-                    <div className="text-[#6B7280] text-xs font-[Barlow] mt-0.5">
+                    <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-0.5">
                       {formatDistanceToNow(item.created_at)}
                     </div>
                   </div>
@@ -161,7 +161,7 @@ export default function ActivityPage() {
             {feed.length >= limit && (
               <button
                 onClick={() => setLimit((l) => l + 40)}
-                className="w-full text-center text-[#C62828] text-sm font-[Barlow] font-medium py-3 mt-2 border border-[#C62828]/30 rounded-xl active:bg-[#C62828]/10 transition-colors"
+                className="w-full text-center text-[#EF4444] text-sm font-[Barlow] font-medium py-3 mt-2 border border-[#C62828]/30 rounded-xl active:bg-[#C62828]/10 transition-colors"
               >
                 Load more
               </button>

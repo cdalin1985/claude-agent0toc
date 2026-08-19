@@ -229,7 +229,7 @@ function RespondModal({
               📅 {formatDateTime(myProposal.scheduled_at)}
             </div>
             <div className="text-[#E8E2D6] font-[Barlow] text-sm">📍 {myProposal.venue}</div>
-            <div className="text-[#6B7280] text-xs font-[Barlow] mt-1.5">
+            <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-1.5">
               You suggested this. They can accept it or suggest another.
             </div>
           </div>
@@ -290,7 +290,7 @@ function RespondModal({
               <li>No match fee is owed.</li>
               <li>An admin can reverse this only if your rankings and stats have not changed yet.</li>
             </ul>
-            <a href="/rules" className="block text-xs font-[Barlow] text-[#C62828] underline underline-offset-2">
+            <a href="/rules" className="block text-xs font-[Barlow] text-[#EF4444] underline underline-offset-2">
               Read the league rules
             </a>
             <div className="flex gap-2 pt-1">
@@ -524,7 +524,7 @@ export default function ChallengesPage() {
                         </div>
                       )}
                       {c.status === 'pending' && !c.is_expired && hoursLeft > 0 && (
-                        <div className={`text-xs font-[Barlow] mt-1 ${hoursLeft <= 24 ? 'text-[#EF4444]' : hoursLeft <= 72 ? 'text-[#F59E0B]' : 'text-[#6B7280]'}`}>
+                        <div className={`text-xs font-[Barlow] mt-1 ${hoursLeft <= 24 ? 'text-[#EF4444]' : hoursLeft <= 72 ? 'text-[#F59E0B]' : 'text-[#9CA3AF]'}`}>
                           {hoursLeft <= 24 ? '⚠️' : '⏰'}{' '}
                           Expires in{' '}
                           {hoursLeft >= 48
@@ -536,7 +536,7 @@ export default function ChallengesPage() {
                           this is finished, not urgent, and there is nothing the
                           member can or should do about it. */}
                       {c.status === 'pending' && c.is_expired && (
-                        <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">Expired — no penalty to either player</div>
+                        <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-1">Expired — no penalty to either player</div>
                       )}
                     </div>
 

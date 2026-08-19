@@ -154,7 +154,7 @@ export default function ChallengePage() {
           <ChevronLeft size={24} className="text-[#9CA3AF]" />
         </button>
         <div>
-          <div className="text-[#6B7280] text-xs font-[Barlow]">Step {step} of 3</div>
+          <div className="text-[#9CA3AF] text-xs font-[Barlow]">Step {step} of 3</div>
           <h1 className="font-[Bebas_Neue] text-3xl text-[#E8E2D6]">
             {step === 1 ? 'Choose Discipline' : step === 2 ? 'Set Race Length' : 'Confirm & Send'}
           </h1>
@@ -176,7 +176,7 @@ export default function ChallengePage() {
             <CoachTip id="challenge.range" size={12} />
           </div>
         </div>
-        <div className="ml-auto text-2xl font-[Bebas_Neue] text-[#6B7280]">VS</div>
+        <div className="ml-auto text-2xl font-[Bebas_Neue] text-[#9CA3AF]">VS</div>
         {myRanking && <PoolBall position={myRanking.ranking.position} size={44} />}
       </GlassCard>
 
@@ -203,7 +203,7 @@ export default function ChallengePage() {
                   <div className="font-[Bebas_Neue] text-2xl text-[#E8E2D6]">{d.value}</div>
                   <div className="text-[#9CA3AF] text-sm font-[Barlow]">{d.desc}</div>
                 </div>
-                {discipline === d.value && <CheckCircle size={20} className="text-[#C62828] shrink-0" />}
+                {discipline === d.value && <CheckCircle size={20} className="text-[#EF4444] shrink-0" />}
               </GlassCard>
             ))}
             <div className="pt-4">
@@ -241,10 +241,10 @@ export default function ChallengePage() {
                   <Plus size={20} className="text-[#9CA3AF]" />
                 </button>
               </div>
-              <div className={`text-sm mt-2 font-[Barlow] ${raceError ? 'text-[#EF4444]' : 'text-[#C62828]'}`}>
+              <div className={`text-sm mt-2 font-[Barlow] ${raceError ? 'text-[#EF4444]' : 'text-[#EF4444]'}`}>
                 {raceError || `First to ${race} wins`}
               </div>
-              <div className="text-[#6B7280] text-xs font-[Barlow] mt-1 flex items-center justify-center gap-1">
+              <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-1 flex items-center justify-center gap-1">
                 Minimum race to 6 · No maximum
                 <CoachTip id="race.min" size={12} />
               </div>

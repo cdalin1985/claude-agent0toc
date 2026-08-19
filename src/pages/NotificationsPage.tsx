@@ -162,7 +162,7 @@ function RespondInline({
         />
       </div>
       {error && <p className="text-[#EF4444] text-xs font-[Barlow]">{error}</p>}
-      <p className="text-[#6B7280] text-xs font-[Barlow]">
+      <p className="text-[#9CA3AF] text-xs font-[Barlow]">
         They can accept this or suggest another time. Nothing is locked in until one of you agrees.
       </p>
       <div className="flex gap-2">
@@ -227,7 +227,7 @@ export default function NotificationsPage() {
     <div className="min-h-screen px-4 pt-8 pb-4">
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-2">
-          <Bell size={24} className="text-[#C62828]" />
+          <Bell size={24} className="text-[#EF4444]" />
           <h1 className="font-[Bebas_Neue] text-5xl tracking-wide text-[#E8E2D6]">Alerts</h1>
           {unread > 0 && (
             <motion.span
@@ -242,7 +242,7 @@ export default function NotificationsPage() {
         {unread > 0 && (
           <button
             onClick={markAllRead}
-            className="flex items-center gap-1 text-[#C62828] text-sm font-[Barlow]"
+            className="flex items-center gap-1 text-[#EF4444] text-sm font-[Barlow]"
           >
             <CheckCheck size={16} /> Mark all read
           </button>
@@ -284,7 +284,7 @@ export default function NotificationsPage() {
                         {n.title}
                       </div>
                       <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-0.5 leading-relaxed">{n.body}</div>
-                      <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">
+                      <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-1">
                         {formatDistanceToNow(n.created_at)}
                       </div>
 

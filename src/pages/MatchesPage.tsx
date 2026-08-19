@@ -137,7 +137,7 @@ export default function MatchesPage() {
                       <div className="text-[#9CA3AF] text-xs font-[Barlow]">
                         {m.discipline} · Race to {m.race_length} · {m.venue}
                       </div>
-                      <div className="text-[#6B7280] text-xs font-[Barlow] mt-0.5">
+                      <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-0.5">
                         {formatDateTime(m.scheduled_at)}
                       </div>
                     </div>
@@ -145,7 +145,7 @@ export default function MatchesPage() {
                       <div className="text-right shrink-0">
                         <div className="font-[Azeret_Mono] font-bold text-2xl">
                           <span style={{ color: won ? '#22C55E' : '#EF4444' }}>{myScore}</span>
-                          <span className="text-[#6B7280] mx-1">–</span>
+                          <span className="text-[#9CA3AF] mx-1">–</span>
                           <span className="text-[#E8E2D6]">{theirScore}</span>
                         </div>
                         {m.status !== 'in_progress' && (

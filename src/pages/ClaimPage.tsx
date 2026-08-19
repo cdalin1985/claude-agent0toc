@@ -108,7 +108,7 @@ export default function ClaimPage() {
 
         {/* Search */}
         <div className="relative mb-4">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280]" />
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
           <input
             type="text"
             placeholder="Search your name…"
@@ -118,7 +118,7 @@ export default function ClaimPage() {
           />
           {search && (
             <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2">
-              <X size={16} className="text-[#6B7280]" />
+              <X size={16} className="text-[#9CA3AF]" />
             </button>
           )}
         </div>
@@ -143,7 +143,7 @@ export default function ClaimPage() {
               ))
             : filtered.length === 0
             ? (
-                <div className="text-center py-12 text-[#6B7280] font-[Barlow]">
+                <div className="text-center py-12 text-[#9CA3AF] font-[Barlow]">
                   {players.length === 0
                     ? 'All players have been claimed. Contact the league admin.'
                     : "No players match your search. Don't see your name? Ask a league admin to add you."}
@@ -166,12 +166,12 @@ export default function ClaimPage() {
                       <div className="font-[Barlow] font-semibold text-[#E8E2D6] truncate">
                         {p.player.full_name}
                       </div>
-                      <div className="text-[#6B7280] text-xs font-[Azeret_Mono] mt-0.5">
+                      <div className="text-[#9CA3AF] text-xs font-[Azeret_Mono] mt-0.5">
                         #{p.ranking?.position}
                         {p.metrics?.fargo_rating ? ` · Fargo ${p.metrics.fargo_rating}` : ''}
                       </div>
                     </div>
-                    <div className="text-[#C62828] text-xs font-[Barlow] font-medium">Claim →</div>
+                    <div className="text-[#EF4444] text-xs font-[Barlow] font-medium">Claim →</div>
                   </GlassCard>
                 </motion.div>
               ))

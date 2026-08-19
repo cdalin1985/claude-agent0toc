@@ -22,7 +22,7 @@ function Section({ icon, title, children }: { icon: string; title: string; child
 function Rule({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex gap-2">
-      <span className="text-[#C62828] shrink-0">▸</span>
+      <span className="text-[#EF4444] shrink-0">▸</span>
       <span>{children}</span>
     </div>
   );
