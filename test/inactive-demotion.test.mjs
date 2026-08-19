@@ -67,8 +67,24 @@ test('the assert actually demotes somebody', () => {
   // A test that called the function against a healthy ladder would have passed
   // every day for three months while the demotion branch was broken.
   assert.match(assertFile, /result := public\.process_inactive_demotions\(\)/);
-  assert.match(assertFile, /INTERVAL '62 days'/);
   assert.match(assertFile, /demoted_count/);
+});
+
+test('the assert covers both a mid-ladder demotion and the bottom cap', () => {
+  // drops_owed = floor(days / 30) * 2.
+  //
+  //   45 days -> 2 owed, lands mid-ladder, everyone below is untouched
+  //   62 days -> 4 owed, runs past the last position, least() caps it
+  //
+  // This file originally used 62 for the mid-ladder case on the belief that it
+  // owed 2. It owes 4, so the demotion silently hit the cap, dragged the player
+  // at the end of the block up with it, and the "nobody below moves" check
+  // failed. Both durations are pinned here because the difference between them
+  // is the whole point: one scenario proves the shift is bounded, the other
+  // proves least() bounds it.
+  assert.match(assertFile, /seed_demotion_block\(p1, p2, p3, p4, p5, 45\)/);
+  assert.match(assertFile, /seed_demotion_block\(p1, p2, p3, p4, p5, 62\)/);
+  assert.match(assertFile, /capped at the bottom of the ladder/);
 });
 
 test('the assert backdates inactivity in a second statement', () => {
@@ -77,7 +93,19 @@ test('the assert backdates inactivity in a second statement', () => {
   // reads as inactive for zero days -- the demotion never runs and the test
   // proves nothing.
   assert.match(assertFile, /UPDATE players SET is_active = false WHERE id = p2;/);
-  assert.match(assertFile, /UPDATE players SET inactivated_at = NOW\(\) - INTERVAL '62 days' WHERE id = p2;/);
+  assert.match(assertFile, /UPDATE players SET inactivated_at = NOW\(\) - make_interval\(days => p_inactive_days\)/);
+
+  // The point is not that a backdate exists, it is that the backdate is its own
+  // statement. If it also set is_active, the BEFORE UPDATE trigger would stamp
+  // inactivated_at = NOW() over it and the player would read as inactive for
+  // zero days -- the demotion never runs and the assert proves nothing while
+  // still reporting success.
+  const backdate = assertFile.match(/UPDATE players SET inactivated_at[\s\S]*?;/);
+  assert.ok(backdate, 'no backdate statement found');
+  assert.ok(
+    !/is_active/.test(backdate[0]),
+    'the backdate statement must not also set is_active, or the trigger overwrites it',
+  );
 });
 
 test('the assert checks the ladder is still intact afterwards', () => {
