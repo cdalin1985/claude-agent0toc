@@ -174,3 +174,44 @@ body {
   /* Optimize buttons for landscape */
   button { padding: 6px 12px; }
 }
+
+/* ── Reduced motion ───────────────────────────────────────────── */
+/*
+ * WCAG 2.3.3. Until now this app honoured the OS "reduce motion" setting
+ * nowhere: 27 components animate through Framer Motion and there are a dozen
+ * CSS keyframes, every decorative one of them running `infinite`.
+ *
+ * The ambient set is the problem for anyone with vestibular sensitivity --
+ * drift1/2/3 translate and scale the background orbs forever, float-up carries
+ * particles 110px up the screen, ring-pulse scales 1 -> 1.75, and text-flicker
+ * strobes opacity. None of it carries information; all of it moves whether the
+ * player asked for motion or not, on a phone they open every day.
+ *
+ * Default is OFF, by blanket rule, rather than a list of the animations that
+ * exist today. A list would need someone to remember to extend it, and this
+ * repo has learned repeatedly what happens to controls that depend on somebody
+ * remembering. Motion added next month is covered the moment it is written.
+ *
+ * The allowlist below is the deliberate exception: for a busy indicator the
+ * motion IS the information, and a frozen spinner reads as a hung app. It is
+ * kept at full speed on purpose -- a spinner is small, localised, and not the
+ * parallax-style movement the setting exists to suppress.
+ *
+ * Framer Motion is handled separately and cannot be reached from CSS: see
+ * <MotionConfig reducedMotion="user"> in App.tsx.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Motion that is load-bearing, not decorative. */
+  .animate-spin {
+    animation: spin 1s linear infinite !important;
+  }
+}

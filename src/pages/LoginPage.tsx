@@ -142,8 +142,22 @@ export default function LoginPage() {
               color: '#E8E2D6',
               textShadow: '0 0 40px rgba(198,40,40,0.4), 0 2px 8px rgba(0,0,0,0.6)',
             }}
+            /*
+              The league's name is set on two lines. It was `TOP OF THE<br />CAPITAL`,
+              and a <br> is not a word separator in accessible-name computation, so
+              screen readers announced "TOP OF THECAPITAL" -- on the first screen
+              anyone using one ever reaches.
+              Splitting it into two block-level spans does NOT fix it: verified in
+              Chrome, the computed name is still "TOP OF THECAPITAL". The accname
+              algorithm concatenates the text of child nodes without inserting
+              whitespace for block boundaries.
+              So the name is stated outright. The spans keep the two-line look; this
+              decides what is announced, independent of how it is laid out.
+            */
+            aria-label="Top of the Capital"
           >
-            TOP OF THE<br />CAPITAL
+            <span className="block">TOP OF THE</span>
+            <span className="block">CAPITAL</span>
           </h1>
           <p className="text-[#9CA3AF] font-[Barlow] text-sm mt-2 tracking-[0.2em] uppercase">
             Helena Pool League
