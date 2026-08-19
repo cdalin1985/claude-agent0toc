@@ -1,6 +1,6 @@
 // Bump CACHE_VERSION whenever caching behavior changes; old caches are
 // cleaned up on activate.
-const CACHE_VERSION = 'toc-v3';
+const CACHE_VERSION = 'toc-v4';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const ASSET_CACHE = `${CACHE_VERSION}-assets`;
 
@@ -77,9 +77,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Build assets are content-hashed, so cache-first is safe; other static
-  // files (icons, fonts, manifest) ride along under the same versioned cache.
-  if (url.pathname.startsWith('/assets/') || /\.(js|css|png|jpg|svg|webmanifest|json|woff2?)$/.test(url.pathname)) {
+  // Vite content-hashes everything under /assets/, so the filename changes
+  // whenever the bytes do. Cache-first is genuinely safe there: a new build is a
+  // new URL, which misses the cache and fetches fresh.
+  if (url.pathname.startsWith('/assets/')) {
     event.respondWith(
       caches.match(request).then(
         (cached) =>
@@ -92,6 +93,37 @@ self.addEventListener('fetch', (event) => {
             return res;
           })
       )
+    );
+    return;
+  }
+
+  // Everything else static is NOT content-hashed: /toclogo.png, the icons, the
+  // web manifest, favicons. These keep their filenames forever, so cache-first
+  // pinned them until somebody remembered to bump CACHE_VERSION by hand -- and
+  // a control that depends on a person remembering is the failure mode this
+  // repo keeps finding. Replace the league logo or fix the manifest and every
+  // installed phone would keep the old one indefinitely, including the PWA
+  // install icon and splash screen.
+  //
+  // Stale-while-revalidate instead: answer instantly from cache so the app
+  // still opens fast at the bar, and refresh in the background so the next
+  // open is current. At most one launch behind, with no version bump required.
+  if (/\.(js|css|png|jpg|jpeg|svg|ico|webmanifest|json|woff2?)$/.test(url.pathname)) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        const network = fetch(request)
+          .then((res) => {
+            if (res.ok) {
+              const copy = res.clone();
+              caches.open(ASSET_CACHE).then((cache) => cache.put(request, copy)).catch(() => {});
+            }
+            return res;
+          })
+          // Offline with nothing cached is a genuine miss; let it surface as a
+          // failed request rather than resolving to undefined.
+          .catch(() => cached);
+        return cached ?? network;
+      })
     );
   }
 });
