@@ -328,7 +328,7 @@ export default function LoginPage() {
         <div className="mt-5 text-center">
           <a
             href="mailto:help@toc.monster?subject=TOC%20sign-in%20help"
-            className="inline-flex items-center gap-1.5 text-[#9CA3AF] hover:text-[#E8E2D6] text-sm font-[Barlow] transition-colors"
+            className="inline-flex items-center gap-1.5 py-2 text-[#9CA3AF] hover:text-[#E8E2D6] text-sm font-[Barlow] transition-colors"
           >
             <HelpCircle size={14} /> Trouble signing in?
           </a>
