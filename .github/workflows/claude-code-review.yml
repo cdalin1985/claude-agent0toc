@@ -138,8 +138,17 @@ jobs:
           # not carry that key, so the tool never got named and the guessing
           # would simply have continued one level deeper. Dump it and read what
           # is actually in there.
-          echo "--- denial records, in full ---"
-          jq -c '.. | objects | select((.permission_denied? == true) or (has("permission_denials")))' "$f" 2>/dev/null | head -20
+          # `permission_denied` is not the field name -- that guess printed
+          # nothing twice. The key dump from the previous run named the real
+          # ones: decision_reason and decision_reason_type. Select on those and
+          # print the values.
+          echo "--- decision reasons (this is what names the denied tool) ---"
+          jq -c '.. | objects | select(has("decision_reason") or has("decision_reason_type"))
+                 | {tool: (.tool_name // .name // .last_tool_name // "?"),
+                    type: .decision_reason_type, reason: .decision_reason}' "$f" 2>/dev/null | sort -u | head -20
+          echo "--- tool_use results carrying an error ---"
+          jq -c '.. | objects | select(.is_error? == true and (has("content") or has("tool_use_id")))
+                 | {id: .tool_use_id, content: (.content | tostring | .[0:220])}' "$f" 2>/dev/null | head -10
           echo "--- every distinct key on any object (to find the name field) ---"
           jq -r '[.. | objects | keys[]] | unique | join(", ")' "$f" 2>/dev/null | fold -w 150
           echo "--- tool-ish values, by frequency ---"
