@@ -71,7 +71,7 @@ export const BottomNav: React.FC<{ unreadCount: number; onMenuToggle: () => void
               key={item.label}
               onClick={onMenuToggle}
               whileTap={{ scale: 0.88 }}
-              className="flex flex-col items-center gap-0.5 px-3 py-1 min-w-[44px] relative"
+              className="flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-w-[44px] min-h-[44px] relative"
               aria-label="Menu"
             >
               <div className="relative">
@@ -96,7 +96,7 @@ export const BottomNav: React.FC<{ unreadCount: number; onMenuToggle: () => void
             key={item.label}
             onClick={() => navigate(item.path)}
             whileTap={{ scale: 0.88 }}
-            className="flex flex-col items-center gap-0.5 px-3 py-1 min-w-[44px] relative"
+            className="flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-w-[44px] min-h-[44px] relative"
             aria-label={item.label}
           >
             {/* Active background pill */}
