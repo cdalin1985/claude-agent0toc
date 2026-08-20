@@ -216,6 +216,19 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen px-4 pt-8 pb-4 space-y-4">
+      {/*
+        The landing screen had no h1 at all -- its first heading was an h2 for
+        "Alerts", most of the way down. Navigating by heading, which is how most
+        screen-reader users move around a page, gave no page title to land on.
+
+        Visually hidden rather than drawn, because the screen's identity is
+        already carried by the header and the bottom nav; adding visible text
+        would be a design change to fix a structural problem. Named to match the
+        route title in lib/pageTitles.ts so the tab, the announcement and the
+        heading all agree.
+      */}
+      <h1 className="sr-only">Home</h1>
+
       <OnboardingTour />
 
       {/* Welcome card for new users */}

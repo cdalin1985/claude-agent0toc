@@ -410,6 +410,15 @@ export default function MatchPage() {
 
   return (
     <div className="min-h-screen px-4 pt-4 pb-8">
+      {/*
+        No h1 on this screen either -- the first heading was an h2 for "Who
+        Won?", part-way down the scoring flow. Visually hidden for the same
+        reason as HomePage: the screen already announces itself through the
+        header and the route title, and this is a structural gap, not a visual
+        one.
+      */}
+      <h1 className="sr-only">Match</h1>
+
       <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-[#9CA3AF] p-2 -ml-2 mb-4">
         <ChevronLeft size={18} /> Back
       </button>

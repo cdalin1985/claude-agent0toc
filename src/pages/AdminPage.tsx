@@ -933,7 +933,7 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     <div className="space-y-3">
       {adding ? (
         <GlassCard className="p-4">
-          <h3 className="font-[Bebas_Neue] text-lg text-[#E8E2D6] mb-3">Add New Player</h3>
+          <h2 className="font-[Bebas_Neue] text-lg text-[#E8E2D6] mb-3">Add New Player</h2>
           <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Full name" autoFocus
             onKeyDown={(e) => e.key === 'Enter' && handleAddPlayer()}
             className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] mb-2" />
@@ -1084,7 +1084,7 @@ function TreasuryTab() {
       </GlassCard>
 
       <GlassCard className="p-4">
-        <h3 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-3">Add Entry</h3>
+        <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-3">Add Entry</h2>
         <div className="space-y-3">
           <div className="flex gap-2">
             {(['credit', 'debit'] as const).map((t) => (
@@ -1168,7 +1168,7 @@ function Rank1Tab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   return (
     <div className="space-y-4">
       <GlassCard className="p-5">
-        <h3 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-1">Rank #1 Obligation</h3>
+        <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-1">Rank #1 Obligation</h2>
         <p className="text-[#9CA3AF] text-xs font-[Barlow] mb-4">
           The #1 player must play 2 top-5 opponents within 30 days of reaching #1 or be moved to #10.
         </p>
@@ -1346,7 +1346,7 @@ function SettingsTab() {
   return (
     <div className="space-y-4">
       <GlassCard className="p-4">
-        <h3 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-1">League Rules</h3>
+        <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-1">League Rules</h2>
         {RULE_FIELDS.map((field) => (
           <SettingsField
             key={field.key}

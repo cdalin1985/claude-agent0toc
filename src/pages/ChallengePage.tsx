@@ -259,7 +259,7 @@ export default function ChallengePage() {
         {step === 3 && (
           <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
             <GlassCard className="p-5 space-y-4">
-              <h3 className="font-[Bebas_Neue] text-xl text-[#E8E2D6]">Challenge Summary</h3>
+              <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6]">Challenge Summary</h2>
               <div className="space-y-3">
                 {[
                   { label: 'Opponent',   value: target.player.full_name },
