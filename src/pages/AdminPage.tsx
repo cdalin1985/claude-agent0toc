@@ -202,12 +202,12 @@ function DisputesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <input type="number" placeholder="P1 score" value={p1Score} onChange={(e) => setP1Score(e.target.value)}
+                <input aria-label="P1 score" type="number" placeholder="P1 score" value={p1Score} onChange={(e) => setP1Score(e.target.value)}
                   className="px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[#C62828]" />
-                <input type="number" placeholder="P2 score" value={p2Score} onChange={(e) => setP2Score(e.target.value)}
+                <input aria-label="P2 score" type="number" placeholder="P2 score" value={p2Score} onChange={(e) => setP2Score(e.target.value)}
                   className="px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[#C62828]" />
               </div>
-              <textarea placeholder="Admin notes…" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
+              <textarea aria-label="Admin notes…" placeholder="Admin notes…" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
                 className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[#C62828] resize-none" />
               {resolveError && (
                 <p className="text-[#EF4444] text-xs font-[Barlow]">{resolveError}</p>
@@ -599,12 +599,12 @@ function MatchesAdminTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <input type="number" placeholder={`${getName(m.player1_id)} score`} value={p1Score} onChange={(e) => setP1Score(e.target.value)}
+                <input aria-label={`${getName(m.player1_id)} score`} type="number" placeholder={`${getName(m.player1_id)} score`} value={p1Score} onChange={(e) => setP1Score(e.target.value)}
                   className="px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[#C62828]" />
-                <input type="number" placeholder={`${getName(m.player2_id)} score`} value={p2Score} onChange={(e) => setP2Score(e.target.value)}
+                <input aria-label={`${getName(m.player2_id)} score`} type="number" placeholder={`${getName(m.player2_id)} score`} value={p2Score} onChange={(e) => setP2Score(e.target.value)}
                   className="px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[#C62828]" />
               </div>
-              <textarea placeholder="Admin notes…" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
+              <textarea aria-label="Admin notes…" placeholder="Admin notes…" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
                 className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[#C62828] resize-none" />
               {error && <p className="text-[#EF4444] text-xs font-[Barlow]">{error}</p>}
               <div className="flex gap-2">
@@ -934,13 +934,13 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
       {adding ? (
         <GlassCard className="p-4">
           <h2 className="font-[Bebas_Neue] text-lg text-[#E8E2D6] mb-3">Add New Player</h2>
-          <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Full name" autoFocus
+          <input aria-label="Full name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Full name" autoFocus
             onKeyDown={(e) => e.key === 'Enter' && handleAddPlayer()}
             className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] mb-2" />
-          <input type="number" min={0} step={1} inputMode="numeric" value={newFargo} onChange={(e) => setNewFargo(e.target.value)} placeholder="Fargo rating (optional)"
+          <input aria-label="Fargo rating (optional)" type="number" min={0} step={1} inputMode="numeric" value={newFargo} onChange={(e) => setNewFargo(e.target.value)} placeholder="Fargo rating (optional)"
             onKeyDown={(e) => e.key === 'Enter' && handleAddPlayer()}
             className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] mb-2" />
-          <input type="email" inputMode="email" autoComplete="off" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="Email (optional — sends invite)"
+          <input aria-label="Email (optional — sends invite)" type="email" inputMode="email" autoComplete="off" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="Email (optional — sends invite)"
             onKeyDown={(e) => e.key === 'Enter' && handleAddPlayer()}
             className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] mb-1" />
           <p className="text-[#9CA3AF] text-xs font-[Barlow] mb-3">
@@ -1004,7 +1004,7 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
             </div>
             {isInviting && (
               <div className="mt-3 space-y-2">
-                <input
+                <input aria-label="Email address for the invitation"
                   type="email"
                   inputMode="email"
                   autoFocus
@@ -1094,9 +1094,9 @@ function TreasuryTab() {
               </button>
             ))}
           </div>
-          <input type="number" step="0.01" placeholder="Amount ($)" value={amount} onChange={(e) => setAmount(e.target.value)}
+          <input aria-label="Amount ($)" type="number" step="0.01" placeholder="Amount ($)" value={amount} onChange={(e) => setAmount(e.target.value)}
             className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]" />
-          <input placeholder="Description" value={desc} onChange={(e) => setDesc(e.target.value)}
+          <input aria-label="Description" placeholder="Description" value={desc} onChange={(e) => setDesc(e.target.value)}
             className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]" />
           {error && <p className="text-[#EF4444] text-xs font-[Barlow]">{error}</p>}
           <Button variant="primary" fullWidth loading={loading} onClick={handleAdd} disabled={!amount || !desc}>Add Entry</Button>
@@ -1269,7 +1269,7 @@ function SettingsField({ label, unit, value, onChange, min = 1 }: SettingsFieldP
         <div className="font-[Barlow] text-sm text-[#E8E2D6]">{label}</div>
         <div className="text-[#9CA3AF] text-xs font-[Barlow]">{unit}</div>
       </div>
-      <input
+      <input aria-label={label}
         type="number"
         min={min}
         value={value}

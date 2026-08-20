@@ -164,7 +164,7 @@ export default function RankingsPage() {
       {/* Search */}
       <div className="relative mb-3">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
-        <input
+        <input aria-label="Search players…"
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}

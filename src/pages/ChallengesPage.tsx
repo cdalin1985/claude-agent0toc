@@ -240,7 +240,7 @@ function RespondModal({
             <label className="block text-[#9CA3AF] text-xs font-[Barlow] mb-1.5 flex items-center gap-1">
               <MapPin size={12} /> Venue
             </label>
-            <select
+            <select aria-label="Venue"
               value={venue}
               onChange={(e) => setVenue(e.target.value as Venue)}
               className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
@@ -254,7 +254,7 @@ function RespondModal({
               <label className="block text-[#9CA3AF] text-xs font-[Barlow] mb-1.5 flex items-center gap-1">
                 <Calendar size={12} /> Date
               </label>
-              <input
+              <input aria-label="Date"
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
@@ -266,7 +266,7 @@ function RespondModal({
               <label className="block text-[#9CA3AF] text-xs font-[Barlow] mb-1.5 flex items-center gap-1">
                 <Clock size={12} /> Time
               </label>
-              <input
+              <input aria-label="Time"
                 type="time"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}

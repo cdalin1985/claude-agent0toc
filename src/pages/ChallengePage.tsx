@@ -226,7 +226,7 @@ export default function ChallengePage() {
                   <Minus size={20} className="text-[#9CA3AF]" />
                 </button>
                 <div className="w-28 text-center">
-                  <input
+                  <input aria-label="Race length"
                     type="number"
                     value={raceInput}
                     onChange={(e) => handleRaceChange(e.target.value)}
