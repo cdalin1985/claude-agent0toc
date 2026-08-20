@@ -29,7 +29,7 @@ export function TopHeader({ onMenuToggle, isMenuOpen }: TopHeaderProps) {
         {/* Menu Toggle */}
         <motion.button
           onClick={onMenuToggle}
-          className="p-2 rounded-lg transition-colors hover:opacity-80"
+          className="p-2 rounded-lg transition-colors hover:opacity-80 min-w-[44px] min-h-[44px] flex items-center justify-center"
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
