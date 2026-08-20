@@ -1,14 +1,49 @@
 name: Claude Code Review
 
+# DISABLED on PRs, deliberately. Re-enable by restoring the `pull_request:`
+# block below -- but read this first, because it has never once worked and it
+# was not free.
+#
+# It has never posted a review. Not one, across PRs #63-#78. Every run reported
+# the check green, and green meant "the reviewer finished talking to itself".
+#
+# What was tried, in order, and what each cost:
+#
+#   baseline            5 turns   $0.19    1 denial    posted nothing
+#   + --comment         5 turns   $0.19    1 denial    posted nothing
+#   + --allowedTools   10 turns   $0.94    3 denials   posted nothing
+#   (allowlist removed)
+#   larger PR (#78)    35 turns   $3.59   35 denials   posted nothing
+#
+# --comment was necessary and not sufficient: without it the skill writes
+# findings to stdout, which in CI goes nowhere. With it the reviewer forms a
+# review and is then refused the tool that writes the comment, so it discards
+# the review and exits green.
+#
+# --allowedTools made it worse. It REPLACES the permissive default rather than
+# adding to it, so granting one tool removed the rest. Reverted.
+#
+# The last run denied all 35 of its 35 turns. The cost scales with the size of
+# the diff, because a bigger PR means more attempts, all refused. That is an
+# unbounded bill for zero output on every PR anyone opens, which is why this is
+# off rather than merely noisy.
+#
+# The diagnostic step below still exists and still works. It prints the denial
+# records from claude-execution-output.json, which the action writes and never
+# surfaces. Run this workflow manually (Actions -> Claude Code Review -> Run
+# workflow) against a branch to collect that output without billing every PR.
+#
+# Do not re-enable on `pull_request` until a run demonstrably posts a comment.
+# A green check here does not mean the code was reviewed, and leaving it on
+# taught exactly that.
+#
+# One more trap for whoever picks this up: a PR that edits THIS FILE is skipped
+# by workflow validation -- the action requires the file to match the default
+# branch so a PR cannot rewrite its own reviewer. It logs "Skipping action due
+# to workflow validation", never starts Claude, and still reports success. Any
+# change here can only be tested on the NEXT PR after it merges.
 on:
-  pull_request:
-    types: [opened, synchronize, ready_for_review, reopened]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
+  workflow_dispatch:
 
 jobs:
   claude-review:
