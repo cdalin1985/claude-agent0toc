@@ -103,24 +103,44 @@ echo "Rewriting the direct host for project $ref onto the session pooler."
 # ---------------------------------------------------------------------------
 candidates=()
 
+# Why the status codes are captured: this script used to pipe both API calls
+# through `2>/dev/null || true`, so a 401 and a DNS failure were indistinguishable
+# and the only thing it could report was "the Management API was unreachable or
+# SUPABASE_ACCESS_TOKEN is missing" -- a guess covering two unrelated causes with
+# different fixes. Swallowing the status is the same mistake as the drift check
+# that stayed red for months without ever connecting.
+#
+# Only the status code is reported, never the body: the body is not secret, but
+# it is not worth the risk of echoing something that later becomes secret.
+pooler_status="not-attempted"
+project_status="not-attempted"
+
 if [ -n "${SUPABASE_ACCESS_TOKEN:-}" ]; then
-  pooler_json="$(curl -sS --max-time 30 \
+  pooler_body="$(mktemp)"
+  pooler_status="$(curl -sS --max-time 30 -o "$pooler_body" -w '%{http_code}' \
     -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-    "https://api.supabase.com/v1/projects/${ref}/config/database/pooler" 2>/dev/null || true)"
-  [ -n "$pooler_json" ] || pooler_json='{}'
+    "https://api.supabase.com/v1/projects/${ref}/config/database/pooler" 2>/dev/null)" \
+    || pooler_status="000"
   # The endpoint has returned both a bare object and a one-element array.
-  api_host="$(printf '%s' "$pooler_json" \
-    | jq -r '(if type=="array" then .[0] else . end) | (.db_host // .host // empty)' \
-    2>/dev/null || true)"
+  api_host="$(jq -r '(if type=="array" then .[0] else . end) | (.db_host // .host // empty)' \
+    <"$pooler_body" 2>/dev/null || true)"
+  rm -f "$pooler_body"
   if [ -n "$api_host" ] && [ "$api_host" != "null" ]; then
     candidates+=("$api_host")
   fi
 
-  region="$(curl -sS --max-time 30 \
+  project_body="$(mktemp)"
+  project_status="$(curl -sS --max-time 30 -o "$project_body" -w '%{http_code}' \
     -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-    "https://api.supabase.com/v1/projects/${ref}" 2>/dev/null \
-    | jq -r '.region // empty' 2>/dev/null || true)"
+    "https://api.supabase.com/v1/projects/${ref}" 2>/dev/null)" \
+    || project_status="000"
+  region="$(jq -r '.region // empty' <"$project_body" 2>/dev/null || true)"
+  rm -f "$project_body"
+
+  echo "  Management API: pooler ${pooler_status}, project ${project_status}"
 else
+  pooler_status="no-token"
+  project_status="no-token"
   region=""
 fi
 
@@ -131,7 +151,20 @@ if [ -n "$region" ] && [ "$region" != "null" ]; then
 fi
 
 if [ ${#candidates[@]} -eq 0 ]; then
-  fail "No pooler host could be resolved for project ${ref}. The Management API was unreachable or SUPABASE_ACCESS_TOKEN is missing, and there is nothing else to derive it from. Fix by hand: Supabase dashboard -> Connect -> Session pooler (port 5432), then update the PROD_DB_URL secret."
+  case "$pooler_status" in
+    401|403)
+      fail "The Supabase Management API rejected SUPABASE_ACCESS_TOKEN (HTTP ${pooler_status}) for project ${ref}. The token is expired, revoked, or has no access to this project -- this is NOT a network problem and retrying will not help. Fix: create a new token at https://supabase.com/dashboard/account/tokens and update the SUPABASE_ACCESS_TOKEN repository secret. The same secret is what deploy-edge-functions.yml uses, so that workflow is failing too."
+      ;;
+    404)
+      fail "The Supabase Management API has no project ${ref} (HTTP 404), or the pooler config endpoint has moved. Check the project ref is still correct -- ankvjywsnydpkepdvuvm is TOC; TOF is a different project and must not be used here."
+      ;;
+    000|no-token)
+      fail "Could not reach the Supabase Management API at all for project ${ref} (curl failed, or SUPABASE_ACCESS_TOKEN is unset: pooler=${pooler_status}). Fix by hand: Supabase dashboard -> Connect -> Session pooler (port 5432), then update the PROD_DB_URL secret."
+      ;;
+    *)
+      fail "No pooler host could be resolved for project ${ref}. Management API returned pooler=${pooler_status}, project=${project_status}, and there is nothing else to derive it from. Fix by hand: Supabase dashboard -> Connect -> Session pooler (port 5432), then update the PROD_DB_URL secret."
+      ;;
+  esac
 fi
 
 for host in "${candidates[@]}"; do

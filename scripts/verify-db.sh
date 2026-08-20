@@ -89,7 +89,23 @@ echo "==> re-applying the newest migrations (they must be idempotent)"
 # Only the new ones: the December 2025 migrations target a schema the March 2026
 # rebuild replaced, so replaying the whole history fails by design. A migration
 # history runs once, in order, on a fresh database.
-newest=$(ls supabase/migrations/20260807*.sql | sort)
+#
+# A RANGE, not a glob. This read `20260807*.sql` until 2026-08-19, which was
+# correct only while 20260807 was the newest date. Four newer migrations landed
+# after it and the glob silently stopped matching them, so the step re-applied
+# the four OLDEST files and skipped the four newest -- the exact inverse of what
+# it says it does, in the step whose whole purpose is catching non-idempotent
+# migrations.
+#
+# It surfaced as a phantom failure: 20260807150000 re-added
+# players_profile_text_bounds without its home_venue clause, 20260813180000 was
+# never re-run to restore it, and 07_visibility_assert failed locally on a tree
+# that is green in CI. A local twin that disagrees with CI is worse than no twin
+# -- it spends your time on bugs that do not exist and teaches you to distrust
+# the failures that are real.
+#
+# Must stay identical to the filter in .github/workflows/migration-replay-check.yml.
+newest=$(ls supabase/migrations/*.sql | sort | awk -F/ '$NF >= "20260807"')
 for f in $newest; do
   $PSQL -d "$DB" -q -f "$f"
 done
