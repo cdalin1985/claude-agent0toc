@@ -44,6 +44,11 @@ name: Claude Code Review
 # change here can only be tested on the NEXT PR after it merges.
 on:
   workflow_dispatch:
+    inputs:
+      pr:
+        description: 'PR number to review (any PR, open or already merged)'
+        required: true
+        type: string
 
 jobs:
   claude-review:
@@ -102,7 +107,11 @@ jobs:
           # That is worse than a red check. A red one gets investigated; a green
           # one that produces nothing quietly certifies every PR it touches, and
           # teaches everyone that the tick means reviewed when it does not.
-          prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }} --comment'
+          # On workflow_dispatch there is no github.event.pull_request, so the
+          # number comes from the input. Without this the manual run produced
+          # ".../pull/" with nothing after it -- which is why the diagnostic
+          # could not be exercised by hand while the PR trigger was off.
+          prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.inputs.pr || github.event.pull_request.number }} --comment'
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
 
