@@ -47,6 +47,15 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
+          # A PR that edits THIS FILE cannot test this file.
+          #
+          # The action refuses to run when the workflow differs from the copy on
+          # the default branch -- otherwise a PR could rewrite its own reviewer.
+          # It logs "Skipping action due to workflow validation", never starts
+          # Claude, and still reports the check as SUCCESS. So on any PR touching
+          # this workflow the green tick means "did not run", and the only way to
+          # test a change here is to merge it and watch the next PR.
+          #
           # --comment is what makes this a review rather than an expensive no-op.
           #
           # Without it the skill writes its findings to stdout, and in CI stdout
