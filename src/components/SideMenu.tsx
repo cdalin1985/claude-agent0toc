@@ -13,6 +13,7 @@ import {
   ArrowRight,
 } from '@phosphor-icons/react';
 import { useAuthStore } from '../stores/authStore';
+import { useModalDialog } from '../hooks/useModalDialog';
 import { supabase } from '../lib/supabase';
 
 interface SideMenuProps {
@@ -29,19 +30,39 @@ interface MenuItem {
   badge?: boolean;
 }
 
+// A stand-in, not a route. There is no /profile in App.tsx: the menu pointed at
+// it anyway, so "Profile" and the profile card both fell through to the `*`
+// catch-all and silently redirected Home. Two dead links in the primary
+// navigation. The real destination depends on who is signed in, so it is
+// resolved per render by resolvePath() below.
+const PROFILE = '#profile';
+
 const menuItems: MenuItem[] = [
   { path: '/', label: 'Home', icon: House },
   { path: '/rankings', label: 'Rankings', icon: Trophy },
   { path: '/challenges', label: 'Challenges', icon: Sword },
   { path: '/matches', label: 'Matches', icon: Flame },
   { path: '/notifications', label: 'Alerts', icon: Bell, badge: true },
-  { path: '/profile', label: 'Profile', icon: User },
+  { path: PROFILE, label: 'Profile', icon: User },
 ];
 
 export function SideMenu({ isOpen, onClose, unreadCount = 0 }: SideMenuProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { profile } = useAuthStore();
+  const { profile, player } = useAuthStore();
+
+  // Their own player page, the same destination RankingsPage uses for everyone
+  // else. A member who has not claimed a profile has no player row and so no
+  // page; Settings is the nearest thing that always exists, and is where
+  // BottomNav already sends people for account matters.
+  const profilePath = player ? `/player/${player.id}` : '/settings';
+  const resolvePath = (path: string) => (path === PROFILE ? profilePath : path);
+
+  // Escape closes it, Tab is trapped inside it while it is open, and focus is
+  // handed back to the menu button on close. None of that happened before: the
+  // first Tab after opening moved through links hidden behind the overlay, and
+  // there was no keyboard way to dismiss it at all.
+  const dialogRef = useModalDialog(isOpen, onClose);
 
   const handleNavigate = (path: string) => {
     navigate(path);
@@ -73,7 +94,14 @@ export function SideMenu({ isOpen, onClose, unreadCount = 0 }: SideMenuProps) {
       <AnimatePresence>
         {isOpen && (
           <motion.nav
-            className="fixed left-0 top-0 h-screen border-r z-50 flex flex-col cursor-grab"
+            ref={dialogRef as React.Ref<HTMLElement>}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Main menu"
+            // Focusable as the trap's fallback landing spot when the menu has
+            // no focusable children yet; never in the tab order itself.
+            tabIndex={-1}
+            className="fixed left-0 top-0 h-screen border-r z-50 flex flex-col cursor-grab focus:outline-none"
             style={{
               width: 'min(256px, 75vw)',
               backgroundColor: 'var(--color-bg-surface)',
@@ -101,7 +129,7 @@ export function SideMenu({ isOpen, onClose, unreadCount = 0 }: SideMenuProps) {
             {profile && (
               <motion.div
                 className="px-4 py-4 border-b cursor-pointer transition-opacity hover:opacity-80"
-                onClick={() => handleNavigate('/profile')}
+                onClick={() => handleNavigate(profilePath)}
                 style={{ borderColor: 'var(--color-border-default)' }}
                 whileTap={{ scale: 0.98 }}
               >
@@ -135,12 +163,12 @@ export function SideMenu({ isOpen, onClose, unreadCount = 0 }: SideMenuProps) {
             <div className="flex-1 overflow-y-auto py-4 px-2">
               {menuItems.map((item, index) => {
                 const Icon = item.icon;
-                const isActive = location.pathname === item.path;
+                const isActive = location.pathname === resolvePath(item.path);
 
                 return (
                   <motion.button
                     key={item.path}
-                    onClick={() => handleNavigate(item.path)}
+                    onClick={() => handleNavigate(resolvePath(item.path))}
                     className="w-full flex items-center justify-between px-4 py-3 rounded-lg mb-2 transition-colors relative border-l-3 hover:opacity-80"
                     style={{
                       backgroundColor: isActive ? 'rgba(198, 40, 40, 0.1)' : 'transparent',

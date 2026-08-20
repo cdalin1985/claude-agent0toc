@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import { Button } from './Button';
+import { useModalDialog } from '../hooks/useModalDialog';
 
 const STEPS = [
   {
@@ -35,12 +36,21 @@ export function OnboardingTour() {
     return localStorage.getItem('toc-new-user') === '1';
   });
 
-  if (!visible) return null;
-
-  const dismiss = () => {
+  // Defined above the early return, and memoised, because useModalDialog takes
+  // it as a dependency: hooks cannot sit after `if (!visible) return null`, and
+  // a fresh closure each render would tear the key listener down and rebuild it
+  // on every keystroke.
+  const dismiss = useCallback(() => {
     localStorage.setItem(DISMISS_KEY, '1');
     setVisible(false);
-  };
+  }, []);
+
+  // This is the first thing a new member ever sees, and it covered the whole
+  // screen at z-60 with no way to leave it from the keyboard and nothing telling
+  // a screen reader the page behind it had gone inert.
+  const dialogRef = useModalDialog(visible, dismiss);
+
+  if (!visible) return null;
 
   const next = () => {
     if (step < STEPS.length - 1) {
@@ -69,7 +79,12 @@ export function OnboardingTour() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 400, damping: 35 }}
-            className="glass-card p-6 w-full max-w-sm text-center"
+            ref={dialogRef as React.Ref<HTMLDivElement>}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Getting started"
+            tabIndex={-1}
+            className="glass-card p-6 w-full max-w-sm text-center focus:outline-none"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="text-5xl mb-4">{current.icon}</div>
