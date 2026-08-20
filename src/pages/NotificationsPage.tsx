@@ -138,7 +138,7 @@ function RespondInline({
 
   return (
     <div className="mt-3 space-y-2 bg-[#1A1A1A] rounded-xl p-3">
-      <select
+      <select aria-label="Venue"
         value={venue}
         onChange={(e) => setVenue(e.target.value as Venue)}
         className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
@@ -147,14 +147,14 @@ function RespondInline({
         {venues.map((v) => <option key={v} value={v}>{v}</option>)}
       </select>
       <div className="grid grid-cols-2 gap-2">
-        <input
+        <input aria-label="Date"
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
           min={new Date().toISOString().split('T')[0]}
           className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
         />
-        <input
+        <input aria-label="Time"
           type="time"
           value={time}
           onChange={(e) => setTime(e.target.value)}

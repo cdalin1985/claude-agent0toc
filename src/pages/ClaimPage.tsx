@@ -109,7 +109,7 @@ export default function ClaimPage() {
         {/* Search */}
         <div className="relative mb-4">
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
-          <input
+          <input aria-label="Search your name…"
             type="text"
             placeholder="Search your name…"
             value={search}

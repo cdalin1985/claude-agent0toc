@@ -419,7 +419,7 @@ export default function SettingsPage() {
                 <User size={14} /> Display Name
               </label>
               <div className="flex gap-2">
-                <input
+                <input aria-label="Display Name"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder={player.full_name}
@@ -436,7 +436,7 @@ export default function SettingsPage() {
               <label className="block text-[#9CA3AF] text-sm font-[Barlow] mb-2 flex items-center gap-1">
                 <FileText size={14} /> Bio
               </label>
-              <textarea
+              <textarea aria-label="Bio"
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
                 maxLength={200}
@@ -475,7 +475,7 @@ export default function SettingsPage() {
             {/* Nickname + tagline */}
             <div className="mb-4">
               <label className="block text-[#9CA3AF] text-sm font-[Barlow] mb-2">Nickname</label>
-              <input
+              <input aria-label="Nickname"
                 type="text"
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
@@ -487,7 +487,7 @@ export default function SettingsPage() {
 
             <div className="mb-4">
               <label className="block text-[#9CA3AF] text-sm font-[Barlow] mb-2">Tagline</label>
-              <input
+              <input aria-label="Tagline"
                 type="text"
                 value={tagline}
                 onChange={(e) => setTagline(e.target.value)}
@@ -568,7 +568,7 @@ export default function SettingsPage() {
             {/* Home venue */}
             <div className="mb-4">
               <label className="block text-[#9CA3AF] text-sm font-[Barlow] mb-2">Home Venue</label>
-              <select
+              <select aria-label="Home Venue"
                 value={homeVenue}
                 onChange={(e) => setHomeVenue(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
@@ -581,7 +581,7 @@ export default function SettingsPage() {
             <div className="grid grid-cols-2 gap-2 mb-5">
               <div>
                 <label className="block text-[#9CA3AF] text-sm font-[Barlow] mb-2">Years Playing</label>
-                <input
+                <input aria-label="Years Playing"
                   type="number"
                   inputMode="numeric"
                   min={0}
@@ -594,7 +594,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <label className="block text-[#9CA3AF] text-sm font-[Barlow] mb-2">Cue</label>
-                <input
+                <input aria-label="Cue"
                   type="text"
                   value={cueBrand}
                   onChange={(e) => setCueBrand(e.target.value)}
