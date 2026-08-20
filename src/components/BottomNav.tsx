@@ -49,6 +49,20 @@ export const BottomNav: React.FC<{ unreadCount: number; onMenuToggle: () => void
       {NAV_ITEMS.map((item) => {
         const active = isActive(item.path, item.menu);
         const { Icon } = item;
+        // This is why the app carries two icon libraries, and why Phosphor
+        // cannot be dropped in favour of the lucide-react used by the other 19
+        // files.
+        //
+        // Phosphor has weight variants; lucide is stroke-only with no fill. The
+        // active tab is filled and the rest are outlined, so the current screen
+        // is distinguishable by SHAPE. Swap in lucide and every tab renders
+        // identically, leaving colour (#EF5350 against #555) as the only
+        // indicator -- information carried by colour alone, which is WCAG 1.4.1.
+        //
+        // One more trap for anyone attempting the migration anyway: Phosphor's
+        // `List` is the hamburger icon. Lucide's `List` is a bulleted list. The
+        // equivalent is `Menu`, and a name-for-name rename silently changes the
+        // header icon.
         const weight: PhosphorWeight = active ? 'fill' : 'regular';
 
         if (item.menu) {

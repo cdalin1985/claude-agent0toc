@@ -20,6 +20,29 @@
 //
 // The brand red is untouched as a fill or a border -- 34 bg- and 40 border-
 // uses -- because non-text contrast is a 3:1 bar, which #C62828 clears.
+//
+// SCOPE, deliberately: this checks `text-[#RRGGBB]` classes only. It does NOT
+// check colours set through inline style={{ color }}, and extending it to those
+// would make it worse, not better.
+//
+// That was measured rather than assumed. Auditing the 16 inline colours against
+// the page and card backgrounds produced 8 "failures", and every one was a false
+// positive:
+//
+//   PoolBall        the ball colours -- #7B0323 is the 7 ball, #003DA5 the 2,
+//                   #1A1A1A the 8 -- drawn as the ball's fill with the number on
+//                   top. The component already picks white or dark for that
+//                   number depending on the ball. Comparing a ball to the page
+//                   background is meaningless.
+//   OfflineBanner   dark text that sits on the banner's own bright background,
+//                   set two lines away.
+//   HomePage:397    #C62828 at text-2xl AND font-bold, which is large text --
+//                   a 3:1 bar, and it measures 3.46.
+//
+// The Tailwind classes this file does check are reliable precisely because those
+// elements sit on the app's two real surfaces. An inline colour usually travels
+// with its own background, so the surface has to be read from context, and a
+// guard that guesses wrong 8 times out of 8 teaches people to ignore it.
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
