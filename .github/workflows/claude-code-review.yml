@@ -47,7 +47,18 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
-          prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
+          # --comment is what makes this a review rather than an expensive no-op.
+          #
+          # Without it the skill writes its findings to stdout, and in CI stdout
+          # goes nowhere. Measured across PRs #63-#69 on 2026-08-19: eight runs
+          # reported `success` and posted zero reviews and zero comments between
+          # them, at roughly $0.53 a run. The green tick meant "the reviewer
+          # finished talking to itself".
+          #
+          # That is worse than a red check. A red one gets investigated; a green
+          # one that produces nothing quietly certifies every PR it touches, and
+          # teaches everyone that the tick means reviewed when it does not.
+          prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }} --comment'
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
 
