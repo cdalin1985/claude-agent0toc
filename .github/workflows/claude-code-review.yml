@@ -89,16 +89,15 @@ jobs:
             echo "No execution log at $f — the action skipped (workflow validation) or died before writing one."
             exit 0
           fi
-          echo "--- permission denials ---"
-          # The shape has moved between versions, so match on the field name
-          # rather than assuming a path, and fall back to a plain grep.
-          jq -r '
-            [.. | objects | select(has("tool_name") or has("tool_use_id"))]
-            | map({tool: (.tool_name // "?"), denied: (.permission_denied // .is_error // null)})
-            | unique | .[] | "\(.tool)  denied=\(.denied)"
-          ' "$f" 2>/dev/null \
-            || grep -oE '"tool_name" *: *"[^"]+"' "$f" | sort -u \
-            || echo "could not parse; first 2KB follows:"
-          echo "--- denial-adjacent lines ---"
-          grep -oE '.{80}(denial|denied|permission).{160}' "$f" | head -20 || true
+          # Print the record whole rather than guessing its fields. The first
+          # version asked for .tool_name and got "?" back: the denial record does
+          # not carry that key, so the tool never got named and the guessing
+          # would simply have continued one level deeper. Dump it and read what
+          # is actually in there.
+          echo "--- denial records, in full ---"
+          jq -c '.. | objects | select((.permission_denied? == true) or (has("permission_denials")))' "$f" 2>/dev/null | head -20
+          echo "--- every distinct key on any object (to find the name field) ---"
+          jq -r '[.. | objects | keys[]] | unique | join(", ")' "$f" 2>/dev/null | fold -w 150
+          echo "--- tool-ish values, by frequency ---"
+          grep -oE '"(tool|tool_name|name|toolName|server)" *: *"[^"]+"' "$f" | sort | uniq -c | sort -rn | head -20 || true
 
