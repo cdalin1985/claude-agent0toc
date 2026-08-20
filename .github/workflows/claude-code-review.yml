@@ -68,6 +68,25 @@ jobs:
           # one that produces nothing quietly certifies every PR it touches, and
           # teaches everyone that the tick means reviewed when it does not.
           prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }} --comment'
+          # --comment alone was necessary and not sufficient. With it, on PR #72
+          # (which did not touch this file, so validation did not skip it) the
+          # reviewer ran properly -- Claude initialized, is_error false, 5 turns,
+          # $0.19 -- and then reported:
+          #
+          #   "permission_denials_count": 1
+          #   No buffered inline comments
+          #
+          # It reviewed the diff and was refused the tool that writes the comment,
+          # so it discarded the review and exited green. Posting an inline comment
+          # goes through the action's own GitHub MCP server, which is not in the
+          # default allowlist; everything else here is read-only and is listed so
+          # that granting the write tool does not quietly widen anything else.
+          #
+          # Kept on one line on purpose: a YAML folded block (>-) turns the
+          # newlines into spaces, which produced "Glob, Bash(gh pr view:*)" with
+          # a leading space on each entry after a break. Tool names are matched
+          # literally, so that silently disables every tool after the first line.
+          claude_args: '--allowedTools "Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(git diff:*),Bash(git log:*),mcp__github_inline_comment__create_inline_comment,mcp__github__create_pending_pull_request_review,mcp__github__add_comment_to_pending_review,mcp__github__submit_pending_pull_request_review"'
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
 
