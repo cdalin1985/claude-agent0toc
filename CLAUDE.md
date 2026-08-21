@@ -6,10 +6,23 @@ This repository is the clean local checkout for **TOC.Monster / Top of the Capit
 
 - Local checkout: `C:/Users/chase/toc-monster-app`
 - GitHub repo: `cdalin1985/claude-agent0toc`
-- Vercel project: `toc-app`
+- Vercel team/project: `cdalin-projects/toc-app`
+- Vercel project ID: `prj_cpSNmnjRXFK14Jadp2yU4tEghDFQ`
+- Vercel organization ID: `team_JIGWMVABx7X7cCpDMuWcujgZ`
 - Production URL: `https://toc.monster`
-- Supabase project: `toc1`
+- Supabase project: `toc1` (`ankvjywsnydpkepdvuvm`)
 - Production branch: `main`
+
+## Cloud environment
+
+- Claude Code cloud sessions load the repository-scoped integrations from `.mcp.json`.
+- Supabase MCP is restricted to project `ankvjywsnydpkepdvuvm`, read-only mode, and the database/debugging/development/docs tool groups.
+- Vercel MCP is restricted to `cdalin-projects/toc-app`.
+- Authenticate MCP servers through `/mcp`; never commit OAuth tokens, access tokens, database passwords, service-role keys, or `.env.local`.
+- Use `bash scripts/cloud-setup.sh` in the Claude Code web environment's **Setup script** field.
+- Start the remote preview with `npm run dev -- --host 0.0.0.0` and use its forwarded port.
+- Never deploy to production or mutate production Supabase data unless Chase explicitly asks for that action.
+- When giving Chase a command, state **Where** to run it and **Why** in one concise sentence.
 
 ## TOC vs TOF — hard boundary
 
