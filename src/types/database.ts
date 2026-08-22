@@ -49,6 +49,10 @@ export interface Database {
           // daily demotion settles a debt rather than re-applying it. Reset to 0
           // on reactivation. Added 20260822130000.
           inactive_drops_applied: number;
+          // Earned by defending your spot; spent by issuing a challenge (which
+          // is then locked_in and shields you from below), or lapsed when
+          // somebody behind you challenges first. Added 20260822160000.
+          lock_in_right: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -92,7 +96,11 @@ export interface Database {
           // Set when status is 'cancelled'. Only 'wash' and 'overdue' are
           // refunded against the weekly challenge limit — see
           // countsAgainstWeeklyLimit in the create-challenge function.
-          cancel_reason: 'wash' | 'withdrawn' | 'overdue' | null;
+          cancel_reason: 'wash' | 'withdrawn' | 'overdue' | 'no_show' | null;
+          // Issued by a player spending the right they earned by defending.
+          // While it is live its challenger cannot be challenged from behind.
+          // Added 20260822160000.
+          locked_in: boolean;
           expires_at: string;
           response_message: string | null;
           created_at: string;

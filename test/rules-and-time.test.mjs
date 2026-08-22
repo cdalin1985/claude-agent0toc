@@ -375,7 +375,12 @@ test('the migration is safe against a database that already has these objects', 
 // --- Types ------------------------------------------------------------------
 
 test('the generated types carry the new columns', () => {
-  assert.match(databaseTypes, /cancel_reason: 'wash' \| 'withdrawn' \| 'overdue' \| null;/);
+  // 'no_show' added 20260822150000, alongside the spot swap. The union has to
+  // track the CHECK constraint: a value the database accepts and the types deny
+  // is a compile error on perfectly legal data.
+  assert.match(databaseTypes, /cancel_reason: 'wash' \| 'withdrawn' \| 'overdue' \| 'no_show' \| null;/);
+  assert.match(databaseTypes, /locked_in: boolean;/);
+  assert.match(databaseTypes, /lock_in_right: boolean;/);
 });
 
 // --- Encoding ---------------------------------------------------------------

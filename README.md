@@ -184,6 +184,19 @@ These rules are checked server-side, so they hold whether or not you go through 
 | Returning from inactive waits 7 days | Yes — 24 hours if you are last on the list |
 | No-show swaps the two players' spots | Yes — applied by an admin |
 | Inactive players reviewed every 30 days | Yes — flagged at 30, 60 and 90 days in Admin |
+| Locking in a challenge after defending | Yes — see below |
+
+### Locking in, in detail
+
+Defend your spot and you earn the right to lock in a challenge. Use it and **nobody below
+you can challenge you** until that challenge is settled. Don't use it and you stay open to
+challenges from behind — and the first player who challenges you takes the opening away.
+
+There is no clock on it. You hold the right until one of you acts: you lock in, or someone
+behind you challenges first. It's a race, deliberately.
+
+Winning a challenge *you* issued is not defending — a top-10 player who challenges down and
+wins has attacked, not defended, so no right is earned.
 
 ## Rules the app does not yet enforce
 
@@ -202,8 +215,6 @@ than by software. **In every case the rulebook wins.**
   So the swap only happens when it moves the no-show *down*; when they already sit below
   their opponent the no-show is recorded and the ladder does not move. If the league wants
   a different answer there, say so and it is a one-function change.
-- **Locking in your challenge after a successful defence.** The app has no "locked in"
-  state, and does not open a defender to challenges from behind.
 - **Removing a player at 90 days.** The review itself is in the app — Admin → Players
   lists every inactive member with their days inactive, flagged at 30, 60 and 90 — but
   the removal is a judgement call and stays a deliberate admin action.

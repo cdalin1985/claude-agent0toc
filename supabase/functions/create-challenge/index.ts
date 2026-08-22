@@ -165,7 +165,7 @@ serve(async (req) => {
     if (!Number.isInteger(race_length) || race_length < minRace) return new Response(JSON.stringify({ error: `Race length must be at least ${minRace}.` }), { status: 400, headers: corsHeaders });
     if (Number.isInteger(maxRace) && race_length > maxRace) return new Response(JSON.stringify({ error: `Race length cannot exceed ${maxRace}.` }), { status: 400, headers: corsHeaders });
 
-    const { data: challenger } = await supabase.from('players').select('id, is_active').eq('profile_id', user.id).single();
+    const { data: challenger } = await supabase.from('players').select('id, is_active, lock_in_right').eq('profile_id', user.id).single();
     if (!challenger) return new Response(JSON.stringify({ error: 'You must claim a player profile first.' }), { status: 400, headers: corsHeaders });
     if (!challenger.is_active) return new Response(JSON.stringify({ error: 'Your account is inactive.' }), { status: 409, headers: corsHeaders });
     if (challenger.id === challenged_player_id) return new Response(JSON.stringify({ error: 'You cannot challenge yourself.' }), { status: 400, headers: corsHeaders });
@@ -210,6 +210,25 @@ serve(async (req) => {
     const { data: existingIn } = await supabase.from('challenges').select('id').eq('challenged_id', challenged_player_id).in('status', ['pending', 'accepted', 'scheduled', 'in_progress']).maybeSingle();
     if (existingIn) return new Response(JSON.stringify({ error: 'That player already has an active challenge they must resolve first.' }), { status: 409, headers: corsHeaders });
 
+    // "you must include a challenge with your results to lock in a challenge if
+    // you do not you are open to challenges from behind until you do so."
+    //
+    // A defender who locked one in is shielded while it is live. The trigger on
+    // challenges is what actually enforces this -- this read is here so the
+    // player gets a sentence naming the rule instead of a constraint error.
+    const { data: theirLockIn } = await supabase
+      .from('challenges')
+      .select('id')
+      .eq('challenger_id', challenged_player_id)
+      .eq('locked_in', true)
+      .in('status', ['pending', 'accepted', 'scheduled', 'in_progress'])
+      .maybeSingle();
+    if (theirLockIn) {
+      return new Response(JSON.stringify({
+        error: 'That player defended their spot and locked in a challenge. They cannot be challenged from behind until it is settled.',
+      }), { status: 409, headers: corsHeaders });
+    }
+
     const now = new Date().toISOString();
     // Ordered limit rather than maybeSingle: a player can hold two overlapping
     // post_match cooldowns (lose a match, then decline a challenge inside the
@@ -240,7 +259,13 @@ serve(async (req) => {
     }
 
     const expiresAt = new Date(Date.now() + challengeExpiryDays * 24 * 3600 * 1000).toISOString();
-    const { data: challenge, error: insertErr } = await supabase.from('challenges').insert({ challenger_id: challenger.id, challenged_id: challenged_player_id, discipline, race_length, status: 'pending', expires_at: expiresAt }).select().single();
+    // Spending the right earned by defending. It has no clock: the defender
+    // keeps it until they use it, or until somebody below challenges them first
+    // and the insert trigger lapses it. So this is simply "do they still hold it
+    // at the moment they issue".
+    const lockedIn = challenger.lock_in_right === true;
+
+    const { data: challenge, error: insertErr } = await supabase.from('challenges').insert({ challenger_id: challenger.id, challenged_id: challenged_player_id, discipline, race_length, status: 'pending', expires_at: expiresAt, locked_in: lockedIn }).select().single();
     // The two reads above are the fast path, not the guard. They use
     // maybeSingle(), which ERRORS once a player already has two live challenges
     // -- the exact state they exist to prevent -- and their errors are
@@ -263,7 +288,22 @@ serve(async (req) => {
             : 'You already have an active outgoing challenge.',
         }), { status: 409, headers: corsHeaders });
       }
+      // The lock-in shield, raised by reject_challenge_against_locked_in. Only
+      // reachable when the read above lost a race with the other player's
+      // insert; the message still has to name the rule rather than read as a
+      // server fault.
+      if (insertErr.code === '23514' && /locked in a challenge/i.test(insertErr.message ?? '')) {
+        return new Response(JSON.stringify({
+          error: 'That player defended their spot and locked in a challenge. They cannot be challenged from behind until it is settled.',
+        }), { status: 409, headers: corsHeaders });
+      }
       throw insertErr;
+    }
+
+    // Spent. Cleared after the insert succeeded rather than before, so a
+    // challenge refused by any of the guards above does not burn the right.
+    if (lockedIn) {
+      await supabase.from('players').update({ lock_in_right: false }).eq('id', challenger.id);
     }
 
     const [{ data: challengerStats }, { data: challengedStats }] = await Promise.all([
