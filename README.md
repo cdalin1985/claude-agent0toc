@@ -179,18 +179,7 @@ These rules are checked server-side, so they hold whether or not you go through 
 | Declining hands over the spot | Yes, recorded as a forfeit |
 | 24-hour wait after a loss, or after climbing | Yes — you may still challenge down |
 | Defending carries no cooldown | Yes |
-
-## Known defect: inactive demotion drops too fast
-
-The rule is **2 spots for every 30 days** of inactivity. The job that applies it runs
-daily and recalculates the spots owed from elapsed time each run, without recording the
-drops it has already taken — so past day 30 it takes another 2 spots **every day** rather
-than every 30, until the player reaches the bottom of the list.
-
-It has never fired, because nobody had reached 30 days inactive. Both current inactive
-members started their clock on **21 August 2026**, so the first live run lands around
-**20 September 2026**. It needs fixing before then. Until it is fixed, do not rely on the
-automatic demotion — check any drop against the rule by hand.
+| Drop 2 spots per 30 days inactive | Yes — charged once per completed 30 days |
 
 ## Rules the app does not yet enforce
 
