@@ -278,6 +278,65 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
+-- E. The shield ends when the locked challenge does
+-- ---------------------------------------------------------------------------
+-- The shield reads status IN (pending, accepted, scheduled, in_progress), so it
+-- should lapse on its own the moment the locked challenge expires, is washed or
+-- is played out -- no cleanup job, no stored expiry.
+--
+-- That is a claim about a filter rather than about code anyone wrote, which is
+-- exactly the kind that gets believed instead of checked. If it were wrong, a
+-- defender whose challenge expired unanswered would be permanently
+-- unchallengeable, and nothing else here would notice.
+DO $$
+DECLARE
+  p_top uuid := '00000000-0000-4000-8000-00000000e001';
+  p_mid uuid := '00000000-0000-4000-8000-00000000e002';
+  p_low uuid := '00000000-0000-4000-8000-00000000e003';
+  blocked_while_live boolean := false;
+  blocked_after      boolean := false;
+  failures text[] := '{}';
+BEGIN
+  PERFORM pg_temp.seed_lock_in(p_top, p_mid, p_low);
+
+  -- Mid holds a live locked-in challenge against Top.
+  INSERT INTO challenges (id, challenger_id, challenged_id, discipline, race_length, status, expires_at, locked_in)
+  VALUES ('00000000-0000-4000-8000-00000000e0ac', p_mid, p_top, '8 Ball', 7, 'pending', now() + INTERVAL '2 days', true);
+
+  BEGIN
+    INSERT INTO challenges (id, challenger_id, challenged_id, discipline, race_length, status, expires_at)
+    VALUES ('00000000-0000-4000-8000-00000000e0ad', p_low, p_mid, '8 Ball', 7, 'pending', now() + INTERVAL '2 days');
+  EXCEPTION WHEN check_violation THEN
+    blocked_while_live := true;
+  END;
+
+  -- The locked challenge now expires unanswered.
+  UPDATE challenges SET status = 'expired' WHERE id = '00000000-0000-4000-8000-00000000e0ac';
+  DELETE FROM challenges WHERE id = '00000000-0000-4000-8000-00000000e0ad';
+
+  BEGIN
+    INSERT INTO challenges (id, challenger_id, challenged_id, discipline, race_length, status, expires_at)
+    VALUES ('00000000-0000-4000-8000-00000000e0ae', p_low, p_mid, '8 Ball', 7, 'pending', now() + INTERVAL '2 days');
+  EXCEPTION WHEN check_violation THEN
+    blocked_after := true;
+  END;
+
+  IF NOT blocked_while_live THEN
+    failures := array_append(failures,
+      'the shield did not hold while the locked challenge was live, so this scenario proved nothing');
+  END IF;
+  IF blocked_after THEN
+    failures := array_append(failures,
+      'the shield outlived the locked challenge -- a defender whose challenge expired unanswered would be unchallengeable forever');
+  END IF;
+
+  IF array_length(failures, 1) IS NOT NULL THEN
+    RAISE EXCEPTION E'LOCK-IN (shield lifetime): % CHECK(S) FAILED\n  - %',
+      array_length(failures, 1), array_to_string(failures, E'\n  - ');
+  END IF;
+END $$;
+
+-- ---------------------------------------------------------------------------
 -- Cleanup
 -- ---------------------------------------------------------------------------
 -- Same reason as 13_: the replay gate re-applies migrations dated 20260807 or
