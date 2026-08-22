@@ -12,8 +12,8 @@ TOC is a live challenge league where players fight for the top spot on a single 
 >
 > They govern the league and the app alike. Where the app behaves differently from
 > anything written here, **the rules are right and the app is wrong** — see
-> [Rules the app does not yet enforce](#rules-the-app-does-not-yet-enforce) for the
-> current gaps.
+> [Rules people enforce, not the app](#rules-people-enforce-not-the-app) for the three
+> the app deliberately leaves to admins and players.
 >
 > Last updated **22 August 2026**. Includes the no-show rule added 2 August 2026.
 > Top of the Capital has the final say on all rules.
@@ -198,10 +198,14 @@ behind you challenges first. It's a race, deliberately.
 Winning a challenge *you* issued is not defending — a top-10 player who challenges down and
 wins has attacked, not defended, so no right is earned.
 
-## Rules the app does not yet enforce
+## Rules people enforce, not the app
 
-The rules above still apply — these are simply enforced by players and admins rather
-than by software. **In every case the rulebook wins.**
+Every rule in this book is now either enforced by the app or listed here. Nothing is
+waiting to be built.
+
+These three are deliberate: each is a judgement call, an accusation about someone else, or
+an agreement between two players at a table — none of them is something software should
+decide. **In every case the rulebook wins.**
 
 - **Filing a no-show yourself.** The swap itself is implemented, but only an admin can
   apply it — tell an admin and they record it in one tap. This is the only ranking move
