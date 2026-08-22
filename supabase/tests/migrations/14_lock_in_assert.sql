@@ -196,6 +196,57 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
+-- C2. A challenge from ABOVE does not lapse the right
+-- ---------------------------------------------------------------------------
+-- "you are open to challenges from behind until you do so" -- from behind,
+-- specifically. A top-10 player may challenge DOWN, so a defender can be
+-- challenged by somebody above them, and that is not the case the rule
+-- describes. Lapsing on any incoming challenge takes away an opening the
+-- rulebook never said they had lost.
+DO $$
+DECLARE
+  p_top uuid := '00000000-0000-4000-8000-00000000e001';
+  p_mid uuid := '00000000-0000-4000-8000-00000000e002';
+  p_low uuid := '00000000-0000-4000-8000-00000000e003';
+  right_before boolean;
+  right_after  boolean;
+  failures text[] := '{}';
+BEGIN
+  PERFORM pg_temp.seed_lock_in(p_top, p_mid, p_low);
+  -- Low challenges Mid; Mid defends and wins, earning the right.
+  PERFORM pg_temp.play_match(
+    '00000000-0000-4000-8000-00000000e0aa', '00000000-0000-4000-8000-00000000e0ba',
+    p_low, p_mid, p_mid, p_low);
+  SELECT lock_in_right INTO right_before FROM players WHERE id = p_mid;
+
+  -- Clear the played challenge so the one-live-challenge index does not mask
+  -- the behaviour under test. Matches first: the FK has no cascade.
+  DELETE FROM matches WHERE challenge_id IN (
+    SELECT id FROM challenges WHERE challenged_id = p_mid AND status IN ('pending','accepted','scheduled','in_progress')
+  );
+  DELETE FROM challenges WHERE challenged_id = p_mid AND status IN ('pending','accepted','scheduled','in_progress');
+
+  -- Top, who is ABOVE Mid, challenges down at them.
+  INSERT INTO challenges (id, challenger_id, challenged_id, discipline, race_length, status, expires_at)
+  VALUES ('00000000-0000-4000-8000-00000000e0ab', p_top, p_mid, '8 Ball', 7, 'pending', now() + INTERVAL '2 days');
+
+  SELECT lock_in_right INTO right_after FROM players WHERE id = p_mid;
+
+  IF NOT COALESCE(right_before, false) THEN
+    failures := array_append(failures, 'the defender never held the right, so this scenario proved nothing');
+  END IF;
+  IF NOT COALESCE(right_after, false) THEN
+    failures := array_append(failures,
+      'a challenge from ABOVE lapsed the defender''s lock-in right -- the rule only opens them to challenges from BEHIND');
+  END IF;
+
+  IF array_length(failures, 1) IS NOT NULL THEN
+    RAISE EXCEPTION E'LOCK-IN (challenged from above): % CHECK(S) FAILED\n  - %',
+      array_length(failures, 1), array_to_string(failures, E'\n  - ');
+  END IF;
+END $$;
+
+-- ---------------------------------------------------------------------------
 -- D. An ordinary challenge shields nobody
 -- ---------------------------------------------------------------------------
 -- Without this, "everyone with an outgoing challenge is immune" would pass every

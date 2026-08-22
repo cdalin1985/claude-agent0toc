@@ -99,7 +99,9 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_locked uuid;
+  v_locked          uuid;
+  v_challenger_pos  integer;
+  v_challenged_pos  integer;
 BEGIN
   SELECT id INTO v_locked
     FROM public.challenges
@@ -113,13 +115,28 @@ BEGIN
       USING ERRCODE = 'check_violation';
   END IF;
 
-  -- Being challenged is what ends the opportunity for a defender who sat on it.
-  -- Done here rather than in the edge function so it holds for every write path,
-  -- and in the same statement that creates the challenge so there is no window
-  -- where both players think they have the opening.
-  UPDATE public.players
-     SET lock_in_right = false
-   WHERE id = NEW.challenged_id AND lock_in_right = true;
+  -- Being challenged FROM BEHIND is what ends the opportunity for a defender
+  -- who sat on it -- "you are open to challenges from behind until you do so".
+  --
+  -- From behind, specifically. A top-10 player may challenge DOWN, so a
+  -- defender can be challenged by somebody ABOVE them, and that is not the
+  -- case the rule describes: it would take away an opening the rulebook never
+  -- said they had lost. A larger position number is further down the ladder,
+  -- so the challenger is behind them when their position is the greater one.
+  --
+  -- Done here rather than in the edge function so it holds for every write
+  -- path, and in the same statement that creates the challenge so there is no
+  -- window where both players think they have the opening.
+  SELECT position INTO v_challenger_pos FROM public.rankings WHERE player_id = NEW.challenger_id;
+  SELECT position INTO v_challenged_pos FROM public.rankings WHERE player_id = NEW.challenged_id;
+
+  IF v_challenger_pos IS NOT NULL
+     AND v_challenged_pos IS NOT NULL
+     AND v_challenger_pos > v_challenged_pos THEN
+    UPDATE public.players
+       SET lock_in_right = false
+     WHERE id = NEW.challenged_id AND lock_in_right = true;
+  END IF;
 
   RETURN NEW;
 END;
