@@ -209,4 +209,35 @@ BEGIN
   END IF;
 END $$;
 
+-- ---------------------------------------------------------------------------
+-- Clean up the fixture challenges
+-- ---------------------------------------------------------------------------
+-- Not tidiness -- this is required for the replay gate to pass, and the reason
+-- is worth writing down because nothing about it is local to this file.
+--
+-- migration-replay-check applies the whole migration set, runs every assert,
+-- then applies the whole set AGAIN. 20260807120000 re-adds
+-- challenges_cancel_reason_check with its own list, which predates 'no_show':
+--
+--   CHECK (cancel_reason IS NULL OR cancel_reason IN ('wash','withdrawn','overdue'))
+--
+-- ADD CONSTRAINT validates existing rows, so a 'no_show' challenge left behind
+-- by this file makes that ALTER fail on the second pass -- an assert file
+-- breaking a migration written two weeks before the value existed. The rows
+-- have served their purpose by here; the fixture re-creates them from scratch
+-- on every pass anyway.
+--
+-- Any future assert that writes a value added by a later migration has the same
+-- problem, and the same fix.
+DELETE FROM matches WHERE challenge_id IN (
+  '00000000-0000-4000-8000-00000000d0c1',
+  '00000000-0000-4000-8000-00000000d0c2',
+  '00000000-0000-4000-8000-00000000d0c3'
+);
+DELETE FROM challenges WHERE id IN (
+  '00000000-0000-4000-8000-00000000d0c1',
+  '00000000-0000-4000-8000-00000000d0c2',
+  '00000000-0000-4000-8000-00000000d0c3'
+);
+
 DO $$ BEGIN RAISE NOTICE 'NO-SHOW SWAP: ALL CHECKS PASSED'; END $$;
