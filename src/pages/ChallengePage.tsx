@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, CheckCircle, Swords, Minus, Plus } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { useRankings } from '../hooks/useRankings';
+import { useLeagueSettings } from '../hooks/useLeagueSettings';
 import { supabase } from '../lib/supabase';
 import { PoolBall } from '../components/PoolBall';
 import { GlassCard } from '../components/GlassCard';
@@ -26,6 +27,13 @@ export default function ChallengePage() {
   const navigate = useNavigate();
   const { player } = useAuthStore();
   const { data: rankings = [], isLoading: rankingsLoading, isError, refetch, isRefetching } = useRankings();
+  // The confirmation screen used to print a hardcoded "7 days" here while the
+  // league ran on a 2-day window — so a player was told they had a week to get
+  // an answer on a challenge that died in 48 hours. The expiry is a league
+  // setting and create-challenge stamps expires_at from that same setting, so
+  // this reads it rather than restating it.
+  const { data: leagueSettings } = useLeagueSettings();
+  const expiryDays = leagueSettings?.challenge_expiry_days ?? 2;
 
   const target   = rankings.find((r) => r.player.id === id);
   const myRanking = rankings.find((r) => r.player.id === player?.id);
@@ -266,7 +274,7 @@ export default function ChallengePage() {
                   { label: 'Their Rank', value: `#${target.ranking.position}` },
                   { label: 'Discipline', value: discipline ?? '' },
                   { label: 'Race',       value: `First to ${race}` },
-                  { label: 'Expires',    value: '7 days' },
+                  { label: 'They must answer within', value: expiryDays === 1 ? '24 hours' : expiryDays === 2 ? '48 hours' : `${expiryDays} days` },
                 ].map((row) => (
                   <div key={row.label} className="flex justify-between items-center">
                     <span className="text-[#9CA3AF] text-sm font-[Barlow]">{row.label}</span>

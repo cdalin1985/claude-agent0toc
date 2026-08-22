@@ -120,5 +120,12 @@ test('the assert checks the ladder is still intact afterwards', () => {
 test('the Rules screen promise this backs is still on the page', () => {
   // If this claim is ever removed, the demotion feature is dead code and this
   // whole file should go with it.
-  assert.match(rules, /inactivity can result in ladder demotion/);
+  //
+  // The page used to hedge -- "extended inactivity can result in ladder
+  // demotion" -- which backed the feature without committing to a rate. It now
+  // states the rulebook's actual terms, so this pins the number: a promise of
+  // "2 spots for every 30 days" is the claim process_inactive_demotions has to
+  // keep, and a weaker word would let the rate drift without failing here.
+  assert.match(rules, /2 spots for every 30 days/);
+  assert.match(rules, /Inactive more than 30 days/);
 });

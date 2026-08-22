@@ -51,16 +51,28 @@ Run lint/build before claiming success.
 
 ## TOC canon
 
-Minimum race = 6.
+**`README.md` is the single source of truth for league rules.** Read its "Official Rules"
+section before changing any rule behaviour, and update it in the same change if a rule
+moves. Where code and README disagree, the README is right and the code is the bug.
+
+Minimum race = 6, no maximum.
 New member first challenge = up to 10 spots above.
 Regular non-top-10 = up to 5 spots above only.
 Top 10 = up/down 5 spots.
-Rank #1 can challenge anyone.
-Post-loss cooldown = 24 hours.
+Rank #1 can challenge anyone, and must play a top-5 player twice per 30 days or drop to #10.
+Must play your first challenger before any other challenge.
+Respond to a challenge within 48 hours; play within 10 days of acceptance.
+Two challenges per week.
+Post-loss cooldown = 24 hours; same after climbing. Defending costs nothing.
+Inactive 30+ days = drop 2 spots per 30 days; returning waits 7 days (24 hours if last).
 One unified ranking list across 8 Ball, 9 Ball, 10 Ball.
 Venues are Eagles 4040 and Valley Hub.
 Treasury is visible to all players.
 Only super_admin manages treasury.
+
+Not yet enforced in code, and tracked in README under "Rules the app does not yet enforce":
+no-show spot swap, 24-hour cooldown after a wash, the 7-day return wait, locking in a
+challenge after a successful defence, and the 30/60/90-day inactive review.
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence

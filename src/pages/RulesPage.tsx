@@ -86,6 +86,20 @@ export default function RulesPage() {
           <Rule>Top 10 players: anyone within <strong>{range} spots up or down</strong>.</Rule>
           <Rule>Rank #1 can challenge anyone.</Rule>
           <Rule>Limit of <strong>{weeklyLimit} challenges per rolling 7 days</strong>, and only one active outgoing challenge at a time.</Rule>
+          <Rule>If more than one player challenges you, you must play the <strong>first person to challenge you</strong> before any other challenge can be made or accepted.</Rule>
+        </Section>
+
+        <Section icon="🎯" title="Before You Play">
+          <Rule>All games are <strong>rack your own</strong>.</Rule>
+          <Rule>Players <strong>lag or flip for the break</strong>, agreed between both players before the match.</Rule>
+          <Rule><strong>Winner breaks</strong>, unless you agree otherwise — including agreeing to alternate.</Rule>
+          <Rule>The <strong>challenger</strong> picks the game and the race. The player <strong>being challenged</strong> picks the table. Both agree on time and place.</Rule>
+        </Section>
+
+        <Section icon="🎲" title="Approved Games">
+          <Rule><strong>8-Ball — BCA rules.</strong> Magic rack allowed if both players agree. Scratch on the break is ball in hand anywhere. Scratch on the 8 is <em>not</em> a loss — ball in hand to your opponent — unless you make the 8 and scratch, which is a loss.</Rule>
+          <Rule><strong>9-Ball — modified BCA.</strong> No magic rack. The 9 on the break is good in the <strong>top two pockets only</strong>. You must call the 9. No three-foul rule.</Rule>
+          <Rule><strong>10-Ball — call shot.</strong> Magic rack allowed. 1 at the front, 10 in the middle, the rest random. The 10 made early via carom or combo, if called, is <em>not</em> a win — it is spotted and you continue shooting. No three-foul rule.</Rule>
         </Section>
 
         <Section icon="🕐" title="Timing">
@@ -118,17 +132,46 @@ export default function RulesPage() {
         <Section icon="💵" title="Match Fee">
           <Rule>Each player owes a <strong>$5 match fee</strong> per match, paid to the league treasury.</Rule>
           <Rule>Pay by cash envelope (at the venue), PayPal, Cash App, or Venmo — pick your method when you submit your result.</Rule>
+          <Rule>Envelopes must be <strong>filled out properly with the proper money</strong> and dropped in the box at either venue. Failure to do so <strong>voids the match</strong>.</Rule>
           <Rule>The treasury ledger is visible to every member under Treasury — full transparency, always.</Rule>
         </Section>
 
         <Section icon="👑" title="Holding Rank #1">
           <Rule>The #1 player must play at least <strong>2 matches against top-5 opponents every 30 days</strong>.</Rule>
           <Rule>Fail the obligation and you drop to #10. No hiding at the top.</Rule>
+          <Rule>#1 may use their remaining challenges on anyone on the list.</Rule>
         </Section>
+
+        <Section icon="😴" title="Going Inactive">
+          <Rule>You can go inactive at any time — you keep your spot on the list, marked inactive, and can't be challenged.</Rule>
+          <Rule>Inactive more than 30 days: you drop <strong>2 spots for every 30 days</strong> of inactivity.</Rule>
+          <Rule>Coming back, you must either defend or wait <strong>7 days</strong> before challenging up. If you're last on the list, <strong>24 hours</strong>.</Rule>
+          <Rule>Inactive players are reviewed every 30 days. No engagement by <strong>90 days</strong> and you may be removed at the admins' discretion.</Rule>
+        </Section>
+
+        <Section icon="📣" title="Posting Callouts &amp; Results">
+          <Rule>Callouts are posted on the <strong>Top of the Capital Facebook page</strong> — tag the player when you post the challenge.</Rule>
+          <Rule>All callouts <em>and</em> all match results must be posted to Top of the Capital.</Rule>
+          <Rule>Once a match time is agreed, the <strong>challenger</strong> posts the date and time.</Rule>
+          <Rule>Admins can't update the list unless they're made aware of the results.</Rule>
+        </Section>
+
+        <GlassCard className="p-5 border border-[#F59E0B]/40 bg-[#F59E0B]/5">
+          <h2 className="font-[Bebas_Neue] text-2xl text-[#E8E2D6] mb-3 flex items-center gap-2">
+            <span className="text-xl">🤝</span> On the Honour System
+          </h2>
+          <div className="text-[#C9C3B8] text-sm font-[Barlow] leading-relaxed space-y-2">
+            <Rule>These are league rules the app doesn't track yet. They still apply — take them to an admin.</Rule>
+            <Rule><strong>No-show.</strong> Not letting your opponent know drops you to the challenger's original spot — the two of you swap places.</Rule>
+            <Rule><strong>Locking in your challenge.</strong> Defend your spot and you can challenge up immediately, but you must post that challenge with your results to lock it in. Until you do, you're open to challenges from behind.</Rule>
+            <Rule><strong>After a wash</strong>, the challenging player sits 24 hours. The challenged player may challenge up right away if nobody is waiting on their spot.</Rule>
+          </div>
+        </GlassCard>
 
         <Section icon="🤝" title="Good to Know">
           <Rule>Questions, mistakes, or disputes? Talk to a league admin — they can fix most things.</Rule>
-          <Rule>Stay active: extended inactivity can result in ladder demotion.</Rule>
+          <Rule>Exceptions to the 10-day match window must be approved by Top of the Capital.</Rule>
+          <Rule>Top of the Capital has the <strong>final say</strong> on all rules.</Rule>
         </Section>
       </div>
     </div>
