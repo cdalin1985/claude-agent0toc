@@ -176,7 +176,7 @@ export default function RankingsPage() {
         </h1>
         <EKGLine className="mx-auto mt-1" />
         <p className="text-[#9CA3AF] text-xs font-[Barlow] mt-2">
-          {rankings.length} players{inactiveCount > 0 ? ` · ${inactiveCount} inactive` : ''} · Season Rankings
+          {rankings.length} players{inactiveCount > 0 ? ` · ${inactiveCount} inactive` : ''} · One unified list
         </p>
       </div>
 
