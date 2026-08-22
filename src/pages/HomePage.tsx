@@ -159,7 +159,11 @@ export default function HomePage() {
   const myPos = myRanking?.ranking.position ?? 99;
   const isFirstChallenge = (myRanking?.stats?.challenges_issued ?? 0) === 0;
   const busySet = new Set(busyPlayerIds);
-  const suggestedOpponent = myRanking && player
+  // myRanking resolves for an inactive member too, now that the ladder carries
+  // them — so check both ends. create-challenge refuses an inactive challenger
+  // ("Your account is inactive"), and suggesting an opponent it would reject is
+  // worse than suggesting nobody.
+  const suggestedOpponent = myRanking?.player.is_active && player
     ? rankings
         .filter((r) => {
           if (!r.player.is_active) return false;

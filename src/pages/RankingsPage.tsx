@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Search, X, Swords } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -22,16 +22,14 @@ function canChallenge(myPos: number, theirPos: number, isFirstChallenge: boolean
 
 function RankCard({
   rp,
-  myPosition,
   myPlayerId,
-  isFirstChallenge,
+  eligible,
   index,
   challengeMode,
 }: {
   rp: RankedPlayer;
-  myPosition: number | null;
   myPlayerId: string | null;
-  isFirstChallenge: boolean;
+  eligible: boolean;
   index: number;
   challengeMode: boolean;
 }) {
@@ -39,7 +37,11 @@ function RankCard({
   const pos       = rp.ranking.position;
   const isMe      = rp.player.id === myPlayerId;
   const isTop3    = pos <= 3;
-  const eligible  = myPosition !== null && canChallenge(myPosition, pos, isFirstChallenge) && !isMe;
+  // An inactive member keeps their slot on the list — the number stays theirs
+  // while they are out, so the ladder reads 1..N with no holes — but the row is
+  // dimmed and carries no Challenge button. create-challenge rejects them with
+  // a 409 either way; this just stops the app from offering it.
+  const inactive  = !rp.player.is_active;
   const rankChange = rp.ranking.previous_position !== null
     ? rp.ranking.previous_position - pos  // positive = moved up
     : 0;
@@ -56,6 +58,7 @@ function RankCard({
           'transition-all duration-200',
           isTop3 ? 'gold-shimmer' : '',
           isMe ? 'border-[#C62828]/40' : '',
+          inactive ? 'opacity-60' : '',
         ].join(' ')}
         style={isMe ? { borderColor: 'rgba(198,40,40,0.4)', boxShadow: '0 0 16px rgba(198,40,40,0.1)' } : undefined}
         onClick={() => navigate(`/player/${rp.player.id}`)}
@@ -65,7 +68,9 @@ function RankCard({
           <span
             className="font-[Azeret_Mono] font-bold text-lg"
             style={{
-              color: pos === 1 ? '#D4AF37' : pos === 2 ? '#9CA3AF' : pos === 3 ? '#CD7F32' : '#6B7280',
+              color: inactive
+                ? '#4B5563'
+                : pos === 1 ? '#D4AF37' : pos === 2 ? '#9CA3AF' : pos === 3 ? '#CD7F32' : '#6B7280',
             }}
           >
             {pos}
@@ -78,10 +83,11 @@ function RankCard({
         {/* Name + info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className={`font-[Barlow] font-semibold text-base truncate ${isMe ? 'text-[#E8E2D6]' : 'text-[#E8E2D6]'}`}>
+            <span className={`font-[Barlow] font-semibold text-base truncate ${inactive ? 'text-[#9CA3AF]' : 'text-[#E8E2D6]'}`}>
               {rp.player.full_name}
             </span>
             {isMe && <Badge variant="info" className="shrink-0">You</Badge>}
+            {inactive && <Badge variant="default" className="shrink-0 text-[10px]">Inactive</Badge>}
             {!rp.player.profile_id && <Badge variant="default" className="shrink-0 text-[10px]">Unclaimed</Badge>}
           </div>
           <div className="flex items-center gap-2 mt-0.5">
@@ -133,17 +139,30 @@ export default function RankingsPage() {
   const myRanking = rankings.find((r) => r.player.id === player?.id);
   const myPosition = myRanking?.ranking.position ?? null;
   const isFirstChallenge = (myRanking?.stats?.challenges_issued ?? 0) === 0;
+  // Inactive members are on the list now, so the viewer may be one of them.
+  // create-challenge turns them away with "Your account is inactive" — don't
+  // offer a button that is going to come back 409.
+  const meActive = myRanking?.player.is_active ?? false;
+  const inactiveCount = rankings.filter((r) => !r.player.is_active).length;
+
+  // One definition of "I can challenge this row", shared by the row's button
+  // and the Can Challenge tab, so the two can't disagree about who's eligible.
+  const canIChallenge = useCallback(
+    (rp: RankedPlayer) =>
+      meActive &&
+      rp.player.is_active &&
+      myPosition !== null &&
+      rp.player.id !== player?.id &&
+      canChallenge(myPosition, rp.ranking.position, isFirstChallenge),
+    [meActive, myPosition, isFirstChallenge, player?.id],
+  );
 
   const filtered = useMemo(() => {
     let list = rankings;
     if (search) list = list.filter((r) => r.player.full_name.toLowerCase().includes(search.toLowerCase()));
-    if (tab === 'near' && myPosition !== null) {
-      list = list.filter((r) =>
-        canChallenge(myPosition, r.ranking.position, isFirstChallenge) && r.player.id !== player?.id
-      );
-    }
+    if (tab === 'near') list = list.filter(canIChallenge);
     return list;
-  }, [rankings, search, tab, myPosition, isFirstChallenge, player?.id]);
+  }, [rankings, search, tab, canIChallenge]);
 
   return (
     <div className="min-h-screen px-4 pt-8 pb-4">
@@ -157,7 +176,7 @@ export default function RankingsPage() {
         </h1>
         <EKGLine className="mx-auto mt-1" />
         <p className="text-[#9CA3AF] text-xs font-[Barlow] mt-2">
-          {rankings.length} players · Season Rankings
+          {rankings.length} players{inactiveCount > 0 ? ` · ${inactiveCount} inactive` : ''} · Season Rankings
         </p>
       </div>
 
@@ -214,9 +233,8 @@ export default function RankingsPage() {
               <RankCard
                 key={rp.player.id}
                 rp={rp}
-                myPosition={myPosition}
                 myPlayerId={player?.id ?? null}
-                isFirstChallenge={isFirstChallenge}
+                eligible={canIChallenge(rp)}
                 index={i}
                 challengeMode={challengeMode}
               />
