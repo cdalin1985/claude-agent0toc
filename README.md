@@ -183,6 +183,7 @@ These rules are checked server-side, so they hold whether or not you go through 
 | A wash sits the challenger 24 hours | Yes — the challenged player is free immediately |
 | Returning from inactive waits 7 days | Yes — 24 hours if you are last on the list |
 | No-show swaps the two players' spots | Yes — applied by an admin |
+| Inactive players reviewed every 30 days | Yes — flagged at 30, 60 and 90 days in Admin |
 
 ## Rules the app does not yet enforce
 
@@ -203,8 +204,9 @@ than by software. **In every case the rulebook wins.**
   a different answer there, say so and it is a one-function change.
 - **Locking in your challenge after a successful defence.** The app has no "locked in"
   state, and does not open a defender to challenges from behind.
-- **The 30/60/90-day inactive evaluation.** Admins can deactivate and remove anyone, but
-  nothing flags who has crossed each threshold.
+- **Removing a player at 90 days.** The review itself is in the app — Admin → Players
+  lists every inactive member with their days inactive, flagged at 30, 60 and 90 — but
+  the removal is a judgement call and stays a deliberate admin action.
 - **Table rules.** Rack your own, the lag or flip, who breaks and who picks the table are
   agreements between the two players. The app does not track them and is not meant to.
 

@@ -857,6 +857,35 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     return map;
   }, [metrics]);
 
+  // "All inactive players will be evaluated every 30 days if a player does not
+  // engage at 90 days they will be removed at the admins discretion."
+  //
+  // The discretion already existed — an admin can deactivate or remove anyone.
+  // The evaluation did not: nothing said who had crossed 30, 60 or 90 days, so
+  // it depended on an admin remembering. Two inactive members is easy to hold in
+  // your head; it is the rule most likely to quietly stop happening as the list
+  // grows, which is exactly when it starts to matter.
+  const inactiveReview = useMemo(() => {
+    const now = Date.now();
+    return players
+      .filter((p) => !p.is_active)
+      .map((p) => {
+        const since = p.inactivated_at ? new Date(p.inactivated_at).getTime() : null;
+        const days = since === null ? null : Math.floor((now - since) / 86_400_000);
+        return { player: p, days };
+      })
+      // Longest-inactive first: the ones nearest removal are the ones to look at.
+      .sort((a, b) => (b.days ?? -1) - (a.days ?? -1));
+  }, [players]);
+
+  const reviewBand = (days: number | null) => {
+    if (days === null) return { label: 'No date recorded', variant: 'default' as const };
+    if (days >= 90) return { label: `${days}d · review for removal`, variant: 'loss' as const };
+    if (days >= 60) return { label: `${days}d · 60-day review`, variant: 'pending' as const };
+    if (days >= 30) return { label: `${days}d · 30-day review`, variant: 'pending' as const };
+    return { label: `${days}d inactive`, variant: 'default' as const };
+  };
+
   // Filters: All / Claimed / Unclaimed
   const [filter, setFilter] = useState<'all' | 'claimed' | 'unclaimed'>('all');
   const filteredPlayers = useMemo(() => {
@@ -1031,6 +1060,27 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
       {addBanner && <p className="text-[#22C55E] text-xs font-[Barlow]">{addBanner}</p>}
       {inviteBanner && <p className="text-[#22C55E] text-xs font-[Barlow]">{inviteBanner}</p>}
       {activeError && <p className="text-[#EF4444] text-xs font-[Barlow]">{activeError}</p>}
+
+      {inactiveReview.length > 0 && (
+        <GlassCard className="p-4">
+          <div className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-1">Inactive Review</div>
+          <p className="text-[#9CA3AF] text-xs font-[Barlow] mb-3">
+            Reviewed every 30 days. Past 90 days a player may be removed at your discretion.
+            Everyone here keeps their spot on the list and drops 2 places per 30 days.
+          </p>
+          <div className="space-y-2">
+            {inactiveReview.map(({ player: p, days }) => {
+              const band = reviewBand(days);
+              return (
+                <div key={p.id} className="flex items-center gap-2 justify-between">
+                  <span className="font-[Barlow] text-sm text-[#E8E2D6] truncate">{p.full_name}</span>
+                  <Badge variant={band.variant} className="shrink-0 text-[10px]">{band.label}</Badge>
+                </div>
+              );
+            })}
+          </div>
+        </GlassCard>
+      )}
 
       {/* Filter buttons */}
       <div className="flex gap-2">

@@ -38,6 +38,17 @@ export interface Database {
           years_playing: number | null;
           cue_brand: string | null;
           is_active: boolean;
+          // Maintained by track_player_inactivation_trigger: stamped when
+          // is_active goes true -> false, cleared on the way back. Drives the
+          // 30-day demotion and the 30/60/90-day review in Admin. Declared here
+          // because production has carried both columns since before the repo
+          // knew about them (see 20260813200000) and the review panel reads one.
+          activated_at: string | null;
+          inactivated_at: string | null;
+          // Spots already taken during the CURRENT spell of inactivity, so the
+          // daily demotion settles a debt rather than re-applying it. Reset to 0
+          // on reactivation. Added 20260822130000.
+          inactive_drops_applied: number;
           created_at: string;
           updated_at: string;
         };
