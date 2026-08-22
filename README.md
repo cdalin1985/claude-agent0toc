@@ -180,6 +180,8 @@ These rules are checked server-side, so they hold whether or not you go through 
 | 24-hour wait after a loss, or after climbing | Yes — you may still challenge down |
 | Defending carries no cooldown | Yes |
 | Drop 2 spots per 30 days inactive | Yes — charged once per completed 30 days |
+| A wash sits the challenger 24 hours | Yes — the challenged player is free immediately |
+| Returning from inactive waits 7 days | Yes — 24 hours if you are last on the list |
 
 ## Rules the app does not yet enforce
 
@@ -188,10 +190,6 @@ than by software. **In every case the rulebook wins.**
 
 - **No-show swap.** Not implemented. Report a no-show to an admin, who will swap the
   spots by hand.
-- **A wash costs the challenger 24 hours.** The app currently applies no cooldown after
-  a wash and refunds the challenge.
-- **Returning from inactive waits 7 days.** The app currently lets a returning player
-  challenge immediately.
 - **Locking in your challenge after a successful defence.** The app has no "locked in"
   state, and does not open a defender to challenges from behind.
 - **The 30/60/90-day inactive evaluation.** Admins can deactivate and remove anyone, but

@@ -49,11 +49,31 @@ test('the climb branch is entered on a lower seed winning, and rankChange is set
   assert.equal(assignments.length, 1, 'rankChange should be assigned exactly once, inside the climb branch');
 });
 
-test('a post-match cooldown blocks challenging up but not challenging down', () => {
-  // README:17 grants top-10 players a challenge DOWN 5 spots, and README:32/:38
-  // put the cooldown specifically on challenging up.
-  assert.match(createChallenge, /if \(myCooldown && theirPos < myPos\) return/);
+test('a cooldown blocks challenging up but not challenging down', () => {
+  // README grants top-10 players a challenge DOWN 5 spots, and puts every
+  // cooldown specifically on challenging up. `theirPos < myPos` is the whole
+  // rule: drop it and a cooldown silently becomes a ban on playing at all.
+  assert.match(createChallenge, /if \(myCooldown && theirPos < myPos\) \{/);
   assert.match(createChallenge, /You can still challenge down/);
+});
+
+test('every cooldown that should block an upward challenge is checked', () => {
+  // The read was `.eq('type', 'post_match')`, so the two cooldowns added in
+  // 20260822140000 would have been written and then never consulted -- the
+  // rules would have looked enforced in the database and done nothing to a
+  // player. post_decline stays out deliberately: it is in the CHECK, has never
+  // been written, and reviving it should be a decision rather than a side
+  // effect of a broader query.
+  assert.match(createChallenge, /const BLOCKING_COOLDOWNS = \['post_match', 'post_wash', 'post_return'\] as const;/);
+  assert.match(createChallenge, /\.in\('type', BLOCKING_COOLDOWNS\)/);
+  assert.doesNotMatch(createChallenge, /\.eq\('type', 'post_match'\)/);
+});
+
+test('the 409 names which rule the player is sitting out', () => {
+  // Three cooldowns now reach the same branch. "You are in a post-match
+  // cooldown" after a wash would be a lie about which rule they broke.
+  assert.match(createChallenge, /post_wash: 'Your last challenge ended in a wash/);
+  assert.match(createChallenge, /post_return: 'You have just returned from inactive/);
 });
 
 test('the ranking reads that gate the cascade, stats and cooldowns are not swallowed', () => {

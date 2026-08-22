@@ -159,7 +159,10 @@ export interface Database {
         Row: {
           id: string;
           player_id: string;
-          type: 'post_match' | 'post_decline';
+          // post_wash and post_return added 20260822140000. Every type except
+          // post_decline (legacy, never written) blocks challenging up until it
+          // expires; none of them blocks defending or challenging down.
+          type: 'post_match' | 'post_decline' | 'post_wash' | 'post_return';
           expires_at: string;
           created_at: string;
         };

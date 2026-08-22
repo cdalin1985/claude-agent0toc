@@ -109,6 +109,28 @@ function canChallenge(
  * A challenge the challenger withdrew before it was accepted DOES count.
  * Otherwise the limit is unenforceable — you could create and withdraw all day.
  */
+/**
+ * Cooldown types that stop a player challenging UP.
+ *
+ * Not every row in the table does. 'post_decline' is in the CHECK constraint,
+ * has never been written, and is deliberately left out rather than swept in by
+ * a broader query -- if it is ever revived, whoever revives it should have to
+ * decide what it blocks.
+ *
+ * README, in three places: post_match ("wait 24 hours before challenging up
+ * again"), post_wash ("challenging player will sit for 24 hrs"), post_return
+ * ("must either defend or wait 7 days before challenging up"). All three are
+ * scoped to challenging up, and none of them stops a player defending.
+ */
+const BLOCKING_COOLDOWNS = ['post_match', 'post_wash', 'post_return'] as const;
+
+/** Player-facing reason, so the 409 says which rule they are sitting out. */
+const COOLDOWN_REASON: Record<string, string> = {
+  post_match: 'You are in a post-match cooldown',
+  post_wash: 'Your last challenge ended in a wash, so you are sitting out',
+  post_return: 'You have just returned from inactive, so you are sitting out',
+};
+
 function countsAgainstWeeklyLimit(row: { status: string; cancel_reason: string | null }): boolean {
   if (row.status === 'expired') return false;
   if (row.status === 'cancelled' && (row.cancel_reason === 'wash' || row.cancel_reason === 'overdue')) return false;
@@ -195,9 +217,9 @@ serve(async (req) => {
     // the one that actually gates them.
     const { data: activeCooldowns, error: cooldownError } = await supabase
       .from('cooldowns')
-      .select('expires_at')
+      .select('expires_at, type')
       .eq('player_id', challenger.id)
-      .eq('type', 'post_match')
+      .in('type', BLOCKING_COOLDOWNS)
       .gt('expires_at', now)
       .order('expires_at', { ascending: false })
       .limit(1);
@@ -210,7 +232,12 @@ serve(async (req) => {
     // before challenging up again" — and separately grants top-10 players the
     // right to challenge down 5 spots. Blocking a downward challenge would take
     // away a challenge the rulebook gives you.
-    if (myCooldown && theirPos < myPos) return new Response(JSON.stringify({ error: `You are in a post-match cooldown and cannot challenge up until ${formatLeagueDateTime(myCooldown.expires_at)}. You can still challenge down.` }), { status: 409, headers: corsHeaders });
+    if (myCooldown && theirPos < myPos) {
+      const reason = COOLDOWN_REASON[myCooldown.type] ?? 'You are in a cooldown';
+      return new Response(JSON.stringify({
+        error: `${reason} and cannot challenge up until ${formatLeagueDateTime(myCooldown.expires_at)}. You can still challenge down, and you can still defend.`,
+      }), { status: 409, headers: corsHeaders });
+    }
 
     const expiresAt = new Date(Date.now() + challengeExpiryDays * 24 * 3600 * 1000).toISOString();
     const { data: challenge, error: insertErr } = await supabase.from('challenges').insert({ challenger_id: challenger.id, challenged_id: challenged_player_id, discipline, race_length, status: 'pending', expires_at: expiresAt }).select().single();
