@@ -6,97 +6,206 @@ TOC is a live challenge league where players fight for the top spot on a single 
 
 ---
 
-## How the List Works
+# Official Rules
 
-Every player holds a numbered rank. To move up, you challenge players above you and win. Beat someone higher than you and you take their spot — everyone between you drops one.
+> **These rules are the single source of truth for Top of the Capital.**
+>
+> They govern the league and the app alike. Where the app behaves differently from
+> anything written here, **the rules are right and the app is wrong** — see
+> [Rules the app does not yet enforce](#rules-the-app-does-not-yet-enforce) for the
+> current gaps.
+>
+> Last updated **22 August 2026**. Includes the no-show rule added 2 August 2026.
+> Top of the Capital has the final say on all rules.
 
-### Who You Can Challenge
+## Getting on the List
 
-- **First challenge ever** — you can challenge anyone up to 10 spots above you
-- **After your first** — you can challenge anyone up to 5 spots above you
-- **Top 10 players** — can challenge up or down 5 spots
-- **#1 ranked player** — can challenge anyone, but must play at least 2 top-5 opponents within 30 days or be moved to #10
+You must be **approved** to enter the list. New members are added at the bottom.
 
-### Challenge Rules
+## Before You Play
 
-- Maximum **2 challenges per week** (rolling 7-day window from your first challenge of the week)
-- You must play the first person who challenged you before accepting any others
-- The challenged player has **48 hours to respond**
-- Once accepted, the match must be played within **10 days**
+- **All games are rack your own.**
+- Players **lag or flip for the break**. This is agreed upon by both players before the match.
+- **Winner breaks**, unless otherwise agreed upon.
 
----
+## Who You Can Challenge
+
+- **Your first challenge** — up to **10 spots** above you.
+- **After your first challenge** — up to **5 spots** above you.
+- **Top 10** — you may challenge **up or down 5 spots**.
+- **#1** — you may challenge **anyone** on the list.
+
+**The #1 spot carries an obligation.** If you are #1 you **must play at least one player
+in the top 5, at least 2 times per month**. You may use your remaining challenges on
+anyone. Fail the obligation and you are moved to **#10**.
+
+## Challenge Limits
+
+- **Two challenges per week.** Your week starts from your first challenge.
+- **If more than one player challenges you**, you must play the **first person to
+  challenge you** before any other challenge can be made or accepted.
+
+## Responding to a Challenge
+
+The player being challenged must respond within **48 hours** of the callout.
+
+### Date
+
+- The match must be played within **10 days** of the challenge being accepted.
+- Exceptions **must** be approved by Top of the Capital.
+
+### Game
+
+- The **challenger** picks the game and the race.
+- **Both players** agree on the time and place.
+- The player **being challenged** picks the table.
+
+## Approved TOC Games
+
+### 8-Ball — BCA Rules
+
+- Magic rack allowed if both players agree.
+- Scratch on the break is ball in hand anywhere.
+- Scratch on the 8 is **not** a loss — it is ball in hand to your opponent. Unless you
+  make the 8 and scratch, which **is** a loss.
+
+### 9-Ball — Modified BCA
+
+- No magic rack.
+- The 9 on the break is good in the **top two pockets only**.
+- You must call the 9.
+- No three-foul rule.
+
+### 10-Ball — Call Shot
+
+- Magic rack allowed.
+- Rack: **1 at the front, 10 in the middle**, the rest random.
+- The 10 can be made early via carom or combo if called, but it is **not a win** — the
+  10 is spotted and the player continues to shoot.
+- No three-foul rule.
+
+## Race
+
+- **Minimum race to six.** No maximum, if it is agreed upon.
+- **Winner breaks**, unless agreed upon to alternate.
+
+## Match Fee
+
+- **$5 per player.**
+- Money goes in the supplied envelopes, and the envelope must be **filled out properly**.
+- Envelopes are available at the Valley Hub and Eagles 4040, and must be dropped in the
+  boxes at either venue.
+- **Failure to fill out the envelope properly with the proper money voids the match.**
+
+## Posting Callouts and Results
+
+- **Callouts can only be made on the Top of the Capital Facebook page.**
+  **Please tag the player when posting the challenge.**
+- All callouts **and** all match results must be posted to Top of the Capital.
+- **Admins cannot update the list unless they are made aware of the match results.**
+- Once a match time is agreed, the **challenger** must post the date and time of the match.
+
+## Location
+
+- Matches are played at the **Valley Hub** or **Eagles 4040**. Other locations may be
+  approved by an admin.
+- Envelopes and drop boxes are available at both venues.
 
 ## After a Match
 
-**If you win (lower seed beats higher seed):**
-You take their spot. They drop one. Everyone between your old spot and theirs also drops one. You must wait 24 hours before challenging up again.
+**If the challenged player declines or cannot play** — the challenger gets the spot.
 
-**If you defend your spot (higher seed wins):**
-You can challenge up immediately — but you must post that challenge with your match results to lock it in.
+**If both players give times but cannot agree** — the match is a wash. The challenging
+player sits for **24 hours**. The challenged player may challenge up immediately, if
+there is no challenge waiting on their spot. If there are challengers waiting, they must
+accept challenges.
 
-**If you lose:**
-You must either defend your new position or wait 24 hours before challenging up.
+**If you defend your spot** — you may challenge up immediately, which means you must
+**include a challenge with your results to lock it in**. If you do not, you are open to
+challenges from behind until you do.
 
-**If the challenged player declines:**
-The challenger takes their spot automatically (confirmed by admin).
+**If you are the lower seed and win** — you must wait **24 hours** to challenge up. This
+includes forfeits.
 
-**If you can't agree on a time:**
-The challenge is a wash. No penalties for either player.
+**If you lose** — you must either defend, or wait **24 hours** before you can challenge up.
 
----
+## No-Show
 
-## Match Setup
+*Added 2 August 2026.*
 
-- **Challenger** picks the game (8-Ball, 9-Ball, or 10-Ball) and the race length
-- **Both players** agree on the time and venue
-- Matches are played at **Eagles 4040** or **Valley Hub** — other venues with admin approval
-- **Minimum race to 6.** No maximum as long as both players agree
-- **Match fee: $5 per player.** Use the supplied envelopes at either venue, or pay digitally (Venmo/Cash App/PayPal)
-
----
-
-## Game Rules
-
-**8-Ball** — BCA Rules
-- Magic rack allowed if both players agree
-- Scratch on the break: ball in hand anywhere
-- Scratch on the 8: ball in hand for opponent (not a loss unless you pocket the 8 and scratch on the same shot)
-
-**9-Ball** — Modified BCA Rules
-- No magic rack
-- 9-ball on the break only counts if it drops in one of the top two pockets
-- Must call the 9-ball
-- No three-foul rule
-
-**10-Ball** — Call Shot
-- Magic rack allowed
-- Rack: 1-ball at front, 10-ball in the middle, everything else random
-- 10-ball pocketed early via combo or carom if called — gets spotted, shooter continues
-- No three-foul rule
-
----
+A no-show **without letting your opponent know** drops you to the challenger's original
+spot. **Both players swap spots** in the standings.
 
 ## Inactive Players
 
-- You can go inactive at any time
-- After 30 days inactive: you drop 2 spots for every additional 30 days
-- Returning: must defend your position or wait 7 days before challenging up
-- Exception: if you're last on the list, only 24 hours
-- Players inactive for 90+ days may be removed at admin discretion
+- Players may go inactive at any time.
+- Inactive **more than 30 days** — you drop **two spots for every 30 days** of inactivity.
+- **Returning to the list** — you must either defend, or wait **7 days** before
+  challenging up. Exception: the last player on the list waits **24 hours** before making
+  a challenge.
+- All inactive players are evaluated every **30 days**. A player who does not engage by
+  **90 days** may be removed at the admins' discretion.
+
+## Questions
+
+Any questions on the above rules, contact any of your TOC admins.
+**Top of the Capital has the final say on all rules.**
 
 ---
 
-## How to Join
+# How the App Fits In
 
-1. Get approved by a TOC admin
-2. You're added to the bottom of the list
-3. Follow the **Top of the Capital Facebook page** — that's where all challenges and results are posted
+The app is the league's live scoreboard and record keeper. It holds the ranked list,
+runs the challenge clocks, tracks results and stats, and keeps the treasury ledger.
+
+## What the app enforces for you
+
+These rules are checked server-side, so they hold whether or not you go through the app:
+
+| Rule | Enforced |
+|---|---|
+| Approval required to join | Only an admin can add a player |
+| First challenge up to 10 spots | Yes |
+| Then up to 5 spots; top 10 up or down 5 | Yes |
+| #1 may challenge anyone | Yes |
+| #1 plays top 5 twice per 30 days, or drops to #10 | Yes, checked twice daily |
+| Play your first challenger before any other | Yes — one live challenge per player, each direction |
+| Respond within 48 hours | Yes, swept every 15 minutes |
+| Match played within 10 days of acceptance | Yes, swept daily; overdue is ruled a wash |
+| Two challenges per week | Yes — washes and expiries are refunded |
+| Challenger picks game and race | Yes |
+| Minimum race 6, no maximum | Yes |
+| Approved venues only | Yes |
+| Declining hands over the spot | Yes, recorded as a forfeit |
+| 24-hour wait after a loss, or after climbing | Yes — you may still challenge down |
+| Defending carries no cooldown | Yes |
+| Drop 2 spots per 30 days inactive | Yes, checked daily |
+
+## Rules the app does not yet enforce
+
+The rules above still apply — these are simply enforced by players and admins rather
+than by software. **In every case the rulebook wins.**
+
+- **No-show swap.** Not implemented. Report a no-show to an admin, who will swap the
+  spots by hand.
+- **A wash costs the challenger 24 hours.** The app currently applies no cooldown after
+  a wash and refunds the challenge.
+- **Returning from inactive waits 7 days.** The app currently lets a returning player
+  challenge immediately.
+- **Locking in your challenge after a successful defence.** The app has no "locked in"
+  state, and does not open a defender to challenges from behind.
+- **The 30/60/90-day inactive evaluation.** Admins can deactivate and remove anyone, but
+  nothing flags who has crossed each threshold.
+- **Table rules.** Rack your own, the lag or flip, who breaks and who picks the table are
+  agreements between the two players. The app does not track them and is not meant to.
 
 ---
 
 ## The App
 
-Built to feel like something more than a spreadsheet. Dark glass UI, animated rankings, live challenge notifications, and a leaderboard that updates the moment a match is confirmed.
+Built to feel like something more than a spreadsheet. Dark glass UI, animated rankings,
+live challenge notifications, and a leaderboard that updates the moment a match is
+confirmed.
 
 - **Magic link login** — no passwords, just your email
 - **Claim your profile** — find your name, tap it, it's yours
@@ -115,7 +224,7 @@ Built to feel like something more than a spreadsheet. Dark glass UI, animated ra
 
 ## Tech Stack
 
-- **React 18 + TypeScript + Vite** — frontend
+- **React 19 + TypeScript + Vite** — frontend
 - **Tailwind CSS v4** — styling
 - **Framer Motion** — animations
 - **Supabase** — Postgres, Auth, Realtime, Edge Functions
