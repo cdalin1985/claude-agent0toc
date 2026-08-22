@@ -162,8 +162,8 @@ export default function RulesPage() {
             <span className="text-xl">🤝</span> On the Honour System
           </h2>
           <div className="text-[#C9C3B8] text-sm font-[Barlow] leading-relaxed space-y-2">
-            <Rule>These are league rules the app doesn't track yet. They still apply — take them to an admin.</Rule>
-            <Rule><strong>No-show.</strong> Not letting your opponent know drops you to the challenger's original spot — the two of you swap places.</Rule>
+            <Rule>These are league rules an admin applies rather than the app. They still apply — take them to an admin.</Rule>
+            <Rule><strong>No-show.</strong> Not letting your opponent know drops you to their spot — the two of you swap places. Tell an admin and they'll record it. It can only ever drop you: if you're already ranked below your opponent, nothing moves.</Rule>
             <Rule><strong>Locking in your challenge.</strong> Defend your spot and you can challenge up immediately, but you must post that challenge with your results to lock it in. Until you do, you're open to challenges from behind.</Rule>
           </div>
         </GlassCard>

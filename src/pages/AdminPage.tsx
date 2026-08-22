@@ -283,12 +283,46 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const getName = (id: string) => players.find((p) => p.id === id)?.full_name ?? id.slice(0, 8) + '…';
 
   const [actioning, setActioning]   = useState<string | null>(null);
-  const [actionType, setActionType] = useState<'cancel' | 'forfeit' | 'reverse_decline' | null>(null);
+  const [actionType, setActionType] = useState<'cancel' | 'forfeit' | 'reverse_decline' | 'no_show' | null>(null);
   const [winnerId, setWinnerId]     = useState('');
+  const [noShowId, setNoShowId]     = useState('');
   const [loading, setLoading]       = useState(false);
   const [actionError, setActionError] = useState('');
 
-  const resetAction = () => { setActioning(null); setActionType(null); setWinnerId(''); setActionError(''); };
+  const resetAction = () => { setActioning(null); setActionType(null); setWinnerId(''); setNoShowId(''); setActionError(''); };
+
+  // "A no show w/o letting your opponent know will drop you to the challengers
+  // original spot. Both players will swap spots in the standings."
+  //
+  // Admin-only on purpose: this is the one ranking move that is an accusation
+  // about somebody else, so letting a player file it would be a way to demote a
+  // rival by claiming they did not turn up.
+  const handleNoShow = async (c: ChallengeRow) => {
+    if (!noShowId) return;
+    setLoading(true);
+    setActionError('');
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setLoading(false); setActionError('Session expired — please log in again.'); return; }
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/report-no-show`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ challenge_id: c.id, no_show_player_id: noShowId }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setLoading(false);
+    // res.ok matters as much as json.error: a gateway 401 carries no `error`
+    // key, and testing json.error alone would close the panel as though a rank
+    // swap had happened.
+    if (!res.ok || json.error) {
+      setActionError(json.error ?? 'Could not record that no-show.');
+      return;
+    }
+    qc.invalidateQueries({ queryKey: ['admin-active-challenges'] });
+    qc.invalidateQueries({ queryKey: ['rankings'] });
+    qc.invalidateQueries({ queryKey: ['challenges'] });
+    qc.invalidateQueries({ queryKey: ['activity-feed-full'] });
+    resetAction();
+  };
 
   const handleReverseDecline = async (c: ChallengeRow) => {
     setLoading(true);
@@ -430,6 +464,32 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
                   </div>
                 );
               }
+              if (actionType === 'no_show') {
+                return (
+                  <div className="space-y-3">
+                    <p className="text-[#9CA3AF] text-xs font-[Barlow]">
+                      Who failed to show without telling their opponent? They swap spots with the
+                      other player. If they are already ranked below their opponent, nothing moves —
+                      the rule can only ever drop a no-show.
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[{ id: c.challenger_id, name: getName(c.challenger_id) }, { id: c.challenged_id, name: getName(c.challenged_id) }].map((p) => (
+                        <button key={p.id} onClick={() => setNoShowId(p.id)}
+                          className={`py-2 rounded-xl border text-sm font-[Barlow] transition-all min-h-[44px] ${noShowId === p.id ? 'border-[#EF4444] bg-[#EF4444]/10 text-[#EF4444]' : 'border-[#333] bg-[#252525]/50 text-[#E8E2D6]'}`}>
+                          {p.name}
+                        </button>
+                      ))}
+                    </div>
+                    {actionError && <p className="text-[#EF4444] text-xs font-[Barlow]">{actionError}</p>}
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="sm" onClick={resetAction}>Back</Button>
+                      <Button variant="danger" size="sm" loading={loading} disabled={!noShowId} onClick={() => handleNoShow(c)}>
+                        Record No-Show
+                      </Button>
+                    </div>
+                  </div>
+                );
+              }
               return (
                 <div className="space-y-3">
                   {actionType === 'forfeit' && (
@@ -478,8 +538,16 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
             }
 
             return (
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Button variant="ghost" size="sm" onClick={() => { setActioning(c.id); setActionType('cancel'); setActionError(''); }}>Cancel</Button>
+                {/* A no-show only makes sense once a time was arranged to miss —
+                    report-no-show rejects anything still pending, so the button
+                    is not offered for one. */}
+                {['accepted', 'scheduled'].includes(c.status) && (
+                  <Button variant="secondary" size="sm" onClick={() => { setActioning(c.id); setActionType('no_show'); setNoShowId(''); setActionError(''); }}>
+                    No-Show
+                  </Button>
+                )}
                 <Button variant="danger" size="sm" onClick={() => { setActioning(c.id); setActionType('forfeit'); setWinnerId(''); setActionError(''); }}>
                   {c.match_id ? 'Force Forfeit' : 'Force Cancel'}
                 </Button>

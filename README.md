@@ -182,14 +182,25 @@ These rules are checked server-side, so they hold whether or not you go through 
 | Drop 2 spots per 30 days inactive | Yes — charged once per completed 30 days |
 | A wash sits the challenger 24 hours | Yes — the challenged player is free immediately |
 | Returning from inactive waits 7 days | Yes — 24 hours if you are last on the list |
+| No-show swaps the two players' spots | Yes — applied by an admin |
 
 ## Rules the app does not yet enforce
 
 The rules above still apply — these are simply enforced by players and admins rather
 than by software. **In every case the rulebook wins.**
 
-- **No-show swap.** Not implemented. Report a no-show to an admin, who will swap the
-  spots by hand.
+- **Filing a no-show yourself.** The swap itself is implemented, but only an admin can
+  apply it — tell an admin and they record it in one tap. This is the only ranking move
+  that is an accusation about somebody else, so it is deliberately not self-service:
+  otherwise any member could demote a rival by claiming they did not turn up.
+
+  One place the code had to read past the literal wording. *"Drop you to the challengers
+  original spot"* assumes the no-show is the higher-ranked player, which is the usual
+  case. But a top-10 player may challenge **down**, so either player can be the no-show —
+  and an unconditional swap would **promote** a lower-ranked player for failing to appear.
+  So the swap only happens when it moves the no-show *down*; when they already sit below
+  their opponent the no-show is recorded and the ladder does not move. If the league wants
+  a different answer there, say so and it is a one-function change.
 - **Locking in your challenge after a successful defence.** The app has no "locked in"
   state, and does not open a defender to challenges from behind.
 - **The 30/60/90-day inactive evaluation.** Admins can deactivate and remove anyone, but
