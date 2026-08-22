@@ -42,7 +42,12 @@ export default function PlayerPage() {
   const myRanking     = rankings.find((r) => r.player.id === myPlayer?.id);
   const isFirstChallenge = (myRanking?.stats?.challenges_issued ?? 0) === 0;
 
-  const eligible = myRanking && targetRanking
+  // Both ends have to be active. The ladder carries inactive members now, so
+  // reaching this page no longer implies either player is on the floor, and
+  // create-challenge rejects both cases with a 409 — an inactive challenger
+  // ("Your account is inactive") and an inactive opponent alike. The banner
+  // above already says so; don't pair it with a button that can't work.
+  const eligible = myRanking?.player.is_active && targetRanking?.player.is_active
     ? canChallenge(myRanking.ranking.position, targetRanking.ranking.position, isFirstChallenge)
     : false;
 
