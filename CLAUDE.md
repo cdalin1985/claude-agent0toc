@@ -70,9 +70,14 @@ Venues are Eagles 4040 and Valley Hub.
 Treasury is visible to all players.
 Only super_admin manages treasury.
 
-Not yet enforced in code, and tracked in README under "Rules the app does not yet enforce":
-no-show spot swap, 24-hour cooldown after a wash, the 7-day return wait, locking in a
-challenge after a successful defence, and the 30/60/90-day inactive review.
+Also enforced in code: 24-hour cooldown after a wash (challenger only), the 7-day return
+wait (24 hours if last), the no-show spot swap (admin-applied, and only ever downward),
+locking in a challenge after defending (shields you from below until it settles), and the
+30/60/90-day inactive review.
+
+Left to people on purpose, and listed in README under "Rules people enforce, not the app":
+filing a no-show (admin applies it), removing a player at 90 days (a judgement call), and
+the table rules — rack your own, the lag or flip, who breaks, who picks the table.
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence

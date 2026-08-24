@@ -107,6 +107,8 @@ export default function RulesPage() {
           <Rule>Once accepted, the match must be played within <strong>{playDays} days</strong>. If it isn't, it's automatically ruled a wash — no penalty for either player, and it doesn't use up a challenge.</Rule>
           <Rule>After you <strong>lose</strong> a match, or after a win that <strong>moves you up</strong> the list, you must wait <strong>{cooldownHours} hours</strong> before challenging up again. You can still challenge down.</Rule>
           <Rule>Successfully defending your spot costs you nothing — you can challenge up immediately.</Rule>
+          <Rule>Defending also earns you a <strong>lock-in</strong>: send your next challenge and nobody below you can challenge you until it's settled. Sit on it and you stay open to challenges from behind — whoever challenges you first takes the opening. Winning a challenge <em>you</em> sent isn't defending, so it earns nothing.</Rule>
+          <Rule>If a challenge ends in a <strong>wash</strong>, the player who issued it waits <strong>{cooldownHours} hours</strong> before challenging up. Whoever was challenged is free straight away.</Rule>
           <Rule>You'll get a reminder before your match starts.</Rule>
         </Section>
 
@@ -145,7 +147,7 @@ export default function RulesPage() {
         <Section icon="😴" title="Going Inactive">
           <Rule>You can go inactive at any time — you keep your spot on the list, marked inactive, and can't be challenged.</Rule>
           <Rule>Inactive more than 30 days: you drop <strong>2 spots for every 30 days</strong> of inactivity.</Rule>
-          <Rule>Coming back, you must either defend or wait <strong>7 days</strong> before challenging up. If you're last on the list, <strong>24 hours</strong>.</Rule>
+          <Rule>Coming back, you must either defend or wait <strong>7 days</strong> before challenging up — <strong>24 hours</strong> if you're last on the list. You can still be challenged, and still defend, the whole time.</Rule>
           <Rule>Inactive players are reviewed every 30 days. No engagement by <strong>90 days</strong> and you may be removed at the admins' discretion.</Rule>
         </Section>
 
@@ -161,10 +163,8 @@ export default function RulesPage() {
             <span className="text-xl">🤝</span> On the Honour System
           </h2>
           <div className="text-[#C9C3B8] text-sm font-[Barlow] leading-relaxed space-y-2">
-            <Rule>These are league rules the app doesn't track yet. They still apply — take them to an admin.</Rule>
-            <Rule><strong>No-show.</strong> Not letting your opponent know drops you to the challenger's original spot — the two of you swap places.</Rule>
-            <Rule><strong>Locking in your challenge.</strong> Defend your spot and you can challenge up immediately, but you must post that challenge with your results to lock it in. Until you do, you're open to challenges from behind.</Rule>
-            <Rule><strong>After a wash</strong>, the challenging player sits 24 hours. The challenged player may challenge up right away if nobody is waiting on their spot.</Rule>
+            <Rule>Applied by an admin rather than by the app. Take it to an admin and they'll record it.</Rule>
+            <Rule><strong>No-show.</strong> Not letting your opponent know drops you to their spot — the two of you swap places. It can only ever drop you: if you're already ranked below your opponent, nothing moves.</Rule>
           </div>
         </GlassCard>
 

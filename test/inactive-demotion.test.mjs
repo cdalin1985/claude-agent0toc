@@ -129,3 +129,51 @@ test('the Rules screen promise this backs is still on the page', () => {
   assert.match(rules, /2 spots for every 30 days/);
   assert.match(rules, /Inactive more than 30 days/);
 });
+
+// ---------------------------------------------------------------------------
+// The rate, not just the mechanics
+// ---------------------------------------------------------------------------
+// The shift above was fixed in August and the function still got the rule
+// wrong: it derived the spots owed from elapsed time alone and applied them to
+// the player's CURRENT position, recording nothing. The cron runs daily, so
+// through days 30..59 it computed "2 owed" every single day and took two more
+// spots each time -- a member owed 2 spots a month lost 2 a day.
+//
+// 10_'s assertions could not see it, because they call the function once and
+// one call is the case the bug gets right. The proof is scenario C in
+// 11_demotion_rate_assert.sql, which calls it twice; these pin the ledger the
+// fix depends on so it cannot be dropped.
+
+const rateMigration = read('supabase/migrations/20260822130000_demote_two_spots_per_30_days_not_per_day.sql');
+const rateAssert = read('supabase/tests/migrations/11_demotion_rate_assert.sql');
+const rateCode = rateMigration.replace(/^\s*--.*$/gm, '');
+
+test('a ledger records what each spell of inactivity has already cost', () => {
+  assert.match(rateCode, /ADD COLUMN IF NOT EXISTS inactive_drops_applied INTEGER NOT NULL DEFAULT 0/i);
+});
+
+test('the function charges the difference, not the whole debt', () => {
+  // The distinction that is the entire fix: earned-minus-taken, rather than
+  // earned applied to wherever the player currently sits.
+  assert.match(rateCode, /v_drops_due\s*:=\s*v_drops_earned - COALESCE\(v_player\.inactive_drops_applied, 0\)/i);
+  assert.match(rateCode, /IF v_drops_due > 0 THEN/i);
+});
+
+test('only the spots the ladder had room for are charged', () => {
+  // least() can cap the landing spot at the bottom. Charging the full owed
+  // amount there would forgive the remainder if the list later grew beneath
+  // them; charging the actual movement keeps it owed.
+  assert.match(rateCode, /v_drops_taken\s*:=\s*v_new_pos - v_current_pos/i);
+  assert.match(rateCode, /SET inactive_drops_applied = COALESCE\(inactive_drops_applied, 0\) \+ v_drops_taken/i);
+});
+
+test('reactivation clears the ledger', () => {
+  // Same lifetime as inactivated_at. Miss this and a member who returns and
+  // later goes inactive again starts already paid up, and never drops at all.
+  assert.match(rateCode, /NEW\.inactive_drops_applied = 0/);
+});
+
+test('the assert calls the function twice, which is the only way to see this', () => {
+  assert.match(rateAssert, /second run inside the same 30-day bucket/i);
+  assert.match(rateAssert, /two spots per 30 days, not per run/i);
+});

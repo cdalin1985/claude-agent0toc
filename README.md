@@ -12,8 +12,8 @@ TOC is a live challenge league where players fight for the top spot on a single 
 >
 > They govern the league and the app alike. Where the app behaves differently from
 > anything written here, **the rules are right and the app is wrong** — see
-> [Rules the app does not yet enforce](#rules-the-app-does-not-yet-enforce) for the
-> current gaps.
+> [Rules people enforce, not the app](#rules-people-enforce-not-the-app) for the three
+> the app deliberately leaves to admins and players.
 >
 > Last updated **22 August 2026**. Includes the no-show rule added 2 August 2026.
 > Top of the Capital has the final say on all rules.
@@ -179,34 +179,49 @@ These rules are checked server-side, so they hold whether or not you go through 
 | Declining hands over the spot | Yes, recorded as a forfeit |
 | 24-hour wait after a loss, or after climbing | Yes — you may still challenge down |
 | Defending carries no cooldown | Yes |
+| Drop 2 spots per 30 days inactive | Yes — charged once per completed 30 days |
+| A wash sits the challenger 24 hours | Yes — the challenged player is free immediately |
+| Returning from inactive waits 7 days | Yes — 24 hours if you are last on the list |
+| No-show swaps the two players' spots | Yes — applied by an admin |
+| Inactive players reviewed every 30 days | Yes — flagged at 30, 60 and 90 days in Admin |
+| Locking in a challenge after defending | Yes — see below |
 
-## Known defect: inactive demotion drops too fast
+### Locking in, in detail
 
-The rule is **2 spots for every 30 days** of inactivity. The job that applies it runs
-daily and recalculates the spots owed from elapsed time each run, without recording the
-drops it has already taken — so past day 30 it takes another 2 spots **every day** rather
-than every 30, until the player reaches the bottom of the list.
+Defend your spot and you earn the right to lock in a challenge. Use it and **nobody below
+you can challenge you** until that challenge is settled. Don't use it and you stay open to
+challenges from behind — and the first player who challenges you takes the opening away.
 
-It has never fired, because nobody had reached 30 days inactive. Both current inactive
-members started their clock on **21 August 2026**, so the first live run lands around
-**20 September 2026**. It needs fixing before then. Until it is fixed, do not rely on the
-automatic demotion — check any drop against the rule by hand.
+There is no clock on it. You hold the right until one of you acts: you lock in, or someone
+behind you challenges first. It's a race, deliberately.
 
-## Rules the app does not yet enforce
+Winning a challenge *you* issued is not defending — a top-10 player who challenges down and
+wins has attacked, not defended, so no right is earned.
 
-The rules above still apply — these are simply enforced by players and admins rather
-than by software. **In every case the rulebook wins.**
+## Rules people enforce, not the app
 
-- **No-show swap.** Not implemented. Report a no-show to an admin, who will swap the
-  spots by hand.
-- **A wash costs the challenger 24 hours.** The app currently applies no cooldown after
-  a wash and refunds the challenge.
-- **Returning from inactive waits 7 days.** The app currently lets a returning player
-  challenge immediately.
-- **Locking in your challenge after a successful defence.** The app has no "locked in"
-  state, and does not open a defender to challenges from behind.
-- **The 30/60/90-day inactive evaluation.** Admins can deactivate and remove anyone, but
-  nothing flags who has crossed each threshold.
+Every rule in this book is now either enforced by the app or listed here. Nothing is
+waiting to be built.
+
+These three are deliberate: each is a judgement call, an accusation about someone else, or
+an agreement between two players at a table — none of them is something software should
+decide. **In every case the rulebook wins.**
+
+- **Filing a no-show yourself.** The swap itself is implemented, but only an admin can
+  apply it — tell an admin and they record it in one tap. This is the only ranking move
+  that is an accusation about somebody else, so it is deliberately not self-service:
+  otherwise any member could demote a rival by claiming they did not turn up.
+
+  One place the code had to read past the literal wording. *"Drop you to the challengers
+  original spot"* assumes the no-show is the higher-ranked player, which is the usual
+  case. But a top-10 player may challenge **down**, so either player can be the no-show —
+  and an unconditional swap would **promote** a lower-ranked player for failing to appear.
+  So the swap only happens when it moves the no-show *down*; when they already sit below
+  their opponent the no-show is recorded and the ladder does not move. If the league wants
+  a different answer there, say so and it is a one-function change.
+- **Removing a player at 90 days.** The review itself is in the app — Admin → Players
+  lists every inactive member with their days inactive, flagged at 30, 60 and 90 — but
+  the removal is a judgement call and stays a deliberate admin action.
 - **Table rules.** Rack your own, the lag or flip, who breaks and who picks the table are
   agreements between the two players. The app does not track them and is not meant to.
 

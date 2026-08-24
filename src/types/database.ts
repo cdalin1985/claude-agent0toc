@@ -38,6 +38,21 @@ export interface Database {
           years_playing: number | null;
           cue_brand: string | null;
           is_active: boolean;
+          // Maintained by track_player_inactivation_trigger: stamped when
+          // is_active goes true -> false, cleared on the way back. Drives the
+          // 30-day demotion and the 30/60/90-day review in Admin. Declared here
+          // because production has carried both columns since before the repo
+          // knew about them (see 20260813200000) and the review panel reads one.
+          activated_at: string | null;
+          inactivated_at: string | null;
+          // Spots already taken during the CURRENT spell of inactivity, so the
+          // daily demotion settles a debt rather than re-applying it. Reset to 0
+          // on reactivation. Added 20260822130000.
+          inactive_drops_applied: number;
+          // Earned by defending your spot; spent by issuing a challenge (which
+          // is then locked_in and shields you from below), or lapsed when
+          // somebody behind you challenges first. Added 20260822160000.
+          lock_in_right: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -81,7 +96,11 @@ export interface Database {
           // Set when status is 'cancelled'. Only 'wash' and 'overdue' are
           // refunded against the weekly challenge limit — see
           // countsAgainstWeeklyLimit in the create-challenge function.
-          cancel_reason: 'wash' | 'withdrawn' | 'overdue' | null;
+          cancel_reason: 'wash' | 'withdrawn' | 'overdue' | 'no_show' | null;
+          // Issued by a player spending the right they earned by defending.
+          // While it is live its challenger cannot be challenged from behind.
+          // Added 20260822160000.
+          locked_in: boolean;
           expires_at: string;
           response_message: string | null;
           created_at: string;
@@ -159,7 +178,10 @@ export interface Database {
         Row: {
           id: string;
           player_id: string;
-          type: 'post_match' | 'post_decline';
+          // post_wash and post_return added 20260822140000. Every type except
+          // post_decline (legacy, never written) blocks challenging up until it
+          // expires; none of them blocks defending or challenging down.
+          type: 'post_match' | 'post_decline' | 'post_wash' | 'post_return';
           expires_at: string;
           created_at: string;
         };

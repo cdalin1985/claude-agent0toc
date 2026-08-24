@@ -428,12 +428,28 @@ serve(async (req) => {
       const { error: matchCancelError } = await supabase.from('matches').update({ status: 'resolved' }).eq('challenge_id', challenge_id).eq('status', 'scheduled');
       if (matchCancelError) throw matchCancelError;
 
+      // "If both players give times but can't agree match is a wash challenging
+      // player will sit for 24 hrs. The challenged player may challenge up
+      // immediately." Only the challenger, and only on a true wash -- a
+      // 'withdrawn' challenge never reached a time to disagree about, and the
+      // rulebook says nothing about sitting the challenger for walking away
+      // before it was accepted. That one already costs them a weekly slot.
+      let washCooldownId: string | null = null;
+      if (cancelReason === 'wash') {
+        const { data: cooldownId, error: washCooldownError } = await supabase
+          .rpc('apply_wash_cooldown', { p_challenger_id: challenge.challenger_id });
+        if (washCooldownError) throw washCooldownError;
+        washCooldownId = cooldownId ?? null;
+      }
+
       const { data: challengerPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenger_id).single();
       const { data: challengedPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenged_id).single();
       const { error: washActivityError } = await supabase.from('activity_feed').insert({
         event_type: 'challenge_cancelled',
         headline: `${callerPlayer.full_name} declared a scheduling wash on ${challengerPlayer?.full_name ?? '?'} vs ${challengedPlayer?.full_name ?? '?'}.`,
-        detail: `${challenge.discipline} · race to ${challenge.race_length} · no ranking change, no cooldown`,
+        detail: washCooldownId
+          ? `${challenge.discipline} · race to ${challenge.race_length} · no ranking change · ${challengerPlayer?.full_name ?? 'the challenger'} sits 24h before challenging up`
+          : `${challenge.discipline} · race to ${challenge.race_length} · no ranking change, no cooldown`,
         actor_player_id: callerPlayer.id,
       });
       if (washActivityError) throw washActivityError;
