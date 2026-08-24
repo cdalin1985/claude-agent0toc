@@ -143,8 +143,10 @@ serve(async (req) => {
     actor_player_id: noShowPlayerId,
   });
 
-  // Both players hear about it. A rank change nobody was told about is how a
-  // league night turns into an argument.
+  // Both players hear about it. Nobody is standing in a room together when this
+  // is recorded -- members arrange their own matches whenever they like -- so a
+  // rank change nobody was told about is one somebody discovers days later, out
+  // of context, and argues about.
   await supabase.from('notifications').insert([
     {
       player_id: noShowPlayerId,
