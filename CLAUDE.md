@@ -55,6 +55,13 @@ Run lint/build before claiming success.
 section before changing any rule behaviour, and update it in the same change if a rule
 moves. Where code and README disagree, the README is right and the code is the bug.
 
+**There are no seasons and no league nights.** TOC runs continuously and every member
+plays at their own pace: they challenge when they want, agree a time between themselves,
+and the list moves when a result comes in. Nothing resets on a calendar and nothing
+happens on a fixed evening. Never write copy, comments or commit messages that assume a
+shared match night, a round, a fixture, a season or a reset — `no-seasons.test.mjs` fails
+the build on the player-facing ones.
+
 Minimum race = 6, no maximum.
 New member first challenge = up to 10 spots above.
 Regular non-top-10 = up to 5 spots above only.

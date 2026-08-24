@@ -4,6 +4,12 @@
 
 TOC is a live challenge league where players fight for the top spot on a single ranked list. Think of it like a boxing ranking — you climb by beating the people above you, one rack at a time. No seasons, no brackets. Just a living leaderboard that shifts every time someone wins.
 
+**It runs continuously, at each player's own pace.** There are no league nights, no fixed
+match days, no rounds and no calendar to keep up with. You challenge when you want to
+play, the two of you agree a time between yourselves, and the list moves when the result
+comes in. The only clocks in the whole league are the ones on an individual challenge —
+48 hours to answer, 10 days to play it — and they start when *you* start them.
+
 ---
 
 # Official Rules
