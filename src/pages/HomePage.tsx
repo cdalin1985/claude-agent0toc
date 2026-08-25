@@ -13,6 +13,7 @@ import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { Skeleton } from '../components/Skeleton';
 import { QueryError } from '../components/QueryError';
+import { InlineQueryError } from '../components/InlineQueryError';
 import { OnboardingTour } from '../components/OnboardingTour';
 import type { ActivityFeedItem, Match, Notification, Challenge } from '../types/database';
 import { formatDistanceToNow } from '../utils/time';
@@ -36,15 +37,20 @@ export default function HomePage() {
   const myRanking = rankings.find((r) => r.player.id === player?.id);
 
   // Pending incoming challenges
-  const { data: pendingChallenges = [] } = useQuery<Challenge[]>({
+  const { data: pendingChallenges = [], isError: pendingError, refetch: refetchPending } = useQuery<Challenge[]>({
     queryKey: ['home-pending-challenges', player?.id],
     queryFn: async () => {
       if (!player) return [];
-      const { data } = await supabase
+      // Throws rather than returning []. A swallowed error here renders as "no
+      // challenges waiting", and the rulebook gives the challenged player 48
+      // hours to answer -- so the one thing this card must never do is show an
+      // empty state it cannot vouch for.
+      const { data, error } = await supabase
         .from('challenges')
         .select('*')
         .eq('challenged_id', player.id)
         .eq('status', 'pending');
+      if (error) throw error;
       return data ?? [];
     },
     enabled: !!player,
@@ -53,15 +59,16 @@ export default function HomePage() {
   });
 
   // Active matches needing action
-  const { data: actionMatches = [] } = useQuery<Match[]>({
+  const { data: actionMatches = [], isError: actionError, refetch: refetchAction } = useQuery<Match[]>({
     queryKey: ['home-action-matches', player?.id],
     queryFn: async () => {
       if (!player) return [];
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('matches')
         .select('*')
         .or(`player1_id.eq.${player.id},player2_id.eq.${player.id}`)
         .in('status', ['in_progress', 'submitted', 'scheduled']);
+      if (error) throw error;
       return data ?? [];
     },
     enabled: !!player,
@@ -69,41 +76,48 @@ export default function HomePage() {
     refetchInterval: BACKSTOP_POLL_MS,
   });
 
-  const { data: notifications = [] } = useQuery<Notification[]>({
+  const { data: notifications = [], isError: notificationsError, refetch: refetchNotifications } = useQuery<Notification[]>({
     queryKey: ['notifications', 'preview', player?.id],
     queryFn: async () => {
       if (!player) return [];
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('notifications')
         .select('*')
         .eq('player_id', player.id)
         .eq('is_read', false)
         .order('created_at', { ascending: false })
         .limit(3);
+      if (error) throw error;
       return data ?? [];
     },
     enabled: !!player,
   });
 
-  const { data: feed = [] } = useQuery<ActivityFeedItem[]>({
+  const { data: feed = [], isError: feedError, refetch: refetchFeed } = useQuery<ActivityFeedItem[]>({
     queryKey: ['activity-feed', 'preview'],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('activity_feed')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(6);
+      if (error) throw error;
       return data ?? [];
     },
   });
 
-  const { data: busyPlayerIds = [] } = useQuery<string[]>({
+  const { data: busyPlayerIds = [], isError: busyError, refetch: refetchBusy } = useQuery<string[]>({
     queryKey: ['active-challenge-player-ids'],
     queryFn: async () => {
-      const { data } = await supabase
+      // Throwing matters more here than it looks. This list is what removes
+      // already-committed players from the suggestions below, so an error
+      // swallowed into [] does not show less -- it shows MORE, and every one of
+      // the extras is someone the edge function will refuse to challenge.
+      const { data, error } = await supabase
         .from('challenges')
         .select('challenger_id, challenged_id')
         .in('status', ['pending', 'accepted', 'scheduled', 'in_progress']);
+      if (error) throw error;
       const ids = new Set<string>();
       for (const c of data ?? []) {
         ids.add(c.challenger_id);
@@ -119,23 +133,34 @@ export default function HomePage() {
     queryKey: ['rank1-compliance', player?.id],
     queryFn: async () => {
       if (!player || !isRank1) return null;
-      const { data: rankRow } = await supabase
+      // Every read in here throws, and this is the block where it matters most.
+      //
+      // The rule is "#1 must play a top-5 player twice per 30 days or be moved
+      // to #10". Each of these three reads used to discard its error, and every
+      // one of them fails the same way: top5 empty -> matchCount 0 -> the card
+      // tells the #1 player they have played nobody and are about to be
+      // demoted. A dropped read is not evidence of a rule breach, and this is
+      // the one screen in the app where saying so confidently has a penalty
+      // attached to it. Better to show nothing than to accuse someone.
+      const { data: rankRow, error: rankErr } = await supabase
         .from('rankings')
         .select('rank1_since')
         .eq('player_id', player.id)
         .single();
+      if (rankErr) throw rankErr;
       if (!rankRow?.rank1_since) return null;
       const rank1Since = new Date(rankRow.rank1_since);
       const daysSince  = (Date.now() - rank1Since.getTime()) / (1000 * 3600 * 24);
-      const { data: top5 } = await supabase
+      const { data: top5, error: top5Err } = await supabase
         .from('rankings')
         .select('player_id')
         .gte('position', 2)
         .lte('position', 5);
+      if (top5Err) throw top5Err;
       const top5Ids = (top5 ?? []).map((r: { player_id: string }) => r.player_id);
       let matchCount = 0;
       if (top5Ids.length > 0) {
-        const { count } = await supabase
+        const { count, error: countErr } = await supabase
           .from('matches')
           .select('id', { count: 'exact', head: true })
           .eq('status', 'confirmed')
@@ -144,6 +169,7 @@ export default function HomePage() {
             `and(player1_id.eq.${player.id},player2_id.in.(${top5Ids.join(',')})),` +
             `and(player2_id.eq.${player.id},player1_id.in.(${top5Ids.join(',')}))`
           );
+        if (countErr) throw countErr;
         matchCount = count ?? 0;
       }
       return {
@@ -268,6 +294,26 @@ export default function HomePage() {
       )}
 
       {/* Action banners — pending challenges */}
+      {/* A partial failure, not a total one -- a total outage is caught by the
+          rankings check above, which takes over the screen. What this covers is
+          one of these reads failing while the rest of the page loads fine: the
+          cards below are all rendered on `.length > 0`, so a swallowed error
+          used to remove them entirely and the screen calmly said there was
+          nothing to do. Consolidated into one line because when the signal
+          drops in a bar these fail together, and four stacked notices would be
+          four ways of saying the same thing. */}
+      {(pendingError || actionError || notificationsError || busyError) && (
+        <InlineQueryError
+          message="Some of this screen didn't load, so it may be missing a challenge or a match that needs you."
+          onRetry={() => {
+            if (pendingError) refetchPending();
+            if (actionError) refetchAction();
+            if (notificationsError) refetchNotifications();
+            if (busyError) refetchBusy();
+          }}
+        />
+      )}
+
       {pendingChallenges.length > 0 && (
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
           <GlassCard
@@ -534,7 +580,14 @@ export default function HomePage() {
               View all →
             </button>
           </div>
-          {feed.length === 0 ? (
+          {feedError ? (
+            /* "No activity yet" is a statement about the league, and a failed
+               read is not entitled to make it. */
+            <InlineQueryError
+              message="Couldn't load the latest league activity."
+              onRetry={() => refetchFeed()}
+            />
+          ) : feed.length === 0 ? (
             <p className="text-[#9CA3AF] text-sm font-[Barlow] py-4 text-center">
               No activity yet. Be the first to challenge someone!
             </p>
