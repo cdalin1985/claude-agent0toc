@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useRankings } from '../hooks/useRankings';
+import { InlineQueryError } from '../components/InlineQueryError';
 import { useLeagueSettings, venuesFrom } from '../hooks/useLeagueSettings';
 import { isMissingSchemaObject } from '../lib/schemaGaps';
 import { Avatar } from '../components/Avatar';
@@ -51,16 +52,26 @@ export default function PlayerPage() {
     ? canChallenge(myRanking.ranking.position, targetRanking.ranking.position, isFirstChallenge)
     : false;
 
-  const { data: matches = [], isLoading: matchesLoading } = useQuery<Match[]>({
+  const {
+    data: matches = [],
+    isLoading: matchesLoading,
+    isError: matchesError,
+    refetch: refetchMatches,
+  } = useQuery<Match[]>({
     queryKey: ['player-matches', id],
     queryFn: async () => {
-      const { data } = await supabase
+      // Throws rather than returning []. This is another member's public
+      // record: rendering a failed read as "No matches yet." tells everyone
+      // looking that they have never played, which on a ladder is a claim
+      // about them, not about the network.
+      const { data, error } = await supabase
         .from('matches')
         .select('*')
         .or(`player1_id.eq.${id},player2_id.eq.${id}`)
         .in('status', ['confirmed', 'resolved'])
         .order('completed_at', { ascending: false })
         .limit(20);
+      if (error) throw error;
       return data ?? [];
     },
     enabled: !!id,
@@ -69,10 +80,11 @@ export default function PlayerPage() {
   const { data: disciplineStats = [] } = useQuery<PlayerDisciplineStats[]>({
     queryKey: ['player-discipline-stats', id],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('player_discipline_stats')
         .select('*')
         .eq('player_id', id);
+      if (error) throw error;
       return data ?? [];
     },
     enabled: !!id,
@@ -425,6 +437,11 @@ export default function PlayerPage() {
             <div className="space-y-2">
               {Array.from({ length: 3 }).map((_, i) => <div key={i} className="skeleton h-12 rounded-lg" />)}
             </div>
+          ) : matchesError ? (
+            <InlineQueryError
+              message="Couldn't load this player's match history."
+              onRetry={() => refetchMatches()}
+            />
           ) : matches.length === 0 ? (
             <p className="text-[#9CA3AF] text-sm font-[Barlow] py-4 text-center">No matches yet.</p>
           ) : (
