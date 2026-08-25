@@ -16,6 +16,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useRankings } from '../hooks/useRankings';
+import { LIVE_MATCH_POLL_MS } from '../lib/polling';
 import { PoolBall } from '../components/PoolBall';
 import { GlassCard } from '../components/GlassCard';
 import { QueryError } from '../components/QueryError';
@@ -223,7 +224,11 @@ export default function MatchPage() {
       return data;
     },
     enabled: !!id,
-    refetchInterval: 5000,
+    // Both players sit on this screen for the length of a race. Realtime
+    // invalidates ['match'] on every matches write, so the score moves as it is
+    // entered; this is the backstop, not the mechanism. At 5 seconds it was
+    // 720 requests an hour per player watching a single match.
+    refetchInterval: LIVE_MATCH_POLL_MS,
   });
 
   // Only take over the screen when we have nothing cached — a failed

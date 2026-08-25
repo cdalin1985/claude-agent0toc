@@ -18,6 +18,14 @@ import { AdminThemeSwitcher } from './admin/AdminThemeSwitcher';
 import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { routeForIdentity } from '../lib/routeForIdentity';
+import { BACKSTOP_POLL_MS } from '../lib/polling';
+
+// How long to let a burst of realtime messages settle before refetching. One
+// ladder move arrives as ~22 separate postgres_changes messages (see the
+// subscription below); this turns that into one refetch. Long enough to cover
+// the burst, short enough that a member watching the list still sees it move
+// as it happens.
+const REALTIME_COALESCE_MS = 400;
 
 // Screens that show bottom nav
 const NAV_ROUTES = ['/', '/rankings', '/matches', '/notifications', '/settings', '/challenges'];
@@ -180,27 +188,74 @@ export const Layout: React.FC = () => {
   }, [session, player, identityStatus, isLoading, location.pathname, navigate]);
 
   // Realtime subscriptions
+  //
+  // Two things were wrong here, and they compounded.
+  //
+  // One: a single ladder move is not a single event. cascade_ranking_after_win
+  // parks every row between the two players at position + 1000, moves the
+  // winner, then brings the block back -- so a win costs roughly
+  // 2 x (spots climbed) + 2 row UPDATEs on `rankings`, each its own WAL record
+  // and so its own postgres_changes message. A 10-spot first challenge is ~22
+  // messages. Every one of them invalidated ['rankings'], and that query
+  // refetches four whole tables. Every connected member paid for all of it,
+  // at once, per win. With the league at 66 players and four matches on record
+  // it is invisible; it is not the kind of thing to discover at 100.
+  //
+  // Two: the keys were aimed slightly wrong. The Home screen's own cards read
+  // from ['home-pending-challenges'] and ['home-action-matches'], which do not
+  // prefix-match ['challenges'] or ['matches'], so realtime never refreshed
+  // them -- their 30-second polls were doing the entire job. (MatchPage and
+  // NotificationsPage already listed those keys by hand when they mutated,
+  // which is how the mismatch stayed hidden.)
+  //
+  // So: collect the keys a burst touches, invalidate each once when it settles,
+  // and name every key that actually depends on the table. The polls that were
+  // covering for this are now backstops rather than the mechanism, and their
+  // intervals have been raised to match.
   useEffect(() => {
     if (!session) return;
+
+    const pending = new Set<string>();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const flush = () => {
+      timer = null;
+      const keys = [...pending];
+      pending.clear();
+      for (const key of keys) queryClient.invalidateQueries({ queryKey: [key] });
+    };
+
+    // Trailing edge, deliberately. A burst arrives over tens of milliseconds
+    // and the last message is the one that leaves the ladder in its final
+    // shape, so refetching once after it settles is both cheaper and more
+    // correct than refetching on the first and catching a half-applied move.
+    const invalidate = (...keys: string[]) => {
+      for (const key of keys) pending.add(key);
+      if (timer === null) timer = setTimeout(flush, REALTIME_COALESCE_MS);
+    };
+
     const channel = supabase.channel('toc-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rankings' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['rankings'] });
+        invalidate('rankings');
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'challenges' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['challenges'] });
+        invalidate('challenges', 'home-pending-challenges', 'active-challenge-player-ids');
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['matches'] });
+        invalidate('matches', 'home-action-matches', 'match', 'rank1-compliance');
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        invalidate('notifications');
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_feed' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['activity-feed'] });
-        queryClient.invalidateQueries({ queryKey: ['activity-feed-full'] });
+        invalidate('activity-feed', 'activity-feed-full');
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+
+    return () => {
+      if (timer !== null) clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
   }, [session, queryClient]);
 
   // Offline detection
@@ -225,7 +280,9 @@ export const Layout: React.FC = () => {
       return count ?? 0;
     },
     enabled: !!player,
-    refetchInterval: 30000,
+    // ['notifications'] prefix-matches this key, so the realtime INSERT handler
+    // above already refreshes the badge the moment a notification lands.
+    refetchInterval: BACKSTOP_POLL_MS,
   });
 
   // Only take over the screen when there is nothing to fall back on. If an

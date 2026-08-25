@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { BACKSTOP_POLL_MS } from '../lib/polling';
 import type { RankedPlayer, Player, Ranking, PlayerMetrics, PlayerSeasonStats } from '../types/database';
 
 export function useRankings() {
@@ -48,7 +49,13 @@ export function useRankings() {
         stats:   stats.find((s)   => s.player_id === r.player_id) ?? null,
       })).filter((rp) => rp.player);
     },
-    staleTime: 15_000,
-    refetchInterval: 30_000,
+    // This one query reads four whole tables, so it is the most expensive thing
+    // any screen does and the most widely shared -- eight pages call it. The
+    // realtime handler in Layout.tsx invalidates ['rankings'] whenever the
+    // ladder actually moves, so polling is a backstop for a dropped socket
+    // rather than how the list stays current. It used to refetch all four
+    // tables every 30 seconds in every open tab regardless.
+    staleTime: 30_000,
+    refetchInterval: BACKSTOP_POLL_MS,
   });
 }

@@ -28,11 +28,18 @@ export default function MatchesPage() {
     queryKey: ['matches', player?.id],
     queryFn: async () => {
       if (!player) return [];
+      // Bounded. This is the one query in the app that grew with a member's
+      // whole history rather than with the size of the league, so it was the
+      // only one with no ceiling at all -- a member five years in would have
+      // been fetching every match they had ever played, on every visit, to
+      // render a screen that shows the recent ones. 200 is far more than the
+      // page can usefully show and still a bound.
       const { data, error } = await supabase
         .from('matches')
         .select('*')
         .or(`player1_id.eq.${player.id},player2_id.eq.${player.id}`)
-        .order('scheduled_at', { ascending: false });
+        .order('scheduled_at', { ascending: false })
+        .limit(200);
       if (error) throw error;
       return data ?? [];
     },
