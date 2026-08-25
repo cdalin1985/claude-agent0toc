@@ -722,6 +722,7 @@ function RankingsTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const [order, setOrder]   = useState<RankRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved]   = useState(false);
+  const [saveError, setSaveError] = useState('');
   const displayedOrder = order.length > 0 ? order : rawRankings;
 
   // Never offer an editable ladder built from a failed read: saving it would
@@ -755,18 +756,36 @@ function RankingsTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
 
   const handleSave = async () => {
     setSaving(true);
-    await Promise.all(
-      displayedOrder.map((r, i) =>
-        supabase.from('rankings')
-          .update({ position: i + 1, previous_position: r.position })
-          .eq('player_id', r.player_id)
-      )
-    );
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-    qc.invalidateQueries({ queryKey: ['rankings'] });
-    qc.invalidateQueries({ queryKey: ['admin-rankings'] });
+    setSaved(false);
+    setSaveError('');
+
+    try {
+      const { error } = await supabase.rpc('admin_reorder_rankings', {
+        p_player_ids: displayedOrder.map((r) => r.player_id),
+      });
+
+      if (error) {
+        setSaveError(failureMessage('Could not save ranking order', error.message));
+        return;
+      }
+
+      // Wait for the authoritative rows before dropping the staged order. If
+      // this refetch fails, TanStack keeps the query stale and retries later;
+      // the database transaction has still succeeded and realtime will also
+      // invalidate the member-facing ladder.
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['rankings'] }),
+        qc.invalidateQueries({ queryKey: ['admin-rankings'] }),
+        qc.invalidateQueries({ queryKey: ['audit-events'] }),
+      ]);
+      setOrder([]);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      setSaveError('Network error — the ranking order was not saved. Try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (displayedOrder.length === 0) {
@@ -812,6 +831,12 @@ function RankingsTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
           );
         })}
       </div>
+
+      {saveError && (
+        <p role="alert" className="text-[#EF4444] text-xs font-[Barlow] px-1">
+          {saveError}
+        </p>
+      )}
 
       <div className="flex gap-2 pt-2">
         <Button variant="ghost" fullWidth disabled={!isDirty} onClick={() => setOrder(rawRankings)}>
