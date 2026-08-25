@@ -5,6 +5,7 @@ import { Swords, Trophy, TrendingUp, AlertTriangle, DollarSign, X, Target } from
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { useRankings } from '../hooks/useRankings';
+import { BACKSTOP_POLL_MS } from '../lib/polling';
 import { supabase } from '../lib/supabase';
 import { PoolBall } from '../components/PoolBall';
 import { GlassCard } from '../components/GlassCard';
@@ -47,7 +48,8 @@ export default function HomePage() {
       return data ?? [];
     },
     enabled: !!player,
-    refetchInterval: 30000,
+    // Realtime invalidates ['home-pending-challenges'] on any challenges write.
+    refetchInterval: BACKSTOP_POLL_MS,
   });
 
   // Active matches needing action
@@ -63,7 +65,8 @@ export default function HomePage() {
       return data ?? [];
     },
     enabled: !!player,
-    refetchInterval: 30000,
+    // Realtime invalidates ['home-action-matches'] on any matches write.
+    refetchInterval: BACKSTOP_POLL_MS,
   });
 
   const { data: notifications = [] } = useQuery<Notification[]>({
@@ -151,7 +154,9 @@ export default function HomePage() {
       };
     },
     enabled: !!player && isRank1,
-    refetchInterval: 60000,
+    // Only the #1 player runs this, and only a confirmed match can change the
+    // answer -- which realtime now invalidates ['rank1-compliance'] for.
+    refetchInterval: BACKSTOP_POLL_MS,
   });
 
   const myStats = myRanking?.stats;
