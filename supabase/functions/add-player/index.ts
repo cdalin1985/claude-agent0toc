@@ -288,6 +288,23 @@ serve(async (req) => {
       }
     }
 
+    // The admin just told us which address belongs to this player, so record
+    // it as the roster email too. Without this the two onboarding paths drift:
+    // invited members are linked but have nothing on file, so if they ever
+    // needed to re-claim (account lost, profile unlinked) the self-service
+    // route would refuse them. Upsert, because re-inviting with a corrected
+    // address should correct the roster rather than fail on the primary key.
+    const { error: rosterError } = await supabase
+      .from('player_roster_emails')
+      .upsert({
+        player_id: existingPlayer.id,
+        email,
+        added_by: actorProfile.id,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'player_id' });
+    // Never fail an invite that already linked the account over this.
+    if (rosterError) console.error(`[add-player] roster email upsert failed for ${existingPlayer.id}: ${rosterError.message}`);
+
     await supabase.from('audit_events').insert({
       actor_profile_id: actorProfile.id,
       action: 'player.invited',
