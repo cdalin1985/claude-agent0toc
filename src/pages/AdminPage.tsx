@@ -1389,10 +1389,17 @@ const RULE_FIELDS: Array<{ key: keyof SettingsFormState; label: string; unit: st
   { key: 'challenge_range', label: 'Challenge range', unit: 'spots (normal)' },
   { key: 'first_challenge_range', label: 'First challenge range', unit: 'spots (first ever)' },
   { key: 'challenge_weekly_limit', label: 'Weekly challenge limit', unit: 'challenges per 7 days' },
-  { key: 'challenge_response_hours', label: 'Challenge response window', unit: 'hours to accept/decline' },
   { key: 'match_play_days', label: 'Match play window', unit: 'days after acceptance' },
   { key: 'cooldown_hours', label: 'Post-match cooldown', unit: 'hours before challenging up' },
-  { key: 'challenge_expiry_days', label: 'Challenge expiry', unit: 'days until auto-expire' },
+  // This IS the response window -- the rulebook's 48 hours, in days. It is the
+  // value create-challenge sets expires_at from.
+  //
+  // challenge_response_hours used to sit above it, labelled "Challenge response
+  // window / hours to accept/decline", and nothing anywhere read it. An admin
+  // could set it to 24, watch it save, and change nothing about the league. A
+  // control that reports success and does nothing is the same defect as a save
+  // button that always says "Saved"; it is removed rather than relabelled.
+  { key: 'challenge_expiry_days', label: 'Challenge response window', unit: 'days to accept/decline' },
 ];
 
 type SettingsFieldProps = {

@@ -49,7 +49,7 @@ export default function RulesPage() {
   const firstRange     = settings?.first_challenge_range ?? 10;
   const cooldownHours  = settings?.cooldown_hours ?? 24;
   const weeklyLimit    = settings?.challenge_weekly_limit ?? 2;
-  const expiryDays     = settings?.challenge_expiry_days ?? 7;
+  const expiryDays     = settings?.challenge_expiry_days ?? 2;
   const playDays       = settings?.match_play_days ?? 10;
   // One definition of the fallback list, shared with every other screen.
   const venues         = venuesFrom(settings as LeagueSettings | null);

@@ -157,7 +157,9 @@ serve(async (req) => {
     const maxRace = settings?.max_race;
     const challengeRange = settings?.challenge_range ?? 5;
     const firstChallengeRange = settings?.first_challenge_range ?? 10;
-    const challengeExpiryDays = settings?.challenge_expiry_days ?? 7;
+    // 2, not 7. The rulebook gives 48 hours to answer; if settings cannot be
+    // read, falling back to a week silently grants six extra days.
+    const challengeExpiryDays = settings?.challenge_expiry_days ?? 2;
     const weeklyLimit = settings?.challenge_weekly_limit ?? 2;
 
     const validDisciplines = ['8 Ball', '9 Ball', '10 Ball'];
