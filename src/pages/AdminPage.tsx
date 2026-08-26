@@ -12,6 +12,7 @@ import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { QueryError } from '../components/QueryError';
+import { InlineQueryError } from '../components/InlineQueryError';
 import { formatDistanceToNow, formatDate } from '../utils/time';
 import type { Match, Player, AuditEvent, LeagueSettings, Challenge } from '../types/database';
 import { fetchTreasurySnapshot, formatCents, ledgerSignFor } from '../lib/treasury';
@@ -862,6 +863,28 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     },
   });
 
+  // The sign-in address an admin expects for each player. Lives in its own
+  // admin-only table rather than on players, because ClaimPage reads players
+  // with select('*') and this must never reach a member's browser.
+  const {
+    data: rosterEmails = [],
+    isError: rosterError,
+    refetch: refetchRoster,
+  } = useQuery<{ player_id: string; email: string }[]>({
+    queryKey: ['admin-roster-emails'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('player_roster_emails')
+        .select('player_id, email');
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const rosterByPlayer = useMemo(
+    () => new Map(rosterEmails.map((r) => [r.player_id, r.email])),
+    [rosterEmails],
+  );
+
   // Metrics lookup for Fargo ratings
   const playerIds = useMemo(() => players.map((p) => p.id), [players]);
   const { data: metrics = [] } = useQuery<{ player_id: string; fargo_rating: number | null }[]>({
@@ -902,6 +925,38 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
       // Longest-inactive first: the ones nearest removal are the ones to look at.
       .sort((a, b) => (b.days ?? -1) - (a.days ?? -1));
   }, [players]);
+
+  const [emailEditingId, setEmailEditingId] = useState<string | null>(null);
+  const [emailDraft, setEmailDraft]         = useState('');
+  const [emailError, setEmailError]         = useState('');
+  const [emailSaving, setEmailSaving]       = useState(false);
+
+  const saveRosterEmail = async (p: Player) => {
+    const email = emailDraft.trim().toLowerCase();
+    // The column is CHECK-constrained to lowercase and a plausible shape, so a
+    // bad address comes back as a constraint violation nobody can read. Catch
+    // the obvious case here and let the constraint be the backstop.
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email)) {
+      setEmailError("That does not look like an email address.");
+      return;
+    }
+    setEmailSaving(true);
+    setEmailError('');
+    const { error } = await supabase
+      .from('player_roster_emails')
+      .upsert({ player_id: p.id, email }, { onConflict: 'player_id' });
+    setEmailSaving(false);
+    if (error) {
+      // 23505 is the unique index: one address, one member.
+      setEmailError(error.code === '23505'
+        ? 'Another player already has that email on file.'
+        : failureMessage('Could not save that email', error.message));
+      return;
+    }
+    setEmailEditingId(null);
+    setEmailDraft('');
+    qc.invalidateQueries({ queryKey: ['admin-roster-emails'] });
+  };
 
   const reviewBand = (days: number | null) => {
     if (days === null) return { label: 'No date recorded', variant: 'default' as const };
@@ -1118,6 +1173,16 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
       </div>
 
       <p className="text-[#9CA3AF] text-xs font-[Barlow]">{filteredPlayers.length} {filter === 'all' ? 'total' : filter} players</p>
+      {/* Without this, a failed roster read renders as "no sign-up email"
+          against every player -- a confident false statement that would have
+          an admin re-entering addresses they had already saved. Same defect
+          the Home screen had; not repeating it here. */}
+      {rosterError && (
+        <InlineQueryError
+          message="Couldn't load the sign-up emails, so the roster status below may be wrong."
+          onRetry={() => refetchRoster()}
+        />
+      )}
       {filteredPlayers.map((p) => {
         const fr = fargoByPlayer.get(p.id);
         const isInviting = invitingId === p.id;
@@ -1131,9 +1196,30 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
                     <span className="ml-2 text-[#9CA3AF] font-normal">FR {fr}</span>
                   )}
                 </div>
-                <div className="text-[#9CA3AF] text-xs font-[Barlow]">{p.profile_id ? 'Claimed' : 'Unclaimed'}</div>
+                <div className="text-[#9CA3AF] text-xs font-[Barlow]">
+                  {p.profile_id ? 'Claimed' : 'Unclaimed'}
+                  {/* An unclaimed player with no email on file cannot sign
+                      themselves up -- claim-player fails closed -- so it is
+                      the one thing an admin needs to see at a glance here. */}
+                  {!p.profile_id && (
+                    rosterByPlayer.has(p.id)
+                      ? <span className="ml-2 text-[#22C55E]">· {rosterByPlayer.get(p.id)}</span>
+                      : <span className="ml-2 text-[#F59E0B]">· no sign-up email</span>
+                  )}
+                </div>
               </div>
-              {!p.profile_id && !isInviting && (
+              {!p.profile_id && !isInviting && emailEditingId !== p.id && (
+                <button
+                  onClick={() => {
+                    setEmailEditingId(p.id);
+                    setEmailDraft(rosterByPlayer.get(p.id) ?? '');
+                    setEmailError('');
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-[Barlow] font-medium transition-colors bg-[#C9A227]/20 text-[#C9A227] border border-[#C9A227]/30">
+                  {rosterByPlayer.has(p.id) ? 'Change email' : 'Set email'}
+                </button>
+              )}
+              {!p.profile_id && !isInviting && emailEditingId !== p.id && (
                 <button
                   onClick={() => { setInvitingId(p.id); setInviteEmail(''); setInviteError(''); setInviteBanner(''); }}
                   className="px-3 py-1.5 rounded-lg text-xs font-[Barlow] font-medium transition-colors bg-[#3B82F6]/20 text-[#3B82F6] border border-[#3B82F6]/30">
@@ -1145,6 +1231,29 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
                 {activeToggling === p.id ? 'Saving…' : p.is_active ? 'Deactivate' : 'Activate'}
               </button>
             </div>
+            {emailEditingId === p.id && (
+              <div className="mt-3 space-y-2">
+                <p className="text-[#9CA3AF] text-xs font-[Barlow]">
+                  The address {p.full_name} signs in with. They can only claim this profile
+                  themselves if it matches.
+                </p>
+                <input aria-label={`Roster sign-up email for ${p.full_name}`}
+                  type="email"
+                  inputMode="email"
+                  autoFocus
+                  value={emailDraft}
+                  onChange={(e) => { setEmailDraft(e.target.value); setEmailError(''); }}
+                  onKeyDown={(e) => e.key === 'Enter' && saveRosterEmail(p)}
+                  placeholder={`Sign-up email for ${p.full_name}`}
+                  className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
+                />
+                {emailError && <p className="text-[#EF4444] text-xs font-[Barlow]">{emailError}</p>}
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => { setEmailEditingId(null); setEmailDraft(''); setEmailError(''); }}>Cancel</Button>
+                  <Button variant="primary" size="sm" loading={emailSaving} disabled={!emailDraft.trim()} onClick={() => saveRosterEmail(p)}>Save email</Button>
+                </div>
+              </div>
+            )}
             {isInviting && (
               <div className="mt-3 space-y-2">
                 <input aria-label="Email address for the invitation"

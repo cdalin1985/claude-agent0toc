@@ -373,6 +373,26 @@ export interface Database {
         Insert: never;
         Update: Partial<Omit<Database['public']['Tables']['player_preferences']['Row'], 'player_id'>>;
       };
+      // The sign-in address an admin expects for each player, used to gate
+      // self-service claims. Admin-only by RLS and by grant: deliberately NOT a
+      // column on `players`, because ClaimPage and Settings read that table with
+      // select('*') and this must never reach a member's browser.
+      player_roster_emails: {
+        Row: {
+          player_id: string;
+          email: string;
+          added_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          player_id: string;
+          email: string;
+          added_by?: string | null;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<Database['public']['Tables']['player_roster_emails']['Row'], 'player_id' | 'created_at'>>;
+      };
       challenge_proposals: {
         Row: {
           id: string;
