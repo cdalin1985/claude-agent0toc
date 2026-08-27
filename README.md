@@ -240,7 +240,13 @@ live challenge notifications, and a leaderboard that updates the moment a match 
 confirmed.
 
 - **Magic link login** — no passwords, just your email
-- **Claim your profile** — find your name, tap it, it's yours
+- **Claim your profile** — find your name, tap it, it's yours. An admin can pin a name to
+  one sign-up email, and then only that address can claim it. A name with nothing pinned is
+  open to any signed-in account, which is the trade for not having to collect everybody's
+  address before anyone can sign in: every claim is posted to the activity feed and sent to
+  every admin, and an admin can undo a wrong one with **Release claim** in Admin → Players.
+  Releasing puts the name back on the unclaimed list and leaves its ladder position and
+  history untouched.
 - **Real-time updates** — rankings shift live as matches are confirmed
 - **Full stats by discipline** — win rates, streaks, challenger vs defender record in 8-Ball, 9-Ball, and 10-Ball separately
 - **Works on your phone** — installable PWA, designed mobile-first

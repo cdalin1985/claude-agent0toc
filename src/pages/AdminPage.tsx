@@ -958,6 +958,45 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     qc.invalidateQueries({ queryKey: ['admin-roster-emails'] });
   };
 
+  const [releasingId, setReleasingId]           = useState<string | null>(null);
+  const [releaseError, setReleaseError]         = useState('');
+  const [confirmReleaseId, setConfirmReleaseId] = useState<string | null>(null);
+
+  // The other half of an open claim. claim-player lets any signed-in account
+  // take a name nobody has pinned to an address, so the reversal has to be one
+  // tap, and it has to live here next to the claim it undoes -- an admin who
+  // has just been notified about a wrong claim is already looking at this list.
+  const releaseClaim = async (p: Player) => {
+    setReleasingId(p.id);
+    setReleaseError('');
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      setReleaseError('Session expired — please log in again.');
+      setReleasingId(null);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/release-claim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ player_id: p.id }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json.error) {
+        setReleaseError(json.error ?? 'Could not release that claim.');
+        return;
+      }
+      setConfirmReleaseId(null);
+      qc.invalidateQueries({ queryKey: ['admin-players'] });
+      qc.invalidateQueries({ queryKey: ['audit-events'] });
+    } catch {
+      setReleaseError('Network error — please try again.');
+    } finally {
+      setReleasingId(null);
+    }
+  };
+
   const reviewBand = (days: number | null) => {
     if (days === null) return { label: 'No date recorded', variant: 'default' as const };
     if (days >= 90) return { label: `${days}d · review for removal`, variant: 'loss' as const };
@@ -1198,13 +1237,15 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
                 </div>
                 <div className="text-[#9CA3AF] text-xs font-[Barlow]">
                   {p.profile_id ? 'Claimed' : 'Unclaimed'}
-                  {/* An unclaimed player with no email on file cannot sign
-                      themselves up -- claim-player fails closed -- so it is
-                      the one thing an admin needs to see at a glance here. */}
+                  {/* Which of the two claim rules this name is under, because
+                      they are not the same risk. Pinned to an address means
+                      only that address can take it. Open means any signed-in
+                      account can, and an admin hears about it from the alert
+                      afterwards rather than from the gate beforehand. */}
                   {!p.profile_id && (
                     rosterByPlayer.has(p.id)
-                      ? <span className="ml-2 text-[#22C55E]">· {rosterByPlayer.get(p.id)}</span>
-                      : <span className="ml-2 text-[#F59E0B]">· no sign-up email</span>
+                      ? <span className="ml-2 text-[#22C55E]">· locked to {rosterByPlayer.get(p.id)}</span>
+                      : <span className="ml-2 text-[#F59E0B]">· open to anyone signed in</span>
                   )}
                 </div>
               </div>
@@ -1226,6 +1267,13 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
                   Invite
                 </button>
               )}
+              {p.profile_id && confirmReleaseId !== p.id && (
+                <button
+                  onClick={() => { setConfirmReleaseId(p.id); setReleaseError(''); }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-[Barlow] font-medium transition-colors bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30">
+                  Release claim
+                </button>
+              )}
               <button onClick={() => toggleActive(p)} disabled={activeToggling === p.id}
                 className={`px-3 py-1.5 rounded-lg text-xs font-[Barlow] font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${p.is_active ? 'bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/30' : 'bg-[#22C55E]/20 text-[#22C55E] border border-[#22C55E]/30'}`}>
                 {activeToggling === p.id ? 'Saving…' : p.is_active ? 'Deactivate' : 'Activate'}
@@ -1234,8 +1282,9 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
             {emailEditingId === p.id && (
               <div className="mt-3 space-y-2">
                 <p className="text-[#9CA3AF] text-xs font-[Barlow]">
-                  The address {p.full_name} signs in with. They can only claim this profile
-                  themselves if it matches.
+                  The address {p.full_name} signs in with. Set one and only that address can
+                  claim this profile. Leave it blank and anyone signed in can — you get an
+                  alert and can release it.
                 </p>
                 <input aria-label={`Roster sign-up email for ${p.full_name}`}
                   type="email"
@@ -1251,6 +1300,20 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
                 <div className="flex gap-2">
                   <Button variant="ghost" size="sm" onClick={() => { setEmailEditingId(null); setEmailDraft(''); setEmailError(''); }}>Cancel</Button>
                   <Button variant="primary" size="sm" loading={emailSaving} disabled={!emailDraft.trim()} onClick={() => saveRosterEmail(p)}>Save email</Button>
+                </div>
+              </div>
+            )}
+            {confirmReleaseId === p.id && (
+              <div className="mt-3 space-y-2">
+                <p className="text-[#9CA3AF] text-xs font-[Barlow]">
+                  Unlink the account that claimed {p.full_name}. The name goes back on the
+                  unclaimed list and their ladder position and history stay exactly as they are.
+                  Set a sign-up email first if only one address should be able to take it next time.
+                </p>
+                {releaseError && <p className="text-[#EF4444] text-xs font-[Barlow]">{releaseError}</p>}
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => { setConfirmReleaseId(null); setReleaseError(''); }}>Cancel</Button>
+                  <Button variant="primary" size="sm" loading={releasingId === p.id} onClick={() => releaseClaim(p)}>Release claim</Button>
                 </div>
               </div>
             )}

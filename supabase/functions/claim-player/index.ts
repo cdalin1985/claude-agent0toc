@@ -44,17 +44,19 @@ serve(async (req) => {
 
     // Is this name yours?
     //
-    // Until this existed the answer was "whoever asks first". A claimed profile
-    // accepts and declines challenges -- declining is a forfeit that hands over
-    // a ladder spot -- and submits results, so taking somebody else's name is
-    // not a cosmetic prank. An admin puts the expected address on the roster;
-    // this is where it is checked.
+    // Two answers are acceptable, and which one applies is the admin's choice
+    // per player. If an address is on the roster the claim has to match it --
+    // an admin has said who that name belongs to, and that is binding. If
+    // nothing is on file the claim goes through, because requiring an address
+    // up front means collecting 66 of them before anybody can sign in, and TOC
+    // onboards at the table rather than by spreadsheet.
     //
-    // No roster email means no claim, deliberately. An unclaimed name with
-    // nothing on file is exactly the one an impostor would pick, so "not set
-    // up yet" has to fail closed. The admin invite path in add-player links
-    // profile_id directly and does not come through here, so this refuses
-    // nobody who was invited properly.
+    // Failing open is a deliberate trade, not an oversight. It is paid for by
+    // making the claim loud instead of silent: an audit row recording whether
+    // the roster was checked, a line in the public activity feed, and a
+    // notification to every admin -- who can undo it from the Admin tab with
+    // Release claim. Prevention for the names an admin has pinned; detection
+    // and a fast reversal for the rest.
     const { data: rosterRow, error: rosterError } = await supabase
       .from('player_roster_emails')
       .select('email')
@@ -62,21 +64,19 @@ serve(async (req) => {
       .maybeSingle();
 
     if (rosterError) {
+      // A failed read must not be read as "no address on file". That would turn
+      // a transient database blip into an open door on a pinned name.
       console.error(`[claim] roster lookup failed for player ${player_id}: ${rosterError.message}`);
       return new Response(JSON.stringify({ error: 'Could not check that profile. Please try again.' }), { status: 500, headers: corsHeaders });
-    }
-
-    if (!rosterRow?.email) {
-      return new Response(JSON.stringify({
-        error: `${targetPlayer.full_name} is not set up for self sign-up yet. Ask a TOC admin to add your email to the roster, or to send you an invite.`,
-      }), { status: 403, headers: corsHeaders });
     }
 
     // Both sides lowercased and trimmed. The roster column is CHECK-constrained
     // to already be lowercase, but the address on the token comes from whatever
     // the member typed into the sign-in box.
     const signedInEmail = (user.email ?? '').trim().toLowerCase();
-    if (!signedInEmail || signedInEmail !== rosterRow.email) {
+    const isPinned = Boolean(rosterRow?.email);
+
+    if (isPinned && (!signedInEmail || signedInEmail !== rosterRow.email)) {
       // Deliberately does not say which address is on file. Telling an
       // unrecognised caller "we expected dave@..." hands out a member's email
       // to anyone who can guess a name off the public ladder.
@@ -115,12 +115,70 @@ serve(async (req) => {
       action: 'claim_player',
       target_type: 'player',
       target_id: player_id,
-      // Records that the roster gate was applied, not just that a claim
-      // happened. If this rule is ever loosened, the audit trail shows which
-      // claims were checked and which were not.
-      detail: { player_name: targetPlayer.full_name, matched_roster_email: true },
+      // Records whether the roster gate applied, not just that a claim
+      // happened. Unpinned names are claimable by any signed-in account, so
+      // "which claims were actually checked" is the question to answer later.
+      detail: {
+        player_name: targetPlayer.full_name,
+        matched_roster_email: isPinned,
+        claimed_by_email: signedInEmail || null,
+      },
     });
     if (auditError) console.error(`[claim] audit insert failed for player ${player_id}: ${auditError.message}`);
+
+    // Say it out loud. An unpinned claim is not checked against anything, so
+    // the safety net is that a wrong one is visible immediately -- to the whole
+    // league in the feed, and to admins as a notification -- rather than
+    // surfacing weeks later as a forfeited ladder spot.
+    const { error: feedError } = await supabase.from('activity_feed').insert({
+      event_type: 'player_claimed',
+      headline: `${targetPlayer.full_name} claimed their profile.`,
+      detail: isPinned
+        ? 'Matched the sign-up email on file.'
+        : 'Self sign-up · not checked against a sign-up email.',
+      actor_player_id: player_id,
+    });
+    if (feedError) console.error(`[claim] activity insert failed for player ${player_id}: ${feedError.message}`);
+
+    // Notify every admin who has a player row of their own. notification_category
+    // returns NULL for this type and player_accepts_notification treats an
+    // unknown category as "deliver", so this cannot be switched off in
+    // preferences -- which is the point of an alert.
+    const { data: adminProfiles, error: adminLookupError } = await supabase
+      .from('profiles')
+      .select('id')
+      .in('role', ['admin', 'super_admin']);
+
+    if (adminLookupError) {
+      console.error(`[claim] admin lookup failed for player ${player_id}: ${adminLookupError.message}`);
+    } else if (adminProfiles?.length) {
+      const { data: adminPlayers, error: adminPlayerError } = await supabase
+        .from('players')
+        .select('id')
+        .in('profile_id', adminProfiles.map((p: { id: string }) => p.id));
+
+      if (adminPlayerError) {
+        console.error(`[claim] admin player lookup failed for player ${player_id}: ${adminPlayerError.message}`);
+      } else if (adminPlayers?.length) {
+        const rows = adminPlayers
+          // The claimant does not need telling about their own claim.
+          .filter((a: { id: string }) => a.id !== player_id)
+          .map((a: { id: string }) => ({
+            player_id: a.id,
+            type: 'player_claimed',
+            title: isPinned ? 'Profile claimed' : 'Profile claimed — not verified',
+            body: isPinned
+              ? `${targetPlayer.full_name} signed up and matched the email on file.`
+              : `${targetPlayer.full_name} was claimed by ${signedInEmail || 'an account with no email'}, with no sign-up email on file to check it against. Release the claim from the Admin tab if that is not them.`,
+            reference_type: 'player',
+          }));
+
+        if (rows.length) {
+          const { error: notifyError } = await supabase.from('notifications').insert(rows);
+          if (notifyError) console.error(`[claim] admin notify failed for player ${player_id}: ${notifyError.message}`);
+        }
+      }
+    }
 
     return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
