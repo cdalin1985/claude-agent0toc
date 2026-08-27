@@ -116,6 +116,7 @@ jobs:
           create-challenge:false
           manage-treasury:true
           rank1-compliance:true
+          release-claim:true
           report-no-show:true
           resolve-dispute:true
           respond-to-challenge:true
