@@ -10,9 +10,24 @@ name: Migration deploy drift check
 # Requires a repo secret PROD_DB_URL: a Postgres connection string for the
 # production database (read-only role is sufficient; it only SELECTs from
 # supabase_migrations.schema_migrations).
+#
+# WHY workflow_run AND NOT push. This used to trigger on the same `push:
+# branches: [main]` event as migration-apply.yml, racing it: apply takes ~22s
+# to actually commit the new row to schema_migrations, this query ran at
+# ~8-11s, and it read the table before the write landed. Two real merges
+# (2026-08-26 03:39 and 23:53) both failed this way -- the migration in
+# question was live in production both times, seconds after the false
+# "missing" was reported. compare-migrations.sh already has a recency grace
+# window for exactly this, but it compares wall-clock now against the
+# migration's OWN filename timestamp -- when the file was authored, which has
+# no relationship to when it was actually pushed -- so it never engaged for a
+# migration that sat in review for hours before merging, which is the normal
+# case here. Running only after the apply workflow has actually finished
+# removes the race outright instead of trying to out-guess its timing.
 on:
-  push:
-    branches: [main]
+  workflow_run:
+    workflows: ['Apply migrations to production']
+    types: [completed]
   schedule:
     - cron: '0 13 * * *'
   workflow_dispatch:
@@ -20,8 +35,18 @@ on:
 jobs:
   drift-check:
     runs-on: ubuntu-latest
+    # workflow_run fires for every branch that workflow ran on (including a
+    # manual dispatch against a release branch, per its own instructions);
+    # only a run against main is a production apply worth checking.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.head_branch == 'main'
     steps:
       - uses: actions/checkout@v4
+        with:
+          # A workflow_run event's default checkout ref is the branch tip at
+          # the moment THIS check runs, not the commit the apply workflow
+          # actually ran against. They are usually the same commit, but
+          # pinning it explicitly removes the "usually."
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       # This check reported nothing at all from June to August: the secret held
       # the IPv6-only direct host, psql could not connect, and the step had no
