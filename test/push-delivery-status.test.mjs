@@ -20,12 +20,15 @@ const root = process.cwd();
 const read = (p) => readFileSync(join(root, p), 'utf8');
 
 const migrationName = readdirSync(join(root, 'supabase/migrations'))
-  .filter((f) => f.endsWith('_expose_push_delivery_status.sql') || f.endsWith('_push_status_readable_by_members.sql'))
+  .filter((f) => f.endsWith('_expose_push_delivery_status.sql')
+    || f.endsWith('_push_status_readable_by_members.sql')
+    || f.endsWith('_read_push_config_from_vault.sql'))
   .sort()
   .pop();
 const migration = read(`supabase/migrations/${migrationName}`);
 const admin = read('src/pages/AdminPage.tsx');
 const settings = read('src/pages/SettingsPage.tsx');
+const definerAssert = read('supabase/tests/migrations/04_definer_privileges_assert.sql');
 
 const sql = migration.replace(/^\s*--.*$/gm, '');
 
@@ -37,8 +40,8 @@ test('the migration exists and is named for what it does', () => {
 test('it reports the three prerequisites the push path actually needs', () => {
   // Exactly what send_reminder_push() checks before it will POST.
   assert.match(sql, /extname = 'pg_net'/);
-  assert.match(sql, /current_setting\('app\.supabase_url', true\)/);
-  assert.match(sql, /current_setting\('app\.supabase_service_role_key', true\)/);
+  assert.match(sql, /vault\.secrets WHERE name = 'project_url'/);
+  assert.match(sql, /vault\.secrets WHERE name = 'service_role_key'/);
   assert.match(sql, /v_ready := \(v_pg_net AND v_url AND v_key\);/);
   assert.match(sql, /'reminders_can_push', v_ready/);
 });
@@ -47,23 +50,31 @@ test('the service role key is never returned, only its presence', () => {
   // The whole point of the function is to report configuration without
   // becoming a way to read a service-role credential out of the database.
   const returned = sql.slice(sql.indexOf('jsonb_build_object'));
-  assert.doesNotMatch(returned, /current_setting/);
-  assert.doesNotMatch(returned, /service_role_key'\s*\)/);
+  assert.doesNotMatch(returned, /decrypted_secret/);
 
   // Presence is derived into a boolean before it reaches the payload.
-  assert.match(sql, /v_key := NULLIF\(current_setting\('app\.supabase_service_role_key', true\), ''\) IS NOT NULL;/);
   assert.match(sql, /'service_key_set',\s*v_key/);
 });
 
-test('it needs no elevated privileges', () => {
+test('elevation is required, minimal, and allowlisted', () => {
+  // This function was security invoker until the config moved into Vault.
+  // authenticated has no USAGE on the vault schema at all -- correct, and it
+  // must stay that way -- so presence cannot be established as the caller.
   // 04_definer_privileges_assert.sql flags every SECURITY DEFINER function a
-  // member can execute, and it flagged this one on the first attempt. That
-  // guard is right: an in-body role check should never be the only thing
-  // between a member and elevated code. Nothing here needs elevation --
-  // pg_extension is world-readable, current_setting() works for any role, and
-  // the admin check reads only the caller's own profiles row, which the
-  // "Users can view own profile" policy already permits.
-  assert.doesNotMatch(sql, /SECURITY DEFINER/);
+  // member can execute; this one is allowlisted there with that reasoning
+  // rather than quietly exempted.
+  assert.match(sql, /SECURITY DEFINER/);
+  assert.match(definerAssert, /'push_delivery_status'/);
+
+  // What it may do with that elevation: check a secret NAME exists. It must
+  // never decrypt one.
+  assert.match(sql, /FROM vault\.secrets WHERE name = 'project_url'/);
+  assert.match(sql, /FROM vault\.secrets WHERE name = 'service_role_key'/);
+  // Scoped to this function's body: send_reminder_push in the same migration
+  // legitimately decrypts, because it has to send the key as a bearer token.
+  // The status readout must never do that.
+  const statusBody = sql.slice(sql.indexOf('FUNCTION public.push_delivery_status()'));
+  assert.doesNotMatch(statusBody, /decrypted_secret/);
 });
 
 test('a member gets the capability flag, an admin gets the breakdown', () => {

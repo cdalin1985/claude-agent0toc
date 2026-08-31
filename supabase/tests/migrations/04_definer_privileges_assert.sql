@@ -20,7 +20,17 @@ DECLARE
   -- for one player and writes nothing; the client asks it so the UI can explain
   -- why a notification is muted. Anything added here needs the same standard of
   -- justification.
-  allowed  text[] := ARRAY['player_accepts_notification'];
+  allowed  text[] := ARRAY[
+    'player_accepts_notification',
+    -- Reports whether match-reminder push is configured. Needs elevation
+    -- because the two prerequisites now live in Vault and authenticated has no
+    -- USAGE on that schema at all -- which is correct and must stay that way.
+    -- It returns booleans only: EXISTS on a secret NAME, never a decrypted
+    -- value and never the row. A member gets one capability flag so the app can
+    -- say what a reminder will do; the breakdown of which prerequisite is
+    -- missing is gated on an admin role check inside the function.
+    'push_delivery_status'
+  ];
   offenders text;
   n        integer;
   failures text[] := '{}';
