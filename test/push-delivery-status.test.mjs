@@ -51,6 +51,17 @@ test('the service role key is never returned, only its presence', () => {
   assert.match(sql, /'service_key_set',\s*v_key/);
 });
 
+test('it needs no elevated privileges', () => {
+  // 04_definer_privileges_assert.sql flags every SECURITY DEFINER function a
+  // member can execute, and it flagged this one on the first attempt. That
+  // guard is right: an in-body role check should never be the only thing
+  // between a member and elevated code. Nothing here needs elevation --
+  // pg_extension is world-readable, current_setting() works for any role, and
+  // the admin check reads only the caller's own profiles row, which the
+  // "Users can view own profile" policy already permits.
+  assert.doesNotMatch(sql, /SECURITY DEFINER/);
+});
+
 test('it is admin-only and fails closed', () => {
   assert.match(sql, /role = ANY \(ARRAY\['admin'::text, 'super_admin'::text\]\)/);
   // COALESCE(..., false): an unreadable profile is not an admin.

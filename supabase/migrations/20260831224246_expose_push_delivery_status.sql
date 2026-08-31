@@ -24,7 +24,15 @@ CREATE OR REPLACE FUNCTION public.push_delivery_status()
 RETURNS jsonb
 LANGUAGE plpgsql
 STABLE
-SECURITY DEFINER
+-- Deliberately NOT security definer. Everything this reads is available to the
+-- caller in their own right: pg_extension is world-readable, current_setting()
+-- on a custom GUC works for any role, and the admin check reads only the
+-- caller's own profiles row, which the "Users can view own profile" policy
+-- already permits. Elevating would put it inside the net that
+-- 04_definer_privileges_assert.sql casts over every SECURITY DEFINER function
+-- reachable by a member -- correctly, since that guard exists so an in-body
+-- role check is never the only thing standing between a member and elevated
+-- code. Needing no elevation is a better answer than being an exception to it.
 SET search_path TO 'public'
 AS $function$
 DECLARE
@@ -62,13 +70,13 @@ BEGIN
 END;
 $function$;
 
--- Default privileges GRANT EXECUTE to PUBLIC on a new function. This one is
--- SECURITY DEFINER and reads server configuration, so take that back and hand
--- it out deliberately. The in-body admin check is the real gate; this keeps
--- anon from even reaching it.
+-- Default privileges GRANT EXECUTE to PUBLIC on a new function. Take that back
+-- and hand it out deliberately: this reads server configuration, so a
+-- logged-out caller should not reach it at all, and the in-body admin check
+-- handles everyone else.
 REVOKE ALL ON FUNCTION public.push_delivery_status() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.push_delivery_status() FROM anon;
 GRANT EXECUTE ON FUNCTION public.push_delivery_status() TO authenticated;
 
 COMMENT ON FUNCTION public.push_delivery_status() IS
-  'Admin-only. Reports whether match-reminder push can reach a phone: pg_net installed, app.supabase_url set, app.supabase_service_role_key set. Returns booleans only and never exposes the key itself.';
+  'Admin-only, security invoker. Reports whether match-reminder push can reach a phone: pg_net installed, app.supabase_url set, app.supabase_service_role_key set. Returns booleans only and never exposes the key itself.';
