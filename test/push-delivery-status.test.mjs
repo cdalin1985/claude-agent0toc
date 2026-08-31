@@ -20,9 +20,12 @@ const root = process.cwd();
 const read = (p) => readFileSync(join(root, p), 'utf8');
 
 const migrationName = readdirSync(join(root, 'supabase/migrations'))
-  .find((f) => f.endsWith('_expose_push_delivery_status.sql'));
+  .filter((f) => f.endsWith('_expose_push_delivery_status.sql') || f.endsWith('_push_status_readable_by_members.sql'))
+  .sort()
+  .pop();
 const migration = read(`supabase/migrations/${migrationName}`);
 const admin = read('src/pages/AdminPage.tsx');
+const settings = read('src/pages/SettingsPage.tsx');
 
 const sql = migration.replace(/^\s*--.*$/gm, '');
 
@@ -36,7 +39,8 @@ test('it reports the three prerequisites the push path actually needs', () => {
   assert.match(sql, /extname = 'pg_net'/);
   assert.match(sql, /current_setting\('app\.supabase_url', true\)/);
   assert.match(sql, /current_setting\('app\.supabase_service_role_key', true\)/);
-  assert.match(sql, /'reminders_can_push',\s*\(v_pg_net AND v_url AND v_key\)/);
+  assert.match(sql, /v_ready := \(v_pg_net AND v_url AND v_key\);/);
+  assert.match(sql, /'reminders_can_push', v_ready/);
 });
 
 test('the service role key is never returned, only its presence', () => {
@@ -62,11 +66,22 @@ test('it needs no elevated privileges', () => {
   assert.doesNotMatch(sql, /SECURITY DEFINER/);
 });
 
-test('it is admin-only and fails closed', () => {
+test('a member gets the capability flag, an admin gets the breakdown', () => {
+  // Members need to know what a reminder will DO; they do not need to know the
+  // shape of the project's configuration. Making this admin-only left the
+  // member-facing half of the problem open: once VAPID is set the toggle
+  // appears for everyone, and a member who switches it on and gets no match
+  // reminders has nothing telling them why.
   assert.match(sql, /role = ANY \(ARRAY\['admin'::text, 'super_admin'::text\]\)/);
-  // COALESCE(..., false): an unreadable profile is not an admin.
   assert.match(sql, /IF NOT COALESCE\(v_is_admin, false\) THEN/);
-  assert.match(sql, /insufficient_privilege/);
+  assert.match(sql, /RETURN jsonb_build_object\('reminders_can_push', v_ready\);/);
+
+  // A non-admin must not learn which prerequisite is missing. The member branch
+  // is everything between the admin test and the full payload below it.
+  const start = sql.indexOf('IF NOT COALESCE(v_is_admin, false) THEN');
+  const memberBranch = sql.slice(start, sql.indexOf('END IF;', start));
+  assert.doesNotMatch(memberBranch, /service_key_set/);
+  assert.doesNotMatch(memberBranch, /pg_net_installed/);
 });
 
 test('anon cannot reach it at all', () => {
@@ -96,4 +111,25 @@ test('the panel does not reintroduce a banned text colour', () => {
   // globally and caught this exact mistake when the panel was written.
   const panel = admin.slice(admin.indexOf('function PushDeliveryStatus'), admin.indexOf('function SettingsTab'));
   assert.doesNotMatch(panel, /text-\[#6B7280\]/);
+});
+
+// --- what a member is told ---------------------------------------------------
+
+test('the toggle stops promising reminders it cannot deliver', () => {
+  // It used to read "Challenges, results & more" whenever push was on. The
+  // "& more" was match reminders, which do not push unless pg_net and both app
+  // settings are configured.
+  assert.doesNotMatch(settings, /Challenges, results & more/);
+  assert.match(settings, /remindersCanPush \? 'Challenges, results & match reminders' : 'Challenges and results'/);
+});
+
+test('a member is told when reminders will not reach their phone', () => {
+  assert.match(settings, /Match reminders show in the app but won&rsquo;t buzz your phone yet\./);
+  assert.match(settings, /pushSubscribed && !remindersCanPush/);
+});
+
+test('a failed status read does not invent a warning', () => {
+  // Absent or still loading must read as fine. Defaulting the other way would
+  // put a scary note under a feature that is probably working.
+  assert.match(settings, /pushStatus\?\.reminders_can_push !== false/);
 });
