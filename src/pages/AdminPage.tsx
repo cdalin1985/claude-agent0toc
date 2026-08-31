@@ -1605,6 +1605,73 @@ function SettingsField({ label, unit, value, onChange, min = 1 }: SettingsFieldP
   );
 }
 
+// Whether a match reminder can actually reach a phone.
+//
+// check_match_reminders() always writes the in-app notification and only
+// ATTEMPTS the push. send_reminder_push() returns 0 unless pg_net is installed
+// and both app settings are present, and the cron job reports success either
+// way -- so a project with none of them has a green cron history and has never
+// delivered a push.
+//
+// That becomes actively confusing the moment VAPID keys are configured: the
+// Settings toggle appears, members switch push on, they get challenge
+// notifications (edge functions use fetch and need none of this) and no match
+// reminders. This says so out loud instead.
+function PushDeliveryStatus() {
+  const { data, isLoading, isError } = useQuery<{
+    pg_net_installed: boolean;
+    supabase_url_set: boolean;
+    service_key_set: boolean;
+    reminders_can_push: boolean;
+  }>({
+    queryKey: ['push-delivery-status'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('push_delivery_status');
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 60_000,
+  });
+
+  if (isLoading || isError || !data) return null;
+
+  const rows: { label: string; ok: boolean }[] = [
+    { label: 'pg_net extension', ok: data.pg_net_installed },
+    { label: 'app.supabase_url', ok: data.supabase_url_set },
+    { label: 'app.supabase_service_role_key', ok: data.service_key_set },
+  ];
+
+  return (
+    <GlassCard className="p-4">
+      <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-1">Match Reminder Push</h2>
+      {data.reminders_can_push ? (
+        <p className="text-[#22C55E] text-sm font-[Barlow]">
+          Configured — reminders are delivered to members&rsquo; phones.
+        </p>
+      ) : (
+        <>
+          <p className="text-[#F59E0B] text-sm font-[Barlow] mb-2">
+            Not configured. Members still see match reminders when they open the app, but nothing
+            is pushed to their phone. Challenge and result notifications are unaffected.
+          </p>
+          <ul className="space-y-1 mb-2">
+            {rows.map((r) => (
+              <li key={r.label} className="text-xs font-[Azeret_Mono] flex items-center gap-2">
+                <span className={r.ok ? 'text-[#22C55E]' : 'text-[#EF4444]'}>{r.ok ? '✓' : '✗'}</span>
+                <span className="text-[#9CA3AF]">{r.label}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-[#9CA3AF] text-xs font-[Barlow]">
+            See SETUP.md for how to set these. Only booleans are read here — the service role key
+            itself is never sent to the browser.
+          </p>
+        </>
+      )}
+    </GlassCard>
+  );
+}
+
 function SettingsTab() {
   const qc = useQueryClient();
   const { data: settings } = useQuery<LeagueSettings>({
@@ -1667,6 +1734,7 @@ function SettingsTab() {
 
   return (
     <div className="space-y-4">
+      <PushDeliveryStatus />
       <GlassCard className="p-4">
         <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-1">League Rules</h2>
         {RULE_FIELDS.map((field) => (
