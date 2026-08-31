@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 import { LogOut, User, Volume2, VolumeX, Shield, Bell, BellOff, FileText, Camera, X, Swords, Clock, Trophy } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -86,6 +87,30 @@ export default function SettingsPage() {
   const { profile, player, setPlayer, reset } = useAuthStore();
   const { soundEnabled, setSoundEnabled } = useUIStore();
   const { supported: pushSupported, subscribed: pushSubscribed, permission: pushPermission, loading: pushLoading, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications();
+
+  // Whether a match reminder will actually reach this phone.
+  //
+  // Turning push on does not mean every notification arrives. Challenges and
+  // results are sent from edge functions over fetch and always work; the 24h
+  // and 1h match reminders originate in pg_cron and need pg_net plus two app
+  // settings. Where those are missing the reminder still lands in the app and
+  // nothing buzzes -- which reads as push being unreliable rather than as a
+  // gap in the league's setup. Saying so is the difference.
+  //
+  // Members get the capability flag only; the breakdown is admin-only.
+  const { data: pushStatus } = useQuery<{ reminders_can_push?: boolean }>({
+    queryKey: ['push-delivery-status-member'],
+    enabled: pushSupported,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('push_delivery_status');
+      if (error) throw error;
+      return data ?? {};
+    },
+  });
+  // Absent or still loading is treated as "fine": a failed status read must not
+  // put a warning under a feature that may well be working.
+  const remindersCanPush = pushStatus?.reminders_can_push !== false;
   const { data: rankings = [] } = useRankings();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
@@ -654,9 +679,14 @@ export default function SettingsPage() {
                     {pushPermission === 'denied'
                       ? 'Blocked in browser settings'
                       : pushSubscribed
-                      ? 'Challenges, results & more'
+                      ? (remindersCanPush ? 'Challenges, results & match reminders' : 'Challenges and results')
                       : 'Get notified when action is needed'}
                   </div>
+                  {pushSubscribed && !remindersCanPush && (
+                    <div className="text-[#F59E0B] text-xs font-[Barlow] mt-1 max-w-[15rem]">
+                      Match reminders show in the app but won&rsquo;t buzz your phone yet.
+                    </div>
+                  )}
                 </div>
               </div>
               <button
