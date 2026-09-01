@@ -21,15 +21,19 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        # Matches production's major version.
-        image: postgres:17
+        # Supabase's own Postgres image, not stock postgres:17. pg_net (and
+        # pg_cron, pgjwt, ...) are Supabase-packaged extensions absent from
+        # vanilla Postgres, so CREATE EXTENSION pg_net fails here on stock
+        # postgres:17 even though it succeeds against every real Supabase
+        # project, including toc1. Version matches production's major version.
+        image: supabase/postgres:17.6.1.167
         env:
           POSTGRES_PASSWORD: postgres
         ports:
           - 5432:5432
         options: >-
           --health-cmd "pg_isready -U postgres"
-          --health-interval 5s --health-timeout 5s --health-retries 10
+          --health-interval 5s --health-timeout 5s --health-retries 20
     env:
       PGHOST: localhost
       PGPORT: '5432'

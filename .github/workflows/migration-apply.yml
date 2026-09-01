@@ -41,11 +41,19 @@ jobs:
 
       # Prove the set is sound against a throwaway database before touching the
       # live one. A migration that fails here must never reach production.
+      #
+      # Uses Supabase's own Postgres image, not stock postgres:17. pg_net (and
+      # pg_cron, pgjwt, ...) are Supabase-packaged extensions absent from vanilla
+      # Postgres, so CREATE EXTENSION pg_net fails here on stock postgres:17 even
+      # though it succeeds against every real Supabase project, including toc1.
       - name: Rehearse the full migration set on a scratch Postgres
         run: |
           set -euo pipefail
-          docker run -d --name rehearsal -e POSTGRES_PASSWORD=postgres -p 55432:5432 postgres:17
-          for _ in $(seq 1 30); do
+          docker run -d --name rehearsal -e POSTGRES_PASSWORD=postgres -p 55432:5432 supabase/postgres:17.6.1.167
+          # supabase/postgres runs more init-time provisioning than stock
+          # postgres, so give it longer to become ready than the 60s stock
+          # postgres:17 needed.
+          for _ in $(seq 1 60); do
             PGPASSWORD=postgres psql -h localhost -p 55432 -U postgres -c 'select 1' >/dev/null 2>&1 && break
             sleep 2
           done
