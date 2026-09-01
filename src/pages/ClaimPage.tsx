@@ -27,28 +27,41 @@ export default function ClaimPage() {
   const { data: playersData, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['unclaimed-players'],
     queryFn: async () => {
-      const [playersRes, rankingsRes, metricsRes] = await Promise.all([
+      const [playersRes, rankingsRes, metricsRes, claimedRes] = await Promise.all([
         supabase.from('players').select('*').is('profile_id', null).eq('is_active', true).order('full_name'),
         supabase.from('rankings').select('*'),
         supabase.from('player_reference_metrics').select('*'),
+        // Names already spoken for. The list below shows only unclaimed
+        // players, so without this a member whose name somebody else took sees
+        // an empty result and is told to ask an admin to ADD them -- advice
+        // that is wrong, and alarming, at the worst possible moment.
+        supabase.from('players').select('full_name').not('profile_id', 'is', null).eq('is_active', true),
       ]);
       // Distinguish "couldn't load the roster" from "everyone is claimed".
       if (playersRes.error) throw playersRes.error;
       if (rankingsRes.error) throw rankingsRes.error;
       const rankings = (rankingsRes.data ?? []) as Ranking[];
       const metrics  = (metricsRes.data  ?? []) as PlayerMetrics[];
-      return ((playersRes.data ?? []) as Player[]).map((p) => ({
+      const claimedNames = ((claimedRes.data ?? []) as { full_name: string }[]).map((r) => r.full_name);
+      const unclaimed = ((playersRes.data ?? []) as Player[]).map((p) => ({
         player:  p,
         ranking: rankings.find((r) => r.player_id === p.id)!,
         metrics: metrics.find((m) => m.player_id === p.id) ?? null,
       })).filter((p) => p.ranking);
+      return { unclaimed, claimedNames };
     },
   });
 
-  const players = playersData ?? [];
+  const players = playersData?.unclaimed ?? [];
+  const claimedNames = playersData?.claimedNames ?? [];
   const filtered = players.filter((p) =>
     p.player.full_name.toLowerCase().includes(search.toLowerCase())
   );
+  // Only meaningful once something has been typed: with an empty box every
+  // claimed name "matches" and the roster would look closed.
+  const searchMatchesClaimedName =
+    search.trim().length > 0 &&
+    claimedNames.some((n) => n.toLowerCase().includes(search.trim().toLowerCase()));
 
   const handleClaim = async () => {
     if (!selected) return;
@@ -104,6 +117,10 @@ export default function ClaimPage() {
           <p className="text-[#9CA3AF] font-[Barlow] text-sm mt-2">
             Find your name in the league roster and claim your profile.
           </p>
+          <p className="text-[#9CA3AF] font-[Barlow] text-xs mt-2 max-w-xs mx-auto">
+            Names aren&rsquo;t held for anyone &mdash; whoever claims first gets it. If someone
+            takes yours by mistake, a league admin can hand it back.
+          </p>
         </div>
 
         {/* Search */}
@@ -144,7 +161,9 @@ export default function ClaimPage() {
             : filtered.length === 0
             ? (
                 <div className="text-center py-12 text-[#9CA3AF] font-[Barlow]">
-                  {players.length === 0
+                  {searchMatchesClaimedName
+                    ? `“${search.trim()}” has already been claimed. If that is you, ask a league admin — they can release it back to you.`
+                    : players.length === 0
                     ? 'All players have been claimed. Contact the league admin.'
                     : "No players match your search. Don't see your name? Ask a league admin to add you."}
                 </div>
