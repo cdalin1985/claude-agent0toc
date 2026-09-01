@@ -87,6 +87,37 @@ export default function SettingsPage() {
   const { profile, player, setPlayer, reset } = useAuthStore();
   const { soundEnabled, setSoundEnabled } = useUIStore();
   const { supported: pushSupported, subscribed: pushSubscribed, permission: pushPermission, loading: pushLoading, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications();
+  const [testingPush, setTestingPush]     = useState(false);
+  const [pushTestResult, setPushTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  // Reports what actually happened rather than a boolean: not configured, not
+  // subscribed, key-pair mismatch, expired subscription, or delivered. A member
+  // who taps this and reads "your VAPID keys do not match" can hand an admin
+  // something actionable; "it didn't work" cannot be acted on by anyone.
+  const runPushTest = async () => {
+    setTestingPush(true);
+    setPushTestResult(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setPushTestResult({ ok: false, message: 'Your sign-in expired. Sign in again and retry.' });
+        return;
+      }
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-test-push`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      });
+      const body = await res.json().catch(() => ({})) as { ok?: boolean; message?: string; error?: string };
+      setPushTestResult({
+        ok: Boolean(body.ok),
+        message: body.message ?? body.error ?? 'Could not run the test. Try again.',
+      });
+    } catch {
+      setPushTestResult({ ok: false, message: 'Could not reach the league — check your connection and try again.' });
+    } finally {
+      setTestingPush(false);
+    }
+  };
 
   // Whether a match reminder will actually reach this phone.
   //
@@ -696,6 +727,37 @@ export default function SettingsPage() {
               >
                 <div className={`w-5 h-5 rounded-full bg-white absolute top-0.5 transition-transform ${pushSubscribed ? 'translate-x-6' : 'translate-x-0.5'}`} />
               </button>
+            </div>
+          )}
+
+          {/* Whether push actually reaches THIS handset is the one link no
+              server-side check can prove: sendPush looks for a subscription
+              before it ever touches the VAPID keys, so a mismatched key pair
+              stays invisible until a real reminder fails to arrive. One tap
+              settles it, and names the reason when it does not work. */}
+          {pushSupported && pushSubscribed && (
+            <div className="py-3 border-t border-white/5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-[#9CA3AF] text-xs font-[Barlow] max-w-[15rem]">
+                  Not sure it works? Send yourself one now.
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  loading={testingPush}
+                  onClick={runPushTest}
+                >
+                  Send test
+                </Button>
+              </div>
+              {pushTestResult && (
+                <div
+                  role="status"
+                  className={`text-xs font-[Barlow] mt-2 ${pushTestResult.ok ? 'text-[#10B981]' : 'text-[#F59E0B]'}`}
+                >
+                  {pushTestResult.message}
+                </div>
+              )}
             </div>
           )}
         </GlassCard>
