@@ -4,7 +4,7 @@
 
 This repository is the clean local checkout for **TOC.Monster / Top of the Capital**.
 
-- Local checkout: `C:/Users/chase/toc-monster-app`
+- Local checkout: `D:/documents/claude-agent0toc`
 - GitHub repo: `cdalin1985/claude-agent0toc`
 - Vercel team/project: `cdalin-projects/toc-app`
 - Vercel project ID: `prj_cpSNmnjRXFK14Jadp2yU4tEghDFQ`
@@ -32,9 +32,6 @@ Never merge, branch, cherry-pick, or sync code/migrations/PRs between TOC and TO
 
 ## Canonical paths
 
-- TOC.Monster work belongs in `C:/Users/chase/toc-monster-app`.
-- TOF / Top of the Falls work belongs in `C:/Users/chase/tof-app`.
-- `C:/Users/chase/toc-app` should remain absent/unused; the stale old TOF copy was renamed to `C:/Users/chase/toc-app_OLD_TOF_DO_NOT_USE_20260610`.
 - Never put TOF roster files, Carl notes, TOF migrations, or TOF Supabase config in this TOC.Monster checkout.
 
 Never dump random work files into the app repo. Keep scratch files, patch archives, copied prompts, and temporary exports outside the app repo unless they are intentional project documentation under `docs/`.
