@@ -122,6 +122,7 @@ jobs:
           respond-to-challenge:true
           send-match-reminder:true
           send-push:true
+          send-test-push:true
           set-player-active:true
           submit-result:true
           update-match-score:true
@@ -182,7 +183,7 @@ jobs:
 
           for name in add-player claim-player manage-treasury rank1-compliance \
                       resolve-dispute respond-to-challenge send-match-reminder \
-                      send-push set-player-active submit-result update-match-score; do
+                      send-push send-test-push set-player-active submit-result update-match-score; do
             code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
               -X POST "$base/$name" -H 'Content-Type: application/json' -d '{}')"
             case "$code" in
