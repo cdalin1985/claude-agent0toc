@@ -41,7 +41,13 @@ Never dump random work files into the app repo. Keep scratch files, patch archiv
 Chase does not want to babysit multi-step commands.
 Prefer direct tool work.
 When local work is unavoidable, provide one copy/paste command.
-For terminal snippets, always put the correct cd path as the first line.
+Chase's local shell is **PowerShell on Windows**. Write every terminal snippet as
+exact, runnable PowerShell — never cmd syntax (no `cd /d`), never bash syntax, never
+placeholders like `<branch>` or `path/to/x` that Chase has to fill in himself.
+For terminal snippets, always put the correct cd path as the first line:
+`cd D:\documents\claude-agent0toc`.
+Anything that is not literally pasteable (clicking through a UI, an OAuth prompt) goes
+outside the code block, listed as steps — never mixed into the snippet.
 Protect the repo from clutter.
 Use branch/PR workflow.
 Run lint/build before claiming success.
