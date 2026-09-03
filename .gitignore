@@ -10,3 +10,8 @@ dist
 # Local diagnostic logs
 npm-install-log.txt
 npm-build-log.txt
+.env*
+
+# Local CLI state
+.codex/
+supabase/.temp/
