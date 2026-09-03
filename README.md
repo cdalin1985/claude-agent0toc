@@ -21,7 +21,8 @@ comes in. The only clocks in the whole league are the ones on an individual chal
 > [Rules people enforce, not the app](#rules-people-enforce-not-the-app) for the three
 > the app deliberately leaves to admins and players.
 >
-> Last updated **22 August 2026**. Includes the no-show rule added 2 August 2026.
+> Last updated **3 September 2026**. Includes the no-show rule added 2 August 2026, and
+> the single-list and treasury rules written down 3 September 2026.
 > Top of the Capital has the final say on all rules.
 
 ## Getting on the List
@@ -68,6 +69,10 @@ The player being challenged must respond within **48 hours** of the callout.
 
 ## Approved TOC Games
 
+**All three games share one ranked list.** There is no separate 8-Ball, 9-Ball or 10-Ball
+ladder. The challenger picks the game, and the result moves both players on the same
+single list whichever game was played. Stats are kept per discipline; the ranking is not.
+
 ### 8-Ball — BCA Rules
 
 - Magic rack allowed if both players agree.
@@ -102,6 +107,13 @@ The player being challenged must respond within **48 hours** of the callout.
 - Envelopes are available at the Valley Hub and Eagles 4040, and must be dropped in the
   boxes at either venue.
 - **Failure to fill out the envelope properly with the proper money voids the match.**
+
+## Treasury
+
+- **The treasury is visible to every player.** Match fees in, payouts out and the running
+  balance are readable by anyone signed in — none of it is admin-only.
+- **Only a super admin can manage the treasury.** Ordinary admins can read the ledger but
+  cannot add, edit or remove entries.
 
 ## Posting Callouts and Results
 
@@ -191,6 +203,8 @@ These rules are checked server-side, so they hold whether or not you go through 
 | No-show swaps the two players' spots | Yes — applied by an admin |
 | Inactive players reviewed every 30 days | Yes — flagged at 30, 60 and 90 days in Admin |
 | Locking in a challenge after defending | Yes — see below |
+| One ranked list across all three games | Yes — the game played is recorded, the ladder is single |
+| Treasury readable by every player | Yes — writes are restricted to `super_admin` |
 
 ### Locking in, in detail
 
