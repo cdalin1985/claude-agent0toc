@@ -65,6 +65,7 @@ serve(async (req) => {
     const { data: row, error: subErr } = await supabase
       .from('push_subscriptions').select('subscription').eq('player_id', player.id).maybeSingle();
     if (subErr) {
+      console.error(`[test-push] subscription lookup failed for player ${player.id}: ${subErr.message}`);
       return json({ ok: false, reason: 'lookup_failed', message: 'Could not read your notification settings. Try again.' });
     }
     if (!row?.subscription) {
