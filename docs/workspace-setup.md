@@ -54,8 +54,10 @@ the backend target.
 
 Setup branch: `codex/toc-workspace-boundaries`. Existing `CLAUDE.md` edits and
 untracked `.claude/tmp/` content belong to the user and must remain untouched.
-The user authorized a local commit of the reviewed setup changes. Push,
-deployment, migration, and production mutations remain outside this setup.
+The user authorized committing, pushing this setup branch, and opening a draft
+PR. Deployment, migration, merge, and production mutations remain outside this
+setup. `vercel.json` disables automatic deployments only for
+`codex/toc-workspace-boundaries` so publishing the branch does not deploy it.
 
 Local hook installation: `git config --local core.hooksPath .githooks`.
 For another checkout, first verify its remote/status and existing hook settings;
