@@ -11,6 +11,7 @@ dist
 npm-install-log.txt
 npm-build-log.txt
 .env*
+!/.env.example
 
 # Local CLI state
 .codex/
