@@ -2,6 +2,14 @@
 
 ## Workspace policy
 
+For this Windows workspace, the verified checkout is
+`D:/documents/claude-agent0toc`; older machine-specific paths below are not
+instructions to open other directories. Use `docs/workspace-setup.md` for exact
+TOC identifiers and verification status. Run `npm run workspace:check` before
+local work. Preserve local environment files and existing edits. Setup does not
+authorize deployments, migrations, or production writes. Missing TOC resource
+identifiers or access must be requested from the user, never inferred.
+
 This repository is the clean local checkout for **TOC.Monster / Top of the Capital**.
 
 - Local checkout: `C:/Users/chase/toc-monster-app`

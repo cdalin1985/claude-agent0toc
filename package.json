@@ -4,12 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "workspace:check": "node scripts/check-workspace.mjs",
+    "toc:readiness": "node scripts/toc-readiness.mjs",
+    "dev": "node scripts/local-vite.mjs dev",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "test": "node --test test/*.test.mjs",
-    "preview": "vite preview"
+    "preview": "node scripts/local-vite.mjs preview"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
