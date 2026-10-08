@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "workspace:check": "node scripts/check-workspace.mjs",
+    "toc:readiness": "node scripts/toc-readiness.mjs",
     "dev": "node scripts/local-vite.mjs dev",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",

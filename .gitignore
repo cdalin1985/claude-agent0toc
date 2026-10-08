@@ -16,3 +16,19 @@ npm-build-log.txt
 # Local CLI state
 .codex/
 supabase/.temp/
+
+# Repository-authored skills only; keep agent runtime/generated state local.
+/.agents/*
+!/.agents/skills/
+/.agents/skills/*
+!/.agents/skills/toc-bootstrap/
+!/.agents/skills/toc-incident-diagnostics/
+!/.agents/skills/toc-production-qa/
+!/.agents/skills/toc-release/
+!/.agents/skills/toc-rule-change/
+/.agents/skills/*/*
+!/.agents/skills/toc-bootstrap/SKILL.md
+!/.agents/skills/toc-incident-diagnostics/SKILL.md
+!/.agents/skills/toc-production-qa/SKILL.md
+!/.agents/skills/toc-release/SKILL.md
+!/.agents/skills/toc-rule-change/SKILL.md
