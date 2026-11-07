@@ -1,0 +1,61 @@
+name: Stack guard
+
+# TOC is a React/Vite web app. Agents working from the wrong stack have
+# previously merged React Native / Expo code into this repo, and nothing
+# caught it until much later. This check fails the PR at the earliest point
+# instead of letting the drift land silently.
+#
+# Deliberately NOT path-filtered. Drift can land anywhere -- package.json,
+# config files, src/ -- and a path filter is how a green tick ends up meaning
+# "the check was skipped".
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  no-react-native:
+    name: No React Native / Expo
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fail on React Native or Expo artifacts
+        run: |
+          fail=0
+          hit() {
+            echo "::error::STACK GUARD: $1"
+            fail=1
+          }
+
+          # 1. Dependencies declared in package.json
+          grep -q '"react-native"' package.json && hit '"react-native" in package.json dependencies'
+          grep -q '"expo"' package.json && hit '"expo" in package.json dependencies'
+
+          # 2. Imports of react-native in source files
+          if grep -rEn "['\"]react-native['\"]" \
+            --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' \
+            --exclude-dir=node_modules .; then
+            hit 'references to "react-native" found in source (matches above)'
+          fi
+
+          # 3. Expo / React Native config markers
+          for f in app.json app.config.js app.config.ts metro.config.js; do
+            [ -e "$f" ] && hit "config file present: $f"
+          done
+          grep -q 'babel-preset-expo' babel.config.js 2>/dev/null && \
+            hit 'babel-preset-expo referenced in babel.config.js'
+
+          # 4. Native project shells at repo root
+          for d in android ios; do
+            [ -d "$d" ] && hit "native project directory present: $d/"
+          done
+
+          if [ "$fail" -ne 0 ]; then
+            echo 'TOC is a React/Vite web app. React Native and Expo do not belong in this repo.'
+            exit 1
+          fi
+          echo 'Stack guard passed: no React Native or Expo artifacts found.'
