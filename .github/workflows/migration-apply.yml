@@ -37,7 +37,7 @@ jobs:
   apply:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Prove the set is sound against a throwaway database before touching the
       # live one. A migration that fails here must never reach production.
