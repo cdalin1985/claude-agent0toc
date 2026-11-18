@@ -80,6 +80,47 @@ export const Layout: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [retrying, setRetrying] = useState(false);
 
+  // This read decides who the app thinks you are, so it has to distinguish
+  // "you have no player row" from "we could not find out".
+  //
+  // It previously used .single() and threw both answers away:
+  //
+  //   if (playerRes.data) setPlayer(playerRes.data as any);
+  //
+  // so one dropped request left `player` null, and the guard below read that as
+  // "unclaimed" and redirected a member who had claimed their profile weeks ago
+  // to the Claim screen. Their name is not on that list — they already took it —
+  // so there was nothing to tap. The app had simply forgotten them, and the only
+  // way out was a reload that happened to succeed.
+  //
+  // .maybeSingle() is what makes the distinction possible: it returns
+  // { data: null, error: null } for no rows, and reserves `error` for actual
+  // failures. players.profile_id is UNIQUE (20260321032528_toc_schema.sql:20),
+  // so the multiple-rows case maybeSingle() errors on cannot arise here.
+  const fetchProfileAndPlayer = async (userId: string) => {
+    const [profileRes, playerRes] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
+      supabase.from('players').select('*').eq('profile_id', userId).maybeSingle(),
+    ]);
+
+    // Either failing means we do not know who this is. Both reads go to the same
+    // database over the same connection, so in practice they fail together; and
+    // continuing without `profile` would silently drop an admin's role and show
+    // them a member's app, which is its own quiet lie.
+    const failure = playerRes.error ?? profileRes.error;
+    if (failure) {
+      console.error(`[auth] identity read failed for ${userId}: ${failure.message}`);
+      setIdentityStatus('failed');
+      return;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setProfile((profileRes.data ?? null) as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setPlayer((playerRes.data ?? null) as any);
+    setIdentityStatus('resolved');
+  };
+
   // Bootstrap auth state
   useEffect(() => {
     let cancelled = false;
@@ -124,47 +165,6 @@ export const Layout: React.FC = () => {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // This read decides who the app thinks you are, so it has to distinguish
-  // "you have no player row" from "we could not find out".
-  //
-  // It previously used .single() and threw both answers away:
-  //
-  //   if (playerRes.data) setPlayer(playerRes.data as any);
-  //
-  // so one dropped request left `player` null, and the guard below read that as
-  // "unclaimed" and redirected a member who had claimed their profile weeks ago
-  // to the Claim screen. Their name is not on that list — they already took it —
-  // so there was nothing to tap. The app had simply forgotten them, and the only
-  // way out was a reload that happened to succeed.
-  //
-  // .maybeSingle() is what makes the distinction possible: it returns
-  // { data: null, error: null } for no rows, and reserves `error` for actual
-  // failures. players.profile_id is UNIQUE (20260321032528_toc_schema.sql:20),
-  // so the multiple-rows case maybeSingle() errors on cannot arise here.
-  const fetchProfileAndPlayer = async (userId: string) => {
-    const [profileRes, playerRes] = await Promise.all([
-      supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
-      supabase.from('players').select('*').eq('profile_id', userId).maybeSingle(),
-    ]);
-
-    // Either failing means we do not know who this is. Both reads go to the same
-    // database over the same connection, so in practice they fail together; and
-    // continuing without `profile` would silently drop an admin's role and show
-    // them a member's app, which is its own quiet lie.
-    const failure = playerRes.error ?? profileRes.error;
-    if (failure) {
-      console.error(`[auth] identity read failed for ${userId}: ${failure.message}`);
-      setIdentityStatus('failed');
-      return;
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    setProfile((profileRes.data ?? null) as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    setPlayer((playerRes.data ?? null) as any);
-    setIdentityStatus('resolved');
-  };
 
   const retryIdentity = async () => {
     if (!session || retrying) return;
