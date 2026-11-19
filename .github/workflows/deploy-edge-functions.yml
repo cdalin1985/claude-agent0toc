@@ -162,11 +162,13 @@ jobs:
               echo "==> $name (no JWT gate — authenticates internally)"
               supabase functions deploy "$name" \
                 --project-ref "$PROJECT_REF" \
-                --no-verify-jwt
+                --no-verify-jwt \
+                --yes
             else
               echo "==> $name"
               supabase functions deploy "$name" \
-                --project-ref "$PROJECT_REF"
+                --project-ref "$PROJECT_REF" \
+                --yes
             fi
           done
 
