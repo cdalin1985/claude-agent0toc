@@ -37,7 +37,7 @@ jobs:
       PGPASSWORD: postgres
       PGDATABASE: postgres
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build the Supabase shim
         run: psql -v ON_ERROR_STOP=1 -q -f supabase/tests/migrations/00_supabase_shim.sql

@@ -1,4 +1,4 @@
-import webpush from 'npm:web-push';
+import webpush from 'npm:web-push@3.6.7';
 
 type PushRow = { subscription?: webpush.PushSubscription } | null;
 type QueryError = { message: string } | null;
