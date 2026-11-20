@@ -913,8 +913,10 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   // it depended on an admin remembering. Two inactive members is easy to hold in
   // your head; it is the rule most likely to quietly stop happening as the list
   // grows, which is exactly when it starts to matter.
+  // Taken once when the page opens, so the day counts stay stable across
+  // re-renders; reopening the page refreshes them.
+  const [now] = useState(() => Date.now());
   const inactiveReview = useMemo(() => {
-    const now = Date.now();
     return players
       .filter((p) => !p.is_active)
       .map((p) => {
@@ -924,7 +926,7 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
       })
       // Longest-inactive first: the ones nearest removal are the ones to look at.
       .sort((a, b) => (b.days ?? -1) - (a.days ?? -1));
-  }, [players]);
+  }, [players, now]);
 
   const [emailEditingId, setEmailEditingId] = useState<string | null>(null);
   const [emailDraft, setEmailDraft]         = useState('');

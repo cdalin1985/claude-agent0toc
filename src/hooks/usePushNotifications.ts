@@ -13,15 +13,16 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
 
 export function usePushNotifications() {
   const { player } = useAuthStore();
-  const [supported, setSupported] = useState(false);
+  // Read once on first render: these browser capabilities do not change while
+  // the page is open, so there is no reason to set them from an effect.
+  const [supported] = useState(
+    () => 'serviceWorker' in navigator && 'PushManager' in window && !!VAPID_PUBLIC_KEY,
+  );
   const [subscribed, setSubscribed] = useState(false);
-  const [permission, setPermission] = useState<NotificationPermission>('default');
+  const [permission, setPermission] = useState<NotificationPermission>(
+    () => ('Notification' in window ? Notification.permission : 'default'),
+  );
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    setSupported('serviceWorker' in navigator && 'PushManager' in window && !!VAPID_PUBLIC_KEY);
-    if ('Notification' in window) setPermission(Notification.permission);
-  }, []);
 
   useEffect(() => {
     if (!supported || !player) return;
